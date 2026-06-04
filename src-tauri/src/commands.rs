@@ -154,11 +154,7 @@ pub fn list_bookmarks(state: State<AppState>) -> Result<Value, String> {
         let mut obj = row.map_err(|e| e.to_string())?;
         let id = obj["id"].as_str().unwrap_or_default().to_string();
         let tags = tag_map.remove(&id).unwrap_or_default();
-        obj["bookmarks_tags"] = Value::Array(
-            tags.into_iter()
-                .map(|n| json!({ "tags": { "name": n } }))
-                .collect(),
-        );
+        obj["tags"] = Value::Array(tags.into_iter().map(Value::String).collect());
         out.push(obj);
     }
     Ok(Value::Array(out))

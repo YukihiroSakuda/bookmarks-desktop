@@ -34,31 +34,12 @@ export interface BookmarkUI {
 export type SortOption = 'accessCount' | 'title' | 'createdAt' | 'custom';
 export type SortOrder = 'asc' | 'desc';
 
-export interface BookmarkWithTags {
-  id: string;
-  kind: BookmarkKind;
-  title: string;
-  url: string;
-  is_pinned: boolean;
-  created_at: string;
-  updated_at: string;
-  access_count: number;
-  last_accessed_at: string | null;
-  custom_order?: number;
-  memo?: string;
-  bookmarks_tags: Array<{
-    tags: {
-      name: string;
-    };
-  }>;
-}
-
-export const convertToUI = (bookmark: BookmarkWithTags): BookmarkUI => ({
+export const convertToUI = (bookmark: Bookmark & { tags: string[] }): BookmarkUI => ({
   id: bookmark.id,
   kind: bookmark.kind ?? 'url',
   title: bookmark.title,
   url: bookmark.url,
-  tags: bookmark.bookmarks_tags?.map(bt => bt.tags.name) || [],
+  tags: bookmark.tags || [],
   isPinned: bookmark.is_pinned,
   createdAt: bookmark.created_at,
   updatedAt: bookmark.updated_at,

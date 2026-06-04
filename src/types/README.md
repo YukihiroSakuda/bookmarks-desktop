@@ -41,7 +41,7 @@ interface BookmarkUI {
 ```
 
 ### 変換関数
-- `convertToUI(BookmarkWithTags)` → `BookmarkUI` — API レスポンスを UI 型に変換
+- `convertToUI(Bookmark & { tags: string[] })` → `BookmarkUI` — API レスポンスを UI 型に変換
 
 ## userSettings.ts
 

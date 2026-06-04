@@ -140,7 +140,7 @@ export function useTagManagement() {
     for (const bm of bookmarks) {
       const target = (data.targetField === "title" ? bm.title : bm.url).toLowerCase();
       if (matchFn(target)) {
-        const currentTags = bm.bookmarks_tags.map((bt: { tags: { name: string } }) => bt.tags.name);
+        const currentTags = bm.tags as string[];
         if (!currentTags.includes(tagObj.name)) {
           await fetch(`/api/bookmarks/${bm.id}`, {
             method: "PUT",
@@ -182,9 +182,7 @@ export function useTagManagement() {
           for (const bm of bookmarks) {
             const target = (rule.targetField === "title" ? bm.title : bm.url).toLowerCase();
             if (matchFn(target)) {
-              const currentTags = bm.bookmarks_tags
-                .map((bt: { tags: { name: string } }) => bt.tags.name)
-                .filter((n: string) => n !== tagObj.name);
+              const currentTags = (bm.tags as string[]).filter((n: string) => n !== tagObj.name);
               await fetch(`/api/bookmarks/${bm.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
