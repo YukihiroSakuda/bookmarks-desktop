@@ -3,37 +3,20 @@ import {
   Search,
   Tag,
   X,
-  Upload,
-  Download,
-  MoreVertical,
-  Trash2,
   BookOpenCheck,
-  Columns4,
-  Check,
   History,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, RefObject } from "react";
-import { toast } from "sonner";
-import ThemeSwitcher from "./ThemeSwitcher";
 import { TagManager } from "./TagManager";
 import { Tag as TagComponent } from "./Tag";
 import { Button } from "./Button";
-import { useImportBookmarks } from "./ImportBookmarks";
 import { BookmarkUI, SortOption, SortOrder } from "@/types/bookmark";
-import { exportBookmarksToHtml, downloadHtml } from "@/utils/export";
 import { TagRule as TagRuleType, TagRuleFormData } from "../types/tagRule";
 import { Tag as TagType } from "@/types/tag";
 import { TagRule as TagRuleComponent } from "./TagRule";
-import { HelpDialog } from "./HelpDialog";
 import { SortControls } from "./SortControls";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { SettingsDialog } from "./SettingsDialog";
+import { HelpDialog } from "./HelpDialog";
 
 interface BookmarkHeaderProps {
   listColumns: 1 | 2 | 3 | 4;
@@ -101,7 +84,6 @@ export function BookmarkHeader({
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [isTagRuleOpen, setIsTagRuleOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isDeletingAll, setIsDeletingAll] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const filteredHistory = useMemo(() => {
@@ -126,46 +108,6 @@ export function BookmarkHeader({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const { isImporting, handleFileUpload } = useImportBookmarks({
-    onImportComplete: (count) => {
-      toast.success(`${count} bookmarks imported successfully!`);
-    },
-    onBookmarksUpdate,
-  });
-
-  const handleImportClick = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".html";
-    input.onchange = (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      if (target.files) {
-        handleFileUpload({
-          target: {
-            files: target.files,
-          },
-        } as React.ChangeEvent<HTMLInputElement>);
-      }
-    };
-    input.click();
-  };
-
-  const handleExportClick = () => {
-    const html = exportBookmarksToHtml(bookmarks);
-    downloadHtml(html);
-  };
-
-  const handleDeleteAll = async () => {
-    setIsDeletingAll(true);
-    try {
-      await onDeleteAll();
-    } catch (error) {
-      console.error("Error deleting all bookmarks and tags:", error);
-    } finally {
-      setIsDeletingAll(false);
-    }
-  };
 
   return (
     <>
@@ -255,69 +197,14 @@ export function BookmarkHeader({
           </div>
           <div className="flex items-center gap-2">
             <HelpDialog />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={Columns4}
-                    disabled={isOrderingMode}
-                  />
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel>List Columns</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {[1, 2, 3, 4].map((columns) => (
-                  <DropdownMenuItem
-                    key={columns}
-                    onClick={() => onListColumnsChange(columns as 1 | 2 | 3 | 4)}
-                    className={listColumns === columns ? "text-blue-500" : ""}
-                  >
-                    {columns} Column{columns > 1 ? "s" : ""}
-                    {listColumns === columns && (
-                      <Check className="ml-auto h-4 w-4" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <span>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    icon={MoreVertical}
-                    disabled={isOrderingMode}
-                  />
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={handleImportClick}
-                  disabled={isImporting}
-                >
-                  <Upload />
-                  {isImporting ? "Importing..." : "Import from HTML"}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleExportClick}>
-                  <Download />
-                  Export to HTML
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleDeleteAll}
-                  className="text-destructive focus:text-destructive"
-                  disabled={isDeletingAll}
-                >
-                  <Trash2 />
-                  {isDeletingAll ? "Deleting..." : "Delete All Bookmarks"}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <ThemeSwitcher />
+            <SettingsDialog
+              listColumns={listColumns}
+              onListColumnsChange={onListColumnsChange}
+              bookmarks={bookmarks}
+              onBookmarksUpdate={onBookmarksUpdate}
+              onDeleteAll={onDeleteAll}
+              isOrderingMode={isOrderingMode}
+            />
             <Button
               onClick={onAddBookmark}
               variant="primary"

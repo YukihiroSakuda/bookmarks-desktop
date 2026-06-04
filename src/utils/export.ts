@@ -1,5 +1,13 @@
 import { BookmarkUI } from '@/types/bookmark';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 export function exportBookmarksToHtml(bookmarks: BookmarkUI[]): string {
   const html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <!-- This is an automatically generated file.
@@ -9,14 +17,32 @@ export function exportBookmarksToHtml(bookmarks: BookmarkUI[]): string {
 <TITLE>Bookmarks</TITLE>
 <H1>Bookmarks</H1>
 <DL><p>
-${bookmarks.map(bookmark => `    <DT><A HREF="${bookmark.url}" ADD_DATE="${Math.floor(new Date(bookmark.createdAt).getTime() / 1000)}">${bookmark.title}</A>`).join('\n')}
+${bookmarks.map(bookmark => {
+  const addDate = Math.floor(new Date(bookmark.createdAt).getTime() / 1000);
+  const safeDateAttr = isNaN(addDate) ? '' : ` ADD_DATE="${addDate}"`;
+  return `    <DT><A HREF="${escapeHtml(bookmark.url)}"${safeDateAttr}>${escapeHtml(bookmark.title)}</A>`;
+}).join('\n')}
 </DL><p>`;
 
   return html;
 }
 
-export function downloadHtml(html: string, filename: string = 'bookmarks.html'): void {
+export async function downloadHtml(html: string, filename: string = 'bookmarks.html'): Promise<void> {
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+
+  if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+    const handle = await (window as Window & typeof globalThis & {
+      showSaveFilePicker: (opts: object) => Promise<FileSystemFileHandle>;
+    }).showSaveFilePicker({
+      suggestedName: filename,
+      types: [{ description: 'HTML file', accept: { 'text/html': ['.html'] } }],
+    });
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return;
+  }
+
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -24,5 +50,5 @@ export function downloadHtml(html: string, filename: string = 'bookmarks.html'):
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 } 
