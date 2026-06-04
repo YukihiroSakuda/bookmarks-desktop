@@ -1,8 +1,9 @@
 mod commands;
 mod db;
+mod server;
 
 use db::AppState;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -19,12 +20,13 @@ pub fn run() {
                 )?;
             }
 
-            let conn = db::init_db(&app.handle()).map_err(|e| {
+            let raw_conn = db::init_db(&app.handle()).map_err(|e| {
                 Box::<dyn std::error::Error>::from(format!("database init failed: {e}"))
             })?;
-            app.manage(AppState {
-                conn: Mutex::new(conn),
-            });
+            let conn = Arc::new(Mutex::new(raw_conn));
+            app.manage(AppState { conn: conn.clone() });
+
+            tauri::async_runtime::spawn(server::start(conn));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

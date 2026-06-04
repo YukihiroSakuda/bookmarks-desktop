@@ -18,5 +18,5 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["chrome"]
   },
-  "include": ["popup", "background", "content", "lib", "../src/shared/**/*.ts"]
+  "include": ["popup", "background", "lib", "../src/shared/bookmarks/form.ts"]
 }

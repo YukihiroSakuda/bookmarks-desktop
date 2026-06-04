@@ -1,11 +1,9 @@
 use rusqlite::Connection;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
-/// Application state shared across Tauri commands. Holds the single SQLite
-/// connection behind a Mutex (single-user desktop app: contention is trivial).
 pub struct AppState {
-    pub conn: Mutex<Connection>,
+    pub conn: Arc<Mutex<Connection>>,
 }
 
 const SCHEMA: &str = r#"

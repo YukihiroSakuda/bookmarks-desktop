@@ -8,27 +8,121 @@ import {
   X,
 } from "lucide-react";
 import {
-  createBookmark,
-  fetchBookmarkPageTitle,
-  fetchBookmarks,
-  fetchTagRules,
-  fetchTags,
-  type BookmarkListItem,
-  type TagApiItem,
-  type TagRuleApiItem,
-} from "../../src/shared/bookmarks/api";
-import { findDuplicateBookmark, isHttpUrl } from "../../src/shared/bookmarks/form";
+  findDuplicateBookmark,
+  getAutoTagNames,
+  isHttpUrl,
+  mergeBookmarkTags,
+} from "../../src/shared/bookmarks/form";
 
-const DEFAULT_APP_URL = import.meta.env.VITE_APP_URL || "https://bookmarks-local-kltd-20260527.azurewebsites.net";
+const DEFAULT_APP_URL =
+  import.meta.env.VITE_APP_URL || "http://localhost:37373";
 
+// ---------- Types ----------
+
+type TagApiItem = { id: string; name: string };
+type TagRuleRaw = {
+  id: string;
+  match_type: "starts_with" | "contains" | "ends_with";
+  pattern: string;
+  tag_id: string;
+  target_field: "title" | "url";
+};
+type TagRuleItem = {
+  id: string;
+  matchType: "starts_with" | "contains" | "ends_with";
+  pattern: string;
+  tagId: string;
+  targetField: "title" | "url";
+};
+type BookmarkItem = { id: string; title: string; url: string };
 type Status = "loading" | "idle" | "saving" | "error";
+
+// ---------- API helpers ----------
+
+async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) {
+    let msg = `HTTP ${res.status}`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) msg = body.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg);
+  }
+  return res.json() as Promise<T>;
+}
+
+async function fetchTags(baseUrl: string): Promise<TagApiItem[]> {
+  return apiFetch<TagApiItem[]>(`${baseUrl}/api/tags`);
+}
+
+async function fetchTagRules(baseUrl: string): Promise<TagRuleItem[]> {
+  const raw = await apiFetch<TagRuleRaw[]>(`${baseUrl}/api/tag-rules`);
+  return raw.map((r) => ({
+    id: r.id,
+    matchType: r.match_type,
+    pattern: r.pattern,
+    tagId: r.tag_id,
+    targetField: r.target_field,
+  }));
+}
+
+async function fetchBookmarks(baseUrl: string): Promise<BookmarkItem[]> {
+  const data = await apiFetch<{ id: string; title: string; url: string }[]>(
+    `${baseUrl}/api/bookmarks`
+  );
+  return data.map((b) => ({ id: b.id, title: b.title, url: b.url }));
+}
+
+async function fetchPageTitle(url: string, baseUrl: string): Promise<string> {
+  const data = await apiFetch<{ title?: string }>(
+    `${baseUrl}/api/bookmarks/title?url=${encodeURIComponent(url)}`
+  );
+  return data.title ?? "";
+}
+
+async function saveBookmark(
+  baseUrl: string,
+  payload: {
+    title: string;
+    url: string;
+    tags: string[];
+    memo: string;
+    availableTags: TagApiItem[];
+    tagRules: TagRuleItem[];
+  }
+): Promise<void> {
+  const autoTagNames = getAutoTagNames(
+    payload.tagRules,
+    payload.availableTags,
+    { title: payload.title, url: payload.url }
+  );
+  const finalTags = mergeBookmarkTags(payload.tags, autoTagNames);
+
+  await apiFetch(`${baseUrl}/api/bookmarks`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: payload.title,
+      url: payload.url,
+      kind: "url",
+      is_pinned: false,
+      tags: finalTags,
+      memo: payload.memo.trim() || null,
+    }),
+  });
+}
+
+// ---------- useAppUrl hook ----------
 
 function useAppUrl() {
   const [appUrl, setAppUrl] = useState<string | null>(null);
 
   useEffect(() => {
     chrome.storage.local.get("appUrl", (result) => {
-      setAppUrl(result.appUrl || DEFAULT_APP_URL);
+      setAppUrl((result.appUrl as string | undefined) || DEFAULT_APP_URL);
     });
   }, []);
 
@@ -41,6 +135,8 @@ function useAppUrl() {
 
   return { appUrl, saveAppUrl };
 }
+
+// ---------- SettingsView ----------
 
 function SettingsView({
   appUrl,
@@ -62,7 +158,10 @@ function SettingsView({
   return (
     <div className="bg-popover p-6">
       <div className="flex items-center gap-2 mb-6">
-        <button onClick={onBack} className="p-1 rounded hover:bg-accent transition-colors">
+        <button
+          onClick={onBack}
+          className="p-1 rounded hover:bg-accent transition-colors"
+        >
           <ArrowLeft className="size-4" />
         </button>
         <h2 className="text-base font-semibold">設定</h2>
@@ -82,7 +181,9 @@ function SettingsView({
             autoFocus
             className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground"
           />
-          <p className="text-xs text-muted-foreground mt-1">末尾のスラッシュは不要です。</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Tauriアプリ起動中は localhost:37373 で接続できます。
+          </p>
         </div>
 
         <div className="flex justify-end gap-2">
@@ -106,6 +207,8 @@ function SettingsView({
   );
 }
 
+// ---------- Popup ----------
+
 export function Popup() {
   const { appUrl, saveAppUrl } = useAppUrl();
   const [showSettings, setShowSettings] = useState(false);
@@ -115,44 +218,46 @@ export function Popup() {
   const [newTag, setNewTag] = useState("");
   const [memo, setMemo] = useState("");
   const [availableTags, setAvailableTags] = useState<TagApiItem[]>([]);
-  const [tagRules, setTagRules] = useState<TagRuleApiItem[]>([]);
-  const [existingBookmarks, setExistingBookmarks] = useState<BookmarkListItem[]>([]);
-  const [duplicateBookmark, setDuplicateBookmark] = useState<BookmarkListItem | undefined>(undefined);
+  const [tagRules, setTagRules] = useState<TagRuleItem[]>([]);
+  const [existingBookmarks, setExistingBookmarks] = useState<BookmarkItem[]>([]);
+  const [duplicateBookmark, setDuplicateBookmark] = useState<
+    BookmarkItem | undefined
+  >(undefined);
   const [isFetchingTitle, setIsFetchingTitle] = useState(false);
   const [titleEdited, setTitleEdited] = useState(false);
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [isInvalidPage, setIsInvalidPage] = useState(false);
 
+  // Get current tab URL/title from service worker
   useEffect(() => {
     chrome.runtime.sendMessage(
       { type: "GET_CURRENT_TAB" },
       (response: { url: string; title: string }) => {
-        if (response) {
-          const tabUrl = response.url;
-          if (
-            tabUrl.startsWith("chrome://") ||
-            tabUrl.startsWith("chrome-extension://") ||
-            tabUrl.startsWith("edge://") ||
-            tabUrl.startsWith("about:") ||
-            tabUrl.startsWith("file://")
-          ) {
-            setIsInvalidPage(true);
-            return;
-          }
-          setUrl(tabUrl);
-          setTitle(response.title);
-          setTitleEdited(false);
-          setStatus("idle");
+        if (!response) return;
+        const tabUrl = response.url;
+        if (
+          tabUrl.startsWith("chrome://") ||
+          tabUrl.startsWith("chrome-extension://") ||
+          tabUrl.startsWith("edge://") ||
+          tabUrl.startsWith("about:") ||
+          tabUrl.startsWith("file://")
+        ) {
+          setIsInvalidPage(true);
+          return;
         }
+        setUrl(tabUrl);
+        setTitle(response.title);
+        setTitleEdited(false);
+        setStatus("idle");
       }
     );
   }, []);
 
+  // Load tags, tag rules, existing bookmarks from local API
   useEffect(() => {
     if (!appUrl) return;
-
-    const loadData = async () => {
+    const load = async () => {
       try {
         const [nextTags, nextTagRules, nextBookmarks] = await Promise.all([
           fetchTags(appUrl),
@@ -163,42 +268,40 @@ export function Popup() {
         setTagRules(nextTagRules);
         setExistingBookmarks(nextBookmarks);
       } catch (error) {
-        console.error("Error loading popup data:", error);
-        setErrorMessage(error instanceof Error ? error.message : "Failed to load data");
+        setErrorMessage(
+          error instanceof Error ? error.message : "Failed to load data"
+        );
       }
     };
-
-    loadData();
+    load();
   }, [appUrl]);
 
+  // Duplicate detection
   useEffect(() => {
     setDuplicateBookmark(findDuplicateBookmark(existingBookmarks, url));
   }, [existingBookmarks, url]);
 
+  // Auto-fetch page title (debounced)
   useEffect(() => {
     if (!appUrl || !isHttpUrl(url) || titleEdited) return;
-
     const timer = setTimeout(async () => {
       setIsFetchingTitle(true);
       try {
-        const nextTitle = await fetchBookmarkPageTitle(url, appUrl);
-        if (nextTitle && !titleEdited) {
-          setTitle(nextTitle);
-        }
+        const nextTitle = await fetchPageTitle(url, appUrl);
+        if (nextTitle && !titleEdited) setTitle(nextTitle);
       } catch {
-        // ignore title fetch failures in popup
+        // ignore title fetch failures
       } finally {
         setIsFetchingTitle(false);
       }
     }, 500);
-
     return () => clearTimeout(timer);
   }, [appUrl, titleEdited, url]);
 
   const handleTagToggle = useCallback((tagName: string) => {
     setTags((prev) =>
       prev.includes(tagName)
-        ? prev.filter((tag) => tag !== tagName)
+        ? prev.filter((t) => t !== tagName)
         : [...prev, tagName]
     );
   }, []);
@@ -212,39 +315,20 @@ export function Popup() {
 
   const handleSave = useCallback(async () => {
     if (!url || !title || !appUrl) return;
-
     setStatus("saving");
     setErrorMessage("");
-
     try {
-      await createBookmark(
-        {
-          title,
-          url,
-          tags,
-          isPinned: false,
-          memo: memo.trim() || undefined,
-        },
-        {
-          baseUrl: appUrl,
-          availableTags,
-          tagRules,
-        }
-      );
-
+      await saveBookmark(appUrl, { title, url, tags, memo, availableTags, tagRules });
       setExistingBookmarks((prev) => [
         ...prev,
-        {
-          id: crypto.randomUUID(),
-          title,
-          url,
-        },
+        { id: crypto.randomUUID(), title, url },
       ]);
       window.close();
     } catch (error) {
-      console.error("Error saving bookmark:", error);
       setStatus("error");
-      setErrorMessage(error instanceof Error ? error.message : "Failed to save bookmark");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Failed to save bookmark"
+      );
     }
   }, [appUrl, availableTags, memo, tagRules, tags, title, url]);
 
@@ -296,12 +380,13 @@ export function Popup() {
 
       {status === "error" && (
         <div className="mb-4 p-2 bg-muted border border-border rounded-lg flex items-start gap-2">
-          <AlertCircle className="size-4 text-blue-500 mt-0.5 flex-shrink-0" />
+          <AlertCircle className="size-4 text-blue-500 mt-0.5 shrink-0" />
           <p className="text-xs text-muted-foreground">{errorMessage}</p>
         </div>
       )}
 
       <div className="space-y-4">
+        {/* URL */}
         <div>
           <label className="block text-sm font-medium mb-1">URL</label>
           <input
@@ -314,12 +399,14 @@ export function Popup() {
             <div className="flex items-center gap-1.5 mt-1 text-sm text-amber-500">
               <TriangleAlert className="size-4 shrink-0" />
               <span>
-                Already saved as &ldquo;<strong>{duplicateBookmark.title}</strong>&rdquo;
+                Already saved as &ldquo;
+                <strong>{duplicateBookmark.title}</strong>&rdquo;
               </span>
             </div>
           )}
         </div>
 
+        {/* Title */}
         <div className="relative">
           <label className="block text-sm font-medium mb-1">Title</label>
           <input
@@ -336,6 +423,7 @@ export function Popup() {
           )}
         </div>
 
+        {/* Tags */}
         <div>
           <label className="block text-sm font-medium mb-1">Tags</label>
           <div className="flex gap-2">
@@ -376,7 +464,7 @@ export function Popup() {
               </button>
             ))}
             {tags
-              .filter((tag) => !availableTags.some((item) => item.name === tag))
+              .filter((t) => !availableTags.some((a) => a.name === t))
               .map((tag) => (
                 <span
                   key={tag}
@@ -391,8 +479,9 @@ export function Popup() {
           </div>
         </div>
 
+        {/* Memo */}
         <div>
-          <label className="flex items-center gap-1.5 text-sm font-medium mb-1">Memo</label>
+          <label className="block text-sm font-medium mb-1">Memo</label>
           <textarea
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
@@ -400,9 +489,12 @@ export function Popup() {
             rows={3}
             className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y placeholder:text-muted-foreground"
           />
-          <p className="text-xs text-muted-foreground mt-1">{memo.length}/10,000</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {memo.length}/10,000
+          </p>
         </div>
 
+        {/* Actions */}
         <div className="flex justify-end gap-2 mt-6">
           <button
             type="button"
