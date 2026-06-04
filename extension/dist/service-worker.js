@@ -1,0 +1,1 @@
+chrome.runtime.onInstalled.addListener(()=>{console.log("Bookmarks extension installed")});chrome.runtime.onMessage.addListener((r,o,t)=>{if(r.type==="GET_CURRENT_TAB")return chrome.tabs.query({active:!0,currentWindow:!0},n=>{const e=n[0];t({url:(e==null?void 0:e.url)||"",title:(e==null?void 0:e.title)||""})}),!0});
