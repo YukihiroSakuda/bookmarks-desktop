@@ -117,6 +117,7 @@ export function TagManager({
                 value={newTag}
                 onChange={(e) => setNewTag(e.target.value)}
                 placeholder="Add new tag"
+                className="flex-1"
               />
               <Button
                 type="button"

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { BookmarkUI, convertToUI } from '@/types/bookmark';
+import { tauriFetch as fetch } from '@/lib/tauriFetch';
 
 interface UseImportBookmarksProps {
   onImportComplete?: (importedCount: number) => void;
