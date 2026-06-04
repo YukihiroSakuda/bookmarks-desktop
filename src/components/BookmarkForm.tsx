@@ -162,7 +162,8 @@ export function BookmarkForm({
                   type="text"
                   value={url}
                   onChange={(e) => {
-                    const next = e.target.value;
+                    // Strip surrounding quotes added by "Copy as path" in Explorer
+                    const next = e.target.value.replace(/^"(.*)"$/, "$1");
                     setUrl(next);
                     setKind(detectKind(next));
                   }}

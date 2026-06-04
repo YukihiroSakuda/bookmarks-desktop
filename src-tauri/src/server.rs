@@ -10,10 +10,17 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tauri::Emitter;
 use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
 pub type SharedDb = Arc<Mutex<Connection>>;
+
+#[derive(Clone)]
+struct ServerState {
+    db: SharedDb,
+    app: tauri::AppHandle,
+}
 
 type ApiResult = Result<Json<Value>, (StatusCode, Json<Value>)>;
 
@@ -87,7 +94,8 @@ struct TitleQuery {
 
 // ---------- Handlers ----------
 
-async fn get_bookmarks(State(db): State<SharedDb>) -> ApiResult {
+async fn get_bookmarks(State(state): State<ServerState>) -> ApiResult {
+    let db = state.db;
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let conn = db.lock().map_err(|e| e.to_string())?;
 
@@ -156,9 +164,11 @@ async fn get_bookmarks(State(db): State<SharedDb>) -> ApiResult {
 }
 
 async fn post_bookmark(
-    State(db): State<SharedDb>,
+    State(state): State<ServerState>,
     Json(body): Json<CreateBookmarkBody>,
 ) -> ApiResult {
+    let db = state.db;
+    let app = state.app.clone();
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let mut conn = db.lock().map_err(|e| e.to_string())?;
         let ts = now();
@@ -201,9 +211,11 @@ async fn post_bookmark(
     .map_err(|e| internal_err(e.to_string()))
     .and_then(|r| r.map_err(internal_err))
     .map(Json)
+    .inspect(|_| { let _ = app.emit("bookmark-added", ()); })
 }
 
-async fn get_tags(State(db): State<SharedDb>) -> ApiResult {
+async fn get_tags(State(state): State<ServerState>) -> ApiResult {
+    let db = state.db;
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let conn = db.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
@@ -231,7 +243,8 @@ async fn get_tags(State(db): State<SharedDb>) -> ApiResult {
     .map(Json)
 }
 
-async fn post_tag(State(db): State<SharedDb>, Json(body): Json<CreateTagBody>) -> ApiResult {
+async fn post_tag(State(state): State<ServerState>, Json(body): Json<CreateTagBody>) -> ApiResult {
+    let db = state.db;
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let conn = db.lock().map_err(|e| e.to_string())?;
         let ts = now();
@@ -262,7 +275,8 @@ async fn post_tag(State(db): State<SharedDb>, Json(body): Json<CreateTagBody>) -
     .map(Json)
 }
 
-async fn get_tag_rules(State(db): State<SharedDb>) -> ApiResult {
+async fn get_tag_rules(State(state): State<ServerState>) -> ApiResult {
+    let db = state.db;
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let conn = db.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
@@ -365,8 +379,9 @@ async fn get_title(Query(q): Query<TitleQuery>) -> ApiResult {
 
 // ---------- Server entry point ----------
 
-pub async fn start(db: SharedDb) {
+pub async fn start(db: SharedDb, app_handle: tauri::AppHandle) {
     let cors = CorsLayer::permissive();
+    let state = ServerState { db, app: app_handle };
 
     let app = Router::new()
         .route(
@@ -377,7 +392,7 @@ pub async fn start(db: SharedDb) {
         .route("/api/tags", get(get_tags).post(post_tag))
         .route("/api/tag-rules", get(get_tag_rules))
         .layer(cors)
-        .with_state(db);
+        .with_state(state);
 
     match tokio::net::TcpListener::bind("127.0.0.1:37373").await {
         Ok(listener) => {

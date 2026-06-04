@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookmarkList } from "@/components/BookmarkList";
 import { BookmarkHeader } from "@/components/BookmarkHeader";
@@ -154,6 +155,15 @@ export default function BookmarksPage() {
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [refreshData]);
+
+  // Refresh immediately when the browser extension adds a bookmark
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen("bookmark-added", () => {
+      refreshData();
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
   }, [refreshData]);
 
   useEffect(() => {

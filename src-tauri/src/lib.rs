@@ -60,7 +60,8 @@ pub fn run() {
                 }
             }
 
-            tauri::async_runtime::spawn(server::start(conn));
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(server::start(conn, handle));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
