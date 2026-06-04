@@ -1,7 +1,8 @@
 "use client";
 
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Download, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Dialog,
   DialogContent,
@@ -66,6 +67,34 @@ function Strong({ children }: { children: React.ReactNode }) {
   return <span className="font-medium text-foreground">{children}</span>;
 }
 
+function DownloadExtensionButton() {
+  const [saving, setSaving] = useState(false);
+
+  const handleClick = async () => {
+    setSaving(true);
+    try {
+      await invoke("save_extension_zip");
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="mt-4">
+      <button
+        onClick={handleClick}
+        disabled={saving}
+        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+      >
+        {saving ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+        Download Extension
+      </button>
+    </div>
+  );
+}
+
 // ---- section definitions ----------------------------------------------------
 
 const SECTIONS_JA = [
@@ -77,6 +106,7 @@ const SECTIONS_JA = [
   { id: "display",  label: "表示設定" },
   { id: "reorder",  label: "手動並び替え" },
   { id: "importex", label: "インポート / エクスポート" },
+  { id: "explorer", label: "エクスプローラ連携" },
   { id: "memo",     label: "メモ" },
   { id: "shortcuts", label: "ショートカット一覧" },
   { id: "theme",    label: "テーマ" },
@@ -92,6 +122,7 @@ const SECTIONS_EN = [
   { id: "display",  label: "Display" },
   { id: "reorder",  label: "Reordering" },
   { id: "importex", label: "Import / Export" },
+  { id: "explorer", label: "Explorer" },
   { id: "memo",     label: "Memo" },
   { id: "shortcuts", label: "Shortcuts" },
   { id: "theme",    label: "Theme" },
@@ -241,6 +272,28 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
 
       <div className="border-t" />
 
+      <section ref={registerRef("explorer")}>
+        <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">エクスプローラ連携</h2>
+        <H3>概要</H3>
+        <P>Windowsエクスプローラから直接ファイルやフォルダをブックマークに登録できます。</P>
+        <H3>方法1: 右クリックメニュー</H3>
+        <P>アプリ起動時にレジストリへ自動登録されます。</P>
+        <Ul>
+          <Li>エクスプローラでファイルまたはフォルダを右クリック。</Li>
+          <Li><Strong>Add to Bookmarks</Strong> を選択。</Li>
+          <Li>アプリが起動済みの場合は既存ウィンドウにフォームが開き、未起動の場合は起動後に自動でフォームが開きます。</Li>
+        </Ul>
+        <H3>方法2: ドラッグ＆ドロップ</H3>
+        <Ul>
+          <Li>アプリウィンドウが開いている状態で、エクスプローラからファイルまたはフォルダをアプリ画面上にドロップ。</Li>
+          <Li>パスとファイル名（タイトル）が自動入力された状態で追加フォームが開きます。</Li>
+        </Ul>
+        <H3>共通の動作</H3>
+        <P>どちらの方法でも登録フォームはパスとタイトル（ファイル・フォルダ名）が自動入力されます。必要に応じてタグやメモを追加してから <Strong>Add Bookmark</Strong> を押してください。</P>
+      </section>
+
+      <div className="border-t" />
+
       <section ref={registerRef("memo")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">メモ</h2>
         <H3>概要</H3>
@@ -309,20 +362,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>既に保存済みのURLは重複として検知される。</Li>
           <Li><Strong>Add Bookmark</Strong> を押すと、そのまま拡張内から保存できる。</Li>
         </Ul>
-        <div className="mt-4">
-          <a
-            href="/extension.zip"
-            download="bookmarks-extension.zip"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            拡張機能をダウンロード
-          </a>
-        </div>
+        <DownloadExtensionButton />
       </section>
     </>
   );
@@ -465,6 +505,28 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>The exported HTML can be imported into your browser&apos;s bookmark manager.</Li>
           <Li>Memos are not included in exports.</Li>
         </Ul>
+      </section>
+
+      <div className="border-t" />
+
+      <section ref={registerRef("explorer")}>
+        <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Explorer Integration</h2>
+        <H3>Overview</H3>
+        <P>Register files and folders as bookmarks directly from Windows Explorer.</P>
+        <H3>Method 1: Right-click Context Menu</H3>
+        <P>Automatically registered in the Windows Registry when the app starts.</P>
+        <Ul>
+          <Li>Right-click any file or folder in Explorer.</Li>
+          <Li>Select <Strong>Add to Bookmarks</Strong>.</Li>
+          <Li>If the app is already running, the form opens in the existing window. If not, the app launches and the form opens automatically.</Li>
+        </Ul>
+        <H3>Method 2: Drag &amp; Drop</H3>
+        <Ul>
+          <Li>With the app window open, drag a file or folder from Explorer and drop it onto the app.</Li>
+          <Li>The add form opens with the path and filename pre-filled.</Li>
+        </Ul>
+        <H3>Common Behavior</H3>
+        <P>In both methods, the form opens with the path and title (file/folder name) pre-filled. Add tags or a memo as needed, then click <Strong>Add Bookmark</Strong>.</P>
       </section>
 
       <div className="border-t" />

@@ -6,6 +6,7 @@ import { BookmarkList } from "@/components/BookmarkList";
 import { BookmarkHeader } from "@/components/BookmarkHeader";
 import { BookmarkForm } from "@/components/BookmarkForm";
 import { SavingOrderOverlay } from "@/components/SavingOrderOverlay";
+import { DropOverlay } from "@/components/DropOverlay";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +26,7 @@ import {
   useBookmarkOrdering,
   useKeyboardShortcuts,
   useSearchHistory,
+  useExplorerImport,
 } from "@/hooks";
 import { readAppCache, writeAppCache } from "@/lib/appCache";
 import { BookmarkUI } from "@/types/bookmark";
@@ -81,6 +83,15 @@ export default function BookmarksPage() {
   useKeyboardShortcuts({
     onEscape: () => {},
     onFocusSearch: () => searchInputRef.current?.focus(),
+  });
+
+  const { isDragging } = useExplorerImport({
+    isModalOpen,
+    onPathDetected: (values) => {
+      setSelectedBookmark(undefined);
+      setNewBookmarkInitialValues(values);
+      setIsModalOpen(true);
+    },
   });
 
   const filtering = useBookmarkFiltering({
@@ -323,6 +334,7 @@ export default function BookmarksPage() {
       </main>
 
       <SavingOrderOverlay isVisible={ordering.isSavingOrder} />
+      <DropOverlay visible={isDragging} />
 
       <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
         <AlertDialogContent>

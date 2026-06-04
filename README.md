@@ -1,6 +1,7 @@
 # Bookmarks
 
-PostgreSQL ストレージのブックマーク管理アプリ + ブラウザ拡張機能。
+Tauri v2 デスクトップアプリ + ブラウザ拡張機能によるブックマーク管理ツール（Windows）。  
+データは SQLite に保存されるため、外部サーバー不要でオフライン利用可能。
 
 ## 機能一覧
 
@@ -13,10 +14,16 @@ PostgreSQL ストレージのブックマーク管理アプリ + ブラウザ拡
 - ドラッグ&ドロップによるカスタム並べ替え
 - リスト表示（1〜4 カラム）
 
-### 暗号化メモ
+### デスクトップパスブックマーク
 
-- ブックマークごとにメモを添付可能（最大 10,000 文字）
-- AES-256-CBC でサーバーサイド暗号化
+- ファイル・フォルダのパスをブックマークとして登録
+- ファイルはデフォルトアプリで開く、フォルダはエクスプローラで開く
+- Windows エクスプローラからファイル・フォルダをドラッグ&ドロップして追加
+- エクスプローラの右クリックメニュー（「Add to Bookmarks」）から直接登録
+
+### メモ
+
+- ブックマークごとにメモを添付可能
 - メモ内容はカード上に常時表示
 
 ### タグ管理
@@ -39,6 +46,7 @@ PostgreSQL ストレージのブックマーク管理アプリ + ブラウザ拡
 ### ブラウザ拡張機能
 
 - Chrome / Edge 対応（Manifest V3）
+- アプリ内蔵の HTTP サーバー（localhost:37373）経由で連携（Supabase 不要）
 - ワンクリックで現在のページをブックマーク追加
 - 重複 URL の自動検知
 
@@ -53,10 +61,11 @@ PostgreSQL ストレージのブックマーク管理アプリ + ブラウザ拡
 
 | カテゴリ          | 技術                                                   |
 | ----------------- | ------------------------------------------------------ |
+| デスクトップ      | Tauri v2                                               |
+| バックエンド      | Rust / rusqlite (SQLite bundled) / Axum                |
 | フレームワーク    | Next.js 15 (App Router)                                |
-| 言語              | TypeScript                                             |
+| 言語              | TypeScript / Rust                                      |
 | UI                | React 19 / Tailwind CSS 3 / shadcn/ui (New York style) |
-| データベース      | PostgreSQL                                             |
 | ドラッグ&ドロップ | dnd-kit                                                |
 | アイコン          | Lucide React                                           |
 | 拡張機能          | Vite + React (Manifest V3)                             |
@@ -65,13 +74,15 @@ PostgreSQL ストレージのブックマーク管理アプリ + ブラウザ拡
 
 ### 前提条件
 
-- Node.js 18+
+- [Node.js](https://nodejs.org/) 18+
+- [Rust](https://www.rust-lang.org/tools/install) (rustup)
+- [Tauri v2 前提条件](https://v2.tauri.app/start/prerequisites/)（Windows: Microsoft Visual Studio C++ Build Tools）
 
 ### 1. リポジトリのクローン
 
 ```bash
-git clone https://github.com/YukihiroSakuda/bookmarks-local.git
-cd bookmarks-local
+git clone https://github.com/YukihiroSakuda/bookmarks.git
+cd bookmarks
 ```
 
 ### 2. 依存関係のインストール
@@ -80,100 +91,38 @@ cd bookmarks-local
 npm install
 ```
 
-### 3. 環境変数の設定
-
-`.env.local` を作成:
-
-```env
-DATABASE_URL=postgres://postgres:postgres@localhost:5432/bookmarks
-MEMO_ENCRYPTION_KEY=your-32-byte-hex-key
-```
-
-`DATABASE_URL` は PostgreSQL の接続文字列。
-
-`MEMO_ENCRYPTION_KEY` は AES-256 用の 32 バイト鍵（64 文字の 16 進数文字列）。
-
-生成例:
+### 3. 開発サーバーの起動
 
 ```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+npm run tauri:dev
 ```
 
-### 4. 開発サーバーの起動
+Tauri ウィンドウが起動します。SQLite データベースは初回起動時にアプリデータフォルダへ自動作成されます。
+
+### 4. プロダクションビルド
 
 ```bash
-npm run dev
+npm run tauri:build
 ```
 
-http://localhost:3000 でアクセス。データベースファイル (`data/bookmarks.db`) は初回起動時に自動作成されます。
-http://localhost:3000 でアクセス。必要なテーブルは初回接続時に自動作成されます。
+`src-tauri/target/release/bundle/` にインストーラーが生成されます。
 
-### 5. ブラウザ拡張機能（オプション）
+### 5. ブラウザ拡張機能
+
+アプリのヘルプダイアログから `extension.zip` をダウンロードし、解凍後に拡張機能として読み込みます。
+
+- Chrome: `chrome://extensions` → 「パッケージ化されていない拡張機能を読み込む」→ 解凍フォルダを選択
+- Edge: `edge://extensions` → 「展開して読み込み」→ 解凍フォルダを選択
+
+拡張機能はアプリ起動中に自動起動する HTTP サーバー（localhost:37373）に接続します。**アプリを起動した状態で**ブラウザ拡張機能を使用してください。
+
+拡張機能を手動でビルドする場合:
 
 ```bash
 cd extension
 npm install
-```
-
-`extension/.env` を作成:
-
-```env
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
-VITE_APP_URL=http://localhost:3000
-```
-
-```bash
 npm run build
 ```
-
-- Chrome: `chrome://extensions` → 「パッケージ化されていない拡張機能を読み込む」→ `extension/dist` を選択
-- Edge: `edge://extensions` → 「展開して読み込み」→ `extension/dist` を選択
-
-## 本番デプロイ
-
-### Web アプリ（Azure App Service / Node.js）
-
-1. Azure App Service にリポジトリを接続
-2. 環境変数を設定:
-
-- `DATABASE_URL`
-- `MEMO_ENCRYPTION_KEY`
-
-3. デプロイ
-
-### GitHub Actions CI/CD
-
-`main` への push で Web アプリを自動デプロイするワークフローを追加しています。
-
-ワークフロー: [.github/workflows/azure-webapp.yml](.github/workflows/azure-webapp.yml)
-
-事前に GitHub リポジトリの Secrets に以下を設定してください。
-
-- `AZURE_WEBAPP_PUBLISH_PROFILE`
-
-取得例:
-
-```bash
-az webapp deployment list-publishing-profiles \
-  --name bookmarks-local-kltd-20260527 \
-  --resource-group rg-bookmarks-local-jpe-20260527 \
-  --xml
-```
-
-このワークフローは次を行います。
-
-- Pull Request: `npm ci` と `npm run build` で CI 実行
-- `main` push: ビルド成功後に Azure App Service へ自動デプロイ
-
-アプリ設定の `DATABASE_URL` と `MEMO_ENCRYPTION_KEY` は Azure App Service 側に保持し、GitHub Actions 側ではデプロイ時に publish profile だけを使います。
-
-### ブラウザ拡張機能
-
-1. `extension/.env` の `VITE_APP_URL` を本番 URL に変更
-2. `extension/public/manifest.json` の `host_permissions` と `content_scripts.matches` を本番ドメインに変更
-3. `cd extension && npm run build`
-4. Chrome Web Store / Edge Add-ons に `extension/dist` をアップロード
 
 ## プロジェクト構造
 
@@ -181,26 +130,37 @@ az webapp deployment list-publishing-profiles \
 src/
   ├── app/                # Next.js App Router
   │   ├── page.tsx        # メインページ（ブックマーク一覧）
-  │   └── api/            # REST API ルート
+  │   └── api/            # REST API ルート（Tauri IPC 経由）
   ├── components/         # UI コンポーネント
   │   └── ui/             # shadcn/ui ベースコンポーネント
   ├── hooks/              # カスタムフック（状態管理の中心）
-  ├── lib/                # PostgreSQL クライアント (db.ts)、ユーティリティ
+  ├── lib/                # tauriFetch、ユーティリティ
+  ├── shared/             # ブックマーク API・フォームロジック
   ├── types/              # 型定義（DB ↔ UI 変換関数含む）
   └── utils/              # エクスポート等のユーティリティ
+src-tauri/
+  ├── src/
+  │   ├── commands.rs     # Tauri IPC コマンド（CRUD・設定・パス操作）
+  │   ├── db.rs           # SQLite 初期化・スキーマ
+  │   ├── lib.rs          # Tauri アプリエントリ・シングルインスタンス
+  │   └── server.rs       # 内蔵 HTTP サーバー (Axum, :37373)
+  └── Cargo.toml
 extension/                # ブラウザ拡張機能（別プロジェクト）
 docs/                     # 仕様書・テストチェックリスト
+public/
+  └── extension.zip       # ビルド済み拡張機能（ヘルプからダウンロード）
 ```
 
 ## コマンド
 
-| コマンド                        | 説明                       |
-| ------------------------------- | -------------------------- |
-| `npm run dev`                   | 開発サーバー起動           |
-| `npm run build`                 | プロダクションビルド       |
-| `npm run start`                 | プロダクションサーバー起動 |
-| `npm run lint`                  | ESLint 実行                |
-| `cd extension && npm run build` | 拡張機能ビルド             |
+| コマンド                        | 説明                               |
+| ------------------------------- | ---------------------------------- |
+| `npm run tauri:dev`             | Tauri 開発モード起動               |
+| `npm run tauri:build`           | Tauri プロダクションビルド         |
+| `npm run dev`                   | Next.js 開発サーバーのみ起動       |
+| `npm run build`                 | Next.js ビルド                     |
+| `npm run lint`                  | ESLint 実行                        |
+| `cd extension && npm run build` | 拡張機能ビルド                     |
 
 ## ライセンス
 

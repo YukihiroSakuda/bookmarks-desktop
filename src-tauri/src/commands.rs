@@ -546,6 +546,102 @@ pub async fn fetch_title(url: String) -> Result<Value, String> {
     Ok(json!({ "title": title }))
 }
 
+// ---------- Extension download ----------
+
+static EXTENSION_ZIP: &[u8] = include_bytes!("../../public/extension.zip");
+
+#[tauri::command]
+pub async fn save_extension_zip(app: tauri::AppHandle) -> Result<Value, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let dest = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || {
+            app.dialog()
+                .file()
+                .set_file_name("bookmarks-extension.zip")
+                .add_filter("ZIP Archive", &["zip"])
+                .blocking_save_file()
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    match dest {
+        None => Ok(json!({ "cancelled": true })),
+        Some(file_path) => {
+            let tauri_plugin_dialog::FilePath::Path(path) = file_path else {
+                return Err("expected a file path".to_string());
+            };
+            std::fs::write(&path, EXTENSION_ZIP).map_err(|e| e.to_string())?;
+            Ok(json!({ "ok": true }))
+        }
+    }
+}
+
+// ---------- Explorer import helpers ----------
+
+#[tauri::command]
+pub fn get_pending_path(state: State<AppState>) -> Option<String> {
+    state.pending_path.lock().unwrap().take()
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+pub fn register_context_menu() -> Result<Value, String> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+    use winreg::RegKey;
+
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_str = exe.to_str().ok_or("invalid exe path")?;
+    let cmd = format!("\"{}\" --path \"%1\"", exe_str);
+    let label = "Add to Bookmarks";
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+
+    for base in &[
+        "Software\\Classes\\*\\shell\\AddToBookmarks",
+        "Software\\Classes\\Directory\\shell\\AddToBookmarks",
+    ] {
+        let (parent, _) = hkcu
+            .create_subkey_with_flags(base, KEY_WRITE)
+            .map_err(|e| e.to_string())?;
+        parent.set_value("", &label).map_err(|e| e.to_string())?;
+
+        let (cmd_key, _) = hkcu
+            .create_subkey_with_flags(format!("{}\\command", base), KEY_WRITE)
+            .map_err(|e| e.to_string())?;
+        cmd_key.set_value("", &cmd).map_err(|e| e.to_string())?;
+    }
+
+    Ok(json!({ "ok": true }))
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+pub fn register_context_menu() -> Result<Value, String> {
+    Err("context menu registration is only supported on Windows".to_string())
+}
+
+#[cfg(target_os = "windows")]
+#[tauri::command]
+pub fn unregister_context_menu() -> Result<Value, String> {
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let _ = hkcu.delete_subkey_all("Software\\Classes\\*\\shell\\AddToBookmarks");
+    let _ = hkcu.delete_subkey_all("Software\\Classes\\Directory\\shell\\AddToBookmarks");
+
+    Ok(json!({ "ok": true }))
+}
+
+#[cfg(not(target_os = "windows"))]
+#[tauri::command]
+pub fn unregister_context_menu() -> Result<Value, String> {
+    Err("context menu is only supported on Windows".to_string())
+}
+
 // ---------- Open a folder/file path in the OS file explorer ----------
 
 #[tauri::command]

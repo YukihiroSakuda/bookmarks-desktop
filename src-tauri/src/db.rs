@@ -4,6 +4,7 @@ use tauri::{AppHandle, Manager};
 
 pub struct AppState {
     pub conn: Arc<Mutex<Connection>>,
+    pub pending_path: Mutex<Option<String>>,
 }
 
 const SCHEMA: &str = r#"
