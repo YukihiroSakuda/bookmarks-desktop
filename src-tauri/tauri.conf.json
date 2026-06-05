@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "bookmarks",
   "version": "0.1.0",
-  "identifier": "com.bookmarks.app",
+  "identifier": "com.yukihirosakuda.bookmarks",
   "build": {
     "frontendDist": "../out",
     "devUrl": "http://localhost:1420",
@@ -27,7 +27,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis", "msi"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,8 +35,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "android": {
-      "debugApplicationIdSuffix": ".debug"
+    "publisher": "Yukihiro Sakuda",
+    "copyright": "Copyright © 2026 Yukihiro Sakuda",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
     }
   }
 }
