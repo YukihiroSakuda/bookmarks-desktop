@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 import {
   AlertCircle,
   Loader2,
-  Settings,
-  ArrowLeft,
   TriangleAlert,
   X,
+  PowerOff,
+  RefreshCw,
 } from "lucide-react";
 import {
   findDuplicateBookmark,
@@ -14,8 +14,7 @@ import {
   mergeBookmarkTags,
 } from "../../src/shared/bookmarks/form";
 
-const DEFAULT_APP_URL =
-  import.meta.env.VITE_APP_URL || "http://localhost:37373";
+const APP_URL = import.meta.env.VITE_APP_URL || "http://localhost:37373";
 
 // ---------- Types ----------
 
@@ -36,6 +35,12 @@ type TagRuleItem = {
 };
 type BookmarkItem = { id: string; title: string; url: string };
 type Status = "loading" | "idle" | "saving" | "error";
+
+// ---------- Helpers ----------
+
+function isNetworkError(error: unknown): boolean {
+  return error instanceof TypeError;
+}
 
 // ---------- API helpers ----------
 
@@ -115,94 +120,26 @@ async function saveBookmark(
   });
 }
 
-// ---------- useAppUrl hook ----------
+// ---------- ServerDownView ----------
 
-function useAppUrl() {
-  const [appUrl, setAppUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    chrome.storage.local.get("appUrl", (result) => {
-      setAppUrl((result.appUrl as string | undefined) || DEFAULT_APP_URL);
-    });
-  }, []);
-
-  const saveAppUrl = useCallback((url: string) => {
-    const trimmed = url.replace(/\/$/, "");
-    chrome.storage.local.set({ appUrl: trimmed }, () => {
-      setAppUrl(trimmed);
-    });
-  }, []);
-
-  return { appUrl, saveAppUrl };
-}
-
-// ---------- SettingsView ----------
-
-function SettingsView({
-  appUrl,
-  onSave,
-  onBack,
-}: {
-  appUrl: string;
-  onSave: (url: string) => void;
-  onBack: () => void;
-}) {
-  const [value, setValue] = useState(appUrl);
-
-  const handleSave = () => {
-    if (!value.trim()) return;
-    onSave(value.trim());
-    onBack();
-  };
-
+function ServerDownView({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="bg-popover p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <button
-          onClick={onBack}
-          className="p-1 rounded hover:bg-accent transition-colors"
-        >
-          <ArrowLeft className="size-4" />
-        </button>
-        <h2 className="text-base font-semibold">設定</h2>
+    <div className="bg-card p-6 text-center space-y-4">
+      <PowerOff className="size-10 mx-auto text-muted-foreground" />
+      <div>
+        <h2 className="text-base font-semibold mb-1">アプリが起動していません</h2>
+        <p className="text-sm text-muted-foreground">
+          ブックマークアプリを起動してから再度お試しください。
+        </p>
       </div>
-
-      <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">アプリのURL</label>
-          <input
-            type="url"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-            }}
-            placeholder={DEFAULT_APP_URL}
-            autoFocus
-            className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Tauriアプリ起動中は localhost:37373 で接続できます。
-          </p>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onBack}
-            className="h-9 px-4 bg-secondary text-secondary-foreground text-sm font-medium rounded-md shadow-sm hover:bg-secondary/80 transition-colors"
-          >
-            キャンセル
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!value.trim()}
-            className="h-9 px-4 bg-primary text-primary-foreground text-sm font-medium rounded-md shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            保存
-          </button>
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="h-9 px-4 bg-primary text-primary-foreground text-sm font-medium rounded-md shadow hover:bg-primary/90 transition-colors flex items-center gap-1.5 mx-auto"
+      >
+        <RefreshCw className="size-3.5" />
+        再試行
+      </button>
     </div>
   );
 }
@@ -210,8 +147,6 @@ function SettingsView({
 // ---------- Popup ----------
 
 export function Popup() {
-  const { appUrl, saveAppUrl } = useAppUrl();
-  const [showSettings, setShowSettings] = useState(false);
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -228,6 +163,14 @@ export function Popup() {
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [isInvalidPage, setIsInvalidPage] = useState(false);
+  const [serverDown, setServerDown] = useState(false);
+  const [loadKey, setLoadKey] = useState(0);
+
+  const handleRetry = useCallback(() => {
+    setServerDown(false);
+    setErrorMessage("");
+    setLoadKey((k) => k + 1);
+  }, []);
 
   // Get current tab URL/title from service worker
   useEffect(() => {
@@ -256,25 +199,29 @@ export function Popup() {
 
   // Load tags, tag rules, existing bookmarks from local API
   useEffect(() => {
-    if (!appUrl) return;
     const load = async () => {
       try {
         const [nextTags, nextTagRules, nextBookmarks] = await Promise.all([
-          fetchTags(appUrl),
-          fetchTagRules(appUrl),
-          fetchBookmarks(appUrl),
+          fetchTags(APP_URL),
+          fetchTagRules(APP_URL),
+          fetchBookmarks(APP_URL),
         ]);
         setAvailableTags(nextTags);
         setTagRules(nextTagRules);
         setExistingBookmarks(nextBookmarks);
+        setServerDown(false);
       } catch (error) {
-        setErrorMessage(
-          error instanceof Error ? error.message : "Failed to load data"
-        );
+        if (isNetworkError(error)) {
+          setServerDown(true);
+        } else {
+          setErrorMessage(
+            error instanceof Error ? error.message : "Failed to load data"
+          );
+        }
       }
     };
     load();
-  }, [appUrl]);
+  }, [loadKey]);
 
   // Duplicate detection
   useEffect(() => {
@@ -283,11 +230,11 @@ export function Popup() {
 
   // Auto-fetch page title (debounced)
   useEffect(() => {
-    if (!appUrl || !isHttpUrl(url) || titleEdited) return;
+    if (!isHttpUrl(url) || titleEdited) return;
     const timer = setTimeout(async () => {
       setIsFetchingTitle(true);
       try {
-        const nextTitle = await fetchPageTitle(url, appUrl);
+        const nextTitle = await fetchPageTitle(url, APP_URL);
         if (nextTitle && !titleEdited) setTitle(nextTitle);
       } catch {
         // ignore title fetch failures
@@ -296,7 +243,7 @@ export function Popup() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [appUrl, titleEdited, url]);
+  }, [titleEdited, url]);
 
   const handleTagToggle = useCallback((tagName: string) => {
     setTags((prev) =>
@@ -314,11 +261,11 @@ export function Popup() {
   }, [newTag, tags]);
 
   const handleSave = useCallback(async () => {
-    if (!url || !title || !appUrl) return;
+    if (!url || !title) return;
     setStatus("saving");
     setErrorMessage("");
     try {
-      await saveBookmark(appUrl, { title, url, tags, memo, availableTags, tagRules });
+      await saveBookmark(APP_URL, { title, url, tags, memo, availableTags, tagRules });
       setExistingBookmarks((prev) => [
         ...prev,
         { id: crypto.randomUUID(), title, url },
@@ -330,16 +277,10 @@ export function Popup() {
         error instanceof Error ? error.message : "Failed to save bookmark"
       );
     }
-  }, [appUrl, availableTags, memo, tagRules, tags, title, url]);
+  }, [availableTags, memo, tagRules, tags, title, url]);
 
-  if (showSettings || appUrl === "") {
-    return (
-      <SettingsView
-        appUrl={appUrl ?? ""}
-        onSave={saveAppUrl}
-        onBack={() => setShowSettings(false)}
-      />
-    );
+  if (serverDown) {
+    return <ServerDownView onRetry={handleRetry} />;
   }
 
   if (isInvalidPage) {
@@ -354,7 +295,7 @@ export function Popup() {
     );
   }
 
-  if (status === "loading" || appUrl === null) {
+  if (status === "loading") {
     return (
       <div className="p-6 flex items-center justify-center">
         <Loader2 className="size-5 animate-spin text-blue-500" />
@@ -364,18 +305,11 @@ export function Popup() {
 
   return (
     <div className="bg-popover p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h2 className="text-2xl font-bold">
           <span className="text-blue-500">#</span>
           Add New Bookmark
         </h2>
-        <button
-          onClick={() => setShowSettings(true)}
-          className="p-1.5 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
-          title="設定"
-        >
-          <Settings className="size-4" />
-        </button>
       </div>
 
       {status === "error" && (

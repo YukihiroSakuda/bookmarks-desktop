@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert } from "lucide-react";
 import { Button } from "./Button";
 import { useImportBookmarks } from "./ImportBookmarks";
 import { exportBookmarksToHtml, downloadHtml } from "@/utils/export";
 import { BookmarkUI } from "@/types/bookmark";
 import { toast } from "sonner";
+
+const DELETE_CONFIRM_PHRASE = "delete all";
 
 type Theme = "light" | "system" | "dark";
 
@@ -46,6 +48,9 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>("system");
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const deleteInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -82,6 +87,19 @@ export function SettingsDialog({
     input.click();
   }
 
+  function openDeleteConfirm() {
+    setDeleteInput("");
+    setShowDeleteConfirm(true);
+    setTimeout(() => deleteInputRef.current?.focus(), 0);
+  }
+
+  function handleDeleteConfirm() {
+    if (deleteInput !== DELETE_CONFIRM_PHRASE) return;
+    setShowDeleteConfirm(false);
+    setOpen(false);
+    onDeleteAll();
+  }
+
   async function handleExportClick() {
     try {
       const html = exportBookmarksToHtml(bookmarks);
@@ -102,6 +120,59 @@ export function SettingsDialog({
         disabled={isOrderingMode}
         onClick={() => setOpen(true)}
       />
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-[60]">
+          <div className="bg-popover rounded-2xl border shadow-lg p-6 w-full max-w-sm flex flex-col gap-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 shrink-0 flex items-center justify-center size-9 rounded-full bg-destructive/10">
+                <TriangleAlert className="size-5 text-destructive" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-base">Delete all bookmarks?</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  This action <span className="font-medium text-foreground">cannot be undone</span>. All bookmarks will be permanently deleted.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1.5">
+                Type <span className="font-mono font-semibold text-foreground">{DELETE_CONFIRM_PHRASE}</span> to confirm
+              </label>
+              <input
+                ref={deleteInputRef}
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleDeleteConfirm(); }}
+                placeholder={DELETE_CONFIRM_PHRASE}
+                className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground font-mono"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={Trash2}
+                disabled={deleteInput !== DELETE_CONFIRM_PHRASE}
+                onClick={handleDeleteConfirm}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-40"
+              >
+                Delete All
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div className="fixed inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-50">
@@ -159,48 +230,43 @@ export function SettingsDialog({
               {/* Data */}
               <div>
                 <label className="block text-sm font-medium mb-2">Data</label>
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Import from HTML</span>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      icon={Upload}
-                      onClick={handleImportClick}
-                      disabled={isImporting}
-                    >
-                      {isImporting ? "Importing..." : "Import"}
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Export to HTML</span>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      icon={Download}
-                      onClick={handleExportClick}
-                    >
-                      Export
-                    </Button>
-                  </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Upload}
+                    onClick={handleImportClick}
+                    disabled={isImporting}
+                    className="flex-1"
+                  >
+                    {isImporting ? "Importing..." : "Import"}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={Download}
+                    onClick={handleExportClick}
+                    className="flex-1"
+                  >
+                    Export
+                  </Button>
                 </div>
               </div>
 
               {/* Danger Zone */}
-              <div>
-                <label className="block text-sm font-medium mb-2 text-destructive">Danger Zone</label>
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <p className="text-xs font-medium text-destructive mb-2">Danger Zone</p>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm">Delete all bookmarks</span>
+                  <span className="text-sm text-muted-foreground">Delete all bookmarks</span>
                   <Button
                     variant="ghost"
                     size="sm"
                     icon={Trash2}
-                    onClick={() => {
-                      setOpen(false);
-                      onDeleteAll();
-                    }}
+                    onClick={openDeleteConfirm}
                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  />
+                  >
+                    Delete All
+                  </Button>
                 </div>
               </div>
             </div>
