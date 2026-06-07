@@ -160,7 +160,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("search")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">検索</h2>
         <H3>キーワード検索</H3>
-        <P>ヘッダーの検索バーにキーワードを入力すると、<Strong>タイトルとURL</Strong> を対象に絞り込まれます。</P>
+        <P>ヘッダーの検索バーにキーワードを入力すると、<Strong>タイトル・URL・メモ</Strong> を対象に絞り込まれます。</P>
         <H3>検索バーへのフォーカス</H3>
         <P>どこにいても <Kbd>/</Kbd> キーを押すと検索バーに即座にフォーカスが移ります（入力欄にいるときは無効）。</P>
         <H3>検索履歴</H3>
@@ -178,7 +178,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <H3>タグで絞り込む</H3>
         <P>ヘッダー下部のタグ一覧からタグをクリックすると、そのタグを持つブックマークだけが表示されます。</P>
         <H3>複数タグの同時選択</H3>
-        <P><Kbd>Ctrl</Kbd> + クリック（Macは <Kbd>⌘</Kbd> + クリック）で複数のタグを同時に選択できます。選択したすべてのタグを持つブックマークが AND 絞り込みで表示されます。</P>
+        <P><Kbd>Ctrl</Kbd> + クリック（Macは <Kbd>⌘</Kbd> + クリック）で複数のタグを同時に選択できます。選択した<Strong>いずれか</Strong>のタグを持つブックマークが OR 絞り込みで表示されます。</P>
         <H3>フィルターの解除</H3>
         <Ul>
           <Li>個別タグ: 選択中のタグをもう一度クリックで解除。</Li>
@@ -300,12 +300,10 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("memo")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">メモ</h2>
         <H3>概要</H3>
-        <P>各ブックマークにメモを添付できます。メモはローカルのデータベースにテキストとして保存されます。</P>
+        <P>各ブックマークにメモを添付できます。メモはローカルのデータベースにのみ保存され、外部に送信されることはありません。メモ内のテキストは検索バーの絞り込み対象にも含まれます。</P>
         <H3>制限事項</H3>
         <Ul>
-          <Li>パスワードなどの機密情報は保存しないでください。</Li>
           <Li>最大 <Strong>10,000文字</Strong> まで入力可能。</Li>
-          <Li>検索の対象外です（メモ内のキーワードでは絞り込めません）。</Li>
           <Li>エクスポート時には含まれません。</Li>
         </Ul>
         <H3>表示</H3>
@@ -401,7 +399,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("search")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Search</h2>
         <H3>Keyword Search</H3>
-        <P>Type in the search bar to filter bookmarks by <Strong>title and URL</Strong>.</P>
+        <P>Type in the search bar to filter bookmarks by <Strong>title, URL, and memo</Strong>.</P>
         <H3>Focus the Search Bar</H3>
         <P>Press <Kbd>/</Kbd> anywhere to instantly focus the search bar (disabled when already in an input field).</P>
         <H3>Search History</H3>
@@ -419,7 +417,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <H3>Filter by Tag</H3>
         <P>Click a tag from the list below the header to show only bookmarks with that tag.</P>
         <H3>Multi-Tag Selection</H3>
-        <P><Kbd>Ctrl</Kbd>+click (or <Kbd>⌘</Kbd>+click on Mac) to select multiple tags at once. Only bookmarks matching <Strong>all</Strong> selected tags are shown (AND filter).</P>
+        <P><Kbd>Ctrl</Kbd>+click (or <Kbd>⌘</Kbd>+click on Mac) to select multiple tags at once. Bookmarks matching <Strong>any</Strong> of the selected tags are shown (OR filter).</P>
         <H3>Clearing Filters</H3>
         <Ul>
           <Li>Individual tag: click the selected tag again to deselect.</Li>
@@ -541,12 +539,10 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("memo")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Memo</h2>
         <H3>Overview</H3>
-        <P>Attach a memo to any bookmark. Memos are stored locally in plain text.</P>
+        <P>Attach a memo to any bookmark. Memos are stored only in the local database and are never sent anywhere. Memo text is also included in the search bar&apos;s filtering.</P>
         <H3>Limitations</H3>
         <Ul>
-          <Li>Do not store passwords or other sensitive information.</Li>
           <Li>Maximum <Strong>10,000 characters</Strong>.</Li>
-          <Li>Not included in search results.</Li>
           <Li>Not included in exports.</Li>
         </Ul>
         <H3>Display</H3>
@@ -727,13 +723,13 @@ export function HelpDialog() {
 
           <div className="flex flex-1 min-h-0">
             {/* sidebar */}
-            <nav className="w-44 shrink-0 border-r overflow-y-auto py-3">
+            <nav className="w-56 shrink-0 border-r overflow-y-auto py-3">
               {SECTIONS.map(({ id, label }) => (
                 <button
                   key={id}
                   onClick={() => scrollTo(id)}
                   className={cn(
-                    "w-full text-left px-4 py-1.5 text-sm transition-colors",
+                    "w-full text-left px-4 py-1.5 text-sm whitespace-nowrap transition-colors",
                     activeId === id
                       ? "text-blue-500 font-medium bg-blue-500/5"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent"
