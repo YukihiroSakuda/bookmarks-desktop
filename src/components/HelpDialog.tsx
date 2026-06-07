@@ -1,7 +1,7 @@
 "use client";
 
 import { HelpCircle, Download, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Dialog,
@@ -650,6 +650,34 @@ export function HelpDialog() {
   const registerRef = (id: string) => (el: HTMLElement | null) => {
     sectionRefs.current[id] = el;
   };
+
+  // Scroll spy: keep the sidebar entry in sync with the section in view.
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!open || !container) return;
+
+    const handleScroll = () => {
+      // At the very bottom, force-select the last section so short trailing
+      // sections can still become active.
+      if (container.scrollTop + container.clientHeight >= container.scrollHeight - 2) {
+        setActiveId(SECTIONS[SECTIONS.length - 1].id);
+        return;
+      }
+      const threshold = container.getBoundingClientRect().top + 24;
+      let current = SECTIONS[0].id;
+      for (const { id } of SECTIONS) {
+        const el = sectionRefs.current[id];
+        if (el && el.getBoundingClientRect().top - threshold <= 1) {
+          current = id;
+        }
+      }
+      setActiveId(current);
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [open, SECTIONS]);
 
   const handleLangChange = (newLang: "ja" | "en") => {
     setLang(newLang);
