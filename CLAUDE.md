@@ -4,57 +4,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-- **Dev server**: `npm run dev` (http://localhost:3000)
+- **Dev server (web only)**: `npm run dev` (http://localhost:3000)
+- **Tauri dev** (desktop app): `npm run tauri:dev` (Next.js runs on port 1420)
+- **Tauri build** (produces NSIS/MSI installer): `npm run tauri:build`
 - **Build**: `npm run build`
 - **Lint**: `npm run lint`
-- **Start production**: `npm start`
 - **Add shadcn component**: `npx shadcn@latest add <component>`
 - **Build extension**: `cd extension && npm run build`
 
 No test framework is configured.
 
-## Environment Variables
-
-Requires `.env.local` with:
-- `DATABASE_URL` — PostgreSQL connection string
-- `MEMO_ENCRYPTION_KEY` — AES-256 key for encrypted memo feature
-
 ## Tech Stack
 
-Next.js 15 (App Router) / React 19 / TypeScript / Tailwind CSS 3 / shadcn/ui (New York style, neutral base) / PostgreSQL via pg / dnd-kit (drag-and-drop) / Lucide React
+Next.js 15 (App Router, **frontend only — no API routes**) / React 19 / TypeScript / Tailwind CSS 3 / shadcn/ui (New York style, neutral base) / Tauri 2 (Rust backend, SQLite via rusqlite) / dnd-kit / Lucide React
 
 ## Architecture
+
+### Two Runtimes
+
+The app runs in two modes that share the same Next.js frontend:
+
+| Mode | Backend | Database | Port |
+|------|---------|----------|------|
+| Web (dev only) | None — no API routes exist | — | 3000 |
+| Tauri (desktop) | Rust (`src-tauri/`) | SQLite (rusqlite) | 1420 |
+
+In practice the app is deployed as a **Tauri desktop app** only. There are no Next.js API routes — the `src/app/` directory contains only the page and layout files.
+
+### tauriFetch — API Call Routing
+
+`src/lib/tauriFetch.ts` is the critical bridge. All custom hooks call `fetch('/api/...')` as if talking to a Next.js backend, but these calls are intercepted by `tauriFetch` and routed to Rust via Tauri's `invoke()` mechanism instead of HTTP. This lets hooks work unchanged between dev (web) and production (Tauri).
 
 ### Custom Hooks + Thin Page Component
 
 State is managed via custom hooks in `src/hooks/` (barrel-exported from `src/hooks/index.ts`):
-- `useAuth` — stub (always returns `{ isLoading: false, isVisible: true }`); no real auth
-- `useUserSettings` — sort, columns (persisted via `/api/settings`)
-- `useBookmarks` — CRUD, fetch, pin toggle, bulk operations, memo encrypt/decrypt
+- `useUserSettings` — sort, columns (persisted via Tauri `get_settings`/`update_settings`)
+- `useBookmarks` — CRUD, fetch, pin toggle, bulk operations, memo
 - `useBookmarkFiltering` — search (title + URL), tag filter, sort
 - `useBookmarkOrdering` — drag-and-drop reorder
 - `useTagManagement` — tags/rules CRUD
 - `useKeyboardShortcuts` — Ctrl+N (new bookmark), Escape
 - `useSearchHistory` — localStorage-persisted search history (max 10 entries)
+- `useExplorerImport` — Windows Explorer drag-drop, right-click context menu (`--path` CLI arg), single-instance `open-path-bookmark` event
 
 `src/app/page.tsx` composes hooks and passes handlers to child components. No external state management library.
 
-### Route Structure
+### Shared Code (`src/shared/`)
 
-- `/` — Bookmark list with search, filters, sort (list view only)
-- `/api/bookmarks` — GET all, POST create, DELETE all
-- `/api/bookmarks/[id]` — GET, PATCH, DELETE
-- `/api/bookmarks/[id]/access` — POST (increment access count)
-- `/api/bookmarks/[id]/pin` — POST (toggle pin)
-- `/api/bookmarks/[id]/memo` — GET, PUT, DELETE (encrypted memo)
-- `/api/bookmarks/reorder` — POST (drag-drop reorder)
-- `/api/bookmarks/title` — GET (fetch page title with hostname fallback)
-- `/api/memo/encrypt`, `/api/memo/decrypt` — Server-side AES-256-CBC memo encryption
-- `/api/settings` — GET, PUT (user settings)
-- `/api/tags` — GET, POST
-- `/api/tags/[id]` — PATCH, DELETE
-- `/api/tag-rules` — GET, POST
-- `/api/tag-rules/[id]` — PATCH, DELETE
+`src/shared/bookmarks/` is imported by both the main app and the browser extension:
+- `form.ts` — URL/path detection (`detectKind`), auto-tagging logic (`getAutoTagNames`), bookmark form utilities
+- `api.ts` — API client functions (`fetchBookmarks`, `createBookmark`, `updateBookmark`, etc.) that work against any base URL
+
+### Tauri Backend (`src-tauri/`)
+
+Written in Rust. Key files:
+- `src/lib.rs` — app entry point, plugin registration, SQLite init, single-instance handling, spawns local HTTP server
+- `src/db.rs` — SQLite schema (auto-created on first run), `AppState` struct
+- `src/commands.rs` — Tauri `invoke()` handlers for all CRUD operations
+- `src/server.rs` — axum HTTP server on `127.0.0.1:37373` for the browser extension
+
+**SQLite schema** (5 tables): `bookmarks` (includes `kind`, `memo`), `tags`, `bookmarks_tags`, `user_settings`, `tag_rules`. Schema defined in `src-tauri/src/db.rs`.
+
+**Windows features**: On startup, automatically registers a Windows right-click context menu entry. Accepts `--path <filepath>` CLI arg to pre-fill the bookmark form from Explorer. Single-instance plugin ensures a second launch focuses the existing window and forwards the path.
+
+### Local HTTP Server (port 37373)
+
+Tauri spawns an axum server at `127.0.0.1:37373` alongside the app. This is a subset API for the browser extension (read/write bookmarks, tags, tag-rules, title fetch). It is not the same as the Tauri `invoke()` interface used by the frontend.
+
+### Browser Extension (`extension/`)
+
+Chrome/Edge Manifest V3 extension (separate Vite + React project). Build output goes to `extension/dist/` for unpacked loading.
+
+- Connects to the Tauri local HTTP server at `VITE_APP_URL` (default: `http://localhost:37373`)
+- Imports shared logic from `../../src/shared/bookmarks/form` (path is relative, across project boundary)
+- Extension `.env` requires only: `VITE_APP_URL` (optional, defaults to localhost:37373)
+
+### Library Files
+
+- `src/lib/tauriFetch.ts` — Fetch-compatible adapter routing `/api/*` calls to Tauri `invoke()` commands
+- `src/lib/appCache.ts` — localStorage cache for all app data (`bm_app_cache` key), used for instant startup render
+- `src/lib/utils.ts` — `cn()` helper (clsx + tailwind-merge)
+- `src/utils/export.ts` — Bookmark HTML export utility
 
 ### shadcn/ui Components
 
@@ -67,26 +97,6 @@ Database types use snake_case (`is_pinned`, `access_count`), UI types use camelC
 - `src/types/userSettings.ts`: `convertUserSettingsToUI(UserSettings)` → `UserSettingsUI`, `convertUserSettingsToDB(UserSettingsUI)` → DB format
 
 Note: `src/types/tagRule.ts` uses mixed conventions — `matchType`, `targetField` (camelCase) alongside `created_at` (snake_case) in the same interface.
-
-### Database
-
-`src/lib/db.ts` initializes a PostgreSQL pool using `pg` with a global singleton for Next.js hot-reload compatibility. Schema is defined inline and auto-created on first query using `DATABASE_URL`.
-
-Five tables: `bookmarks` (includes `encrypted_memo`, `memo_iv`, `custom_order`), `tags`, `bookmarks_tags` (junction), `user_settings` (single row, id=1), `tag_rules`.
-
-### Key Library Files
-
-- `src/lib/db.ts` — PostgreSQL pool, schema creation, query helpers
-- `src/lib/utils.ts` — `cn()` helper (clsx + tailwind-merge)
-- `src/utils/export.ts` — Bookmark HTML export utility
-
-### Encrypted Memo
-
-Bookmarks can have an encrypted memo (AES-256-CBC). Encryption/decryption happens server-side via `/api/memo/encrypt` and `/api/memo/decrypt`. The key is derived from `MEMO_ENCRYPTION_KEY` env var. Memos are excluded from search and export by design. 10,000 character limit.
-
-### Browser Extension
-
-`extension/` is a Chrome/Edge Manifest V3 extension (separate Vite + React project). Build output goes to `extension/dist/` for unpacked loading. The extension still uses Supabase (`extension/lib/supabase.ts`) and requires its own `.env` with `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_URL`. Excluded from main app's TypeScript compilation.
 
 ### Config Note
 
