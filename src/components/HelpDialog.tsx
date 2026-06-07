@@ -227,7 +227,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("display")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">表示設定</h2>
         <H3>カラム数の変更</H3>
-        <P>ヘッダーの列アイコンをクリックすると <Strong>List Columns</Strong> メニューが開き、1〜4列のレイアウトを切り替えられます。設定は自動保存され、次回起動時も保持されます。</P>
+        <P>ヘッダー右上の歯車（<Strong>Settings</Strong>）アイコンを開き、<Strong>Display Columns</Strong> で 1〜4列のレイアウトを切り替えられます。設定は自動保存され、次回起動時も保持されます。</P>
         <H3>ソート</H3>
         <P>ソートコントロールから並び順を変更できます。</P>
         <Ul>
@@ -255,19 +255,22 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
 
       <section ref={registerRef("importex")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">インポート / エクスポート</h2>
-        <H3>インポート（Import from HTML）</H3>
-        <P>ブラウザからエクスポートしたHTMLファイルを取り込みます。ヘッダーの <Strong>︙ メニュー → Import from HTML</Strong> から実行します。</P>
+        <P>インポート・エクスポートはヘッダー右上の歯車（<Strong>Settings</Strong>）アイコンを開き、<Strong>Data</Strong> セクションの <Strong>Import</Strong> / <Strong>Export</Strong> ボタンから実行します。</P>
+        <H3>インポート（Import）</H3>
+        <P>ブラウザからエクスポートしたHTMLファイルを取り込みます。</P>
         <Ul>
           <Li>Chrome / Edge / Firefox のブックマークエクスポート形式（Netscape HTML）に対応。</Li>
           <Li>タイトル・URL・追加日時が取り込まれます。</Li>
           <Li>既存と同じURLはスキップされます。</Li>
         </Ul>
-        <H3>エクスポート（Export to HTML）</H3>
-        <P>現在のブックマーク一覧をNetscape Bookmark Format（HTML）でダウンロードします。<Strong>︙ メニュー → Export to HTML</Strong> から実行します。</P>
+        <H3>エクスポート（Export）</H3>
+        <P>現在のブックマーク一覧をNetscape Bookmark Format（HTML）でダウンロードします。</P>
         <Ul>
           <Li>エクスポートされたHTMLはブラウザのブックマーク管理からインポートできます。</Li>
           <Li>メモはエクスポートされません。</Li>
         </Ul>
+        <H3>全件削除（Delete All）</H3>
+        <P>同じ <Strong>Settings</Strong> ダイアログの <Strong>Danger Zone</Strong> から、すべてのブックマークとタグを完全に削除できます。誤操作を防ぐため、確認入力欄に <Strong>delete all</Strong> と入力した上で確認すると実行されます。この操作は取り消せません。</P>
       </section>
 
       <div className="border-t" />
@@ -300,6 +303,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>各ブックマークにメモを添付できます。メモはローカルのデータベースにテキストとして保存されます。</P>
         <H3>制限事項</H3>
         <Ul>
+          <Li>パスワードなどの機密情報は保存しないでください。</Li>
           <Li>最大 <Strong>10,000文字</Strong> まで入力可能。</Li>
           <Li>検索の対象外です（メモ内のキーワードでは絞り込めません）。</Li>
           <Li>エクスポート時には含まれません。</Li>
@@ -323,14 +327,14 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("theme")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">テーマ</h2>
         <H3>切り替え方法</H3>
-        <P>ページ上部のテーマ切り替えアイコンから切り替えます。</P>
+        <P>ヘッダー右上の歯車（<Strong>Settings</Strong>）アイコンを開き、<Strong>Theme</Strong> から切り替えます。</P>
         <H3>選択肢</H3>
         <Ul>
-          <Li>太陽アイコン（<Strong>ライト</Strong>）— 常にライトモード。</Li>
-          <Li>モニターアイコン（<Strong>システム</Strong>）— OSのテーマ設定に自動追従（デフォルト）。</Li>
-          <Li>月アイコン（<Strong>ダーク</Strong>）— 常にダークモード。</Li>
+          <Li><Strong>Light</Strong> — 常にライトモード。</Li>
+          <Li><Strong>System</Strong> — OSのテーマ設定に自動追従（デフォルト）。</Li>
+          <Li><Strong>Dark</Strong> — 常にダークモード。</Li>
         </Ul>
-        <P>設定は <Strong>localStorage</Strong> に保存され、ブラウザを閉じても保持されます。</P>
+        <P>設定は <Strong>localStorage</Strong> に保存され、次回起動時も保持されます。</P>
       </section>
 
       <div className="border-t" />
@@ -464,7 +468,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("display")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Display Settings</h2>
         <H3>Column Layout</H3>
-        <P>Click the column icon in the header to open the <Strong>List Columns</Strong> menu and switch between 1–4 column layouts. Settings are saved automatically.</P>
+        <P>Open the gear (<Strong>Settings</Strong>) icon in the header and use <Strong>Display Columns</Strong> to switch between 1–4 column layouts. Settings are saved automatically.</P>
         <H3>Sort</H3>
         <P>Change the sort order from the sort controls.</P>
         <Ul>
@@ -492,19 +496,22 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
 
       <section ref={registerRef("importex")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Import / Export</h2>
-        <H3>Import (Import from HTML)</H3>
-        <P>Import bookmarks from a browser-exported HTML file. Go to <Strong>︙ menu → Import from HTML</Strong>.</P>
+        <P>Import and export are available from the gear (<Strong>Settings</Strong>) icon in the header, under the <Strong>Data</Strong> section&apos;s <Strong>Import</Strong> / <Strong>Export</Strong> buttons.</P>
+        <H3>Import</H3>
+        <P>Import bookmarks from a browser-exported HTML file.</P>
         <Ul>
           <Li>Supports Netscape HTML format from Chrome, Edge, and Firefox.</Li>
           <Li>Title, URL, and date added are imported.</Li>
           <Li>Duplicate URLs are skipped.</Li>
         </Ul>
-        <H3>Export (Export to HTML)</H3>
-        <P>Download your bookmarks as a Netscape Bookmark Format (HTML) file. Go to <Strong>︙ menu → Export to HTML</Strong>.</P>
+        <H3>Export</H3>
+        <P>Download your bookmarks as a Netscape Bookmark Format (HTML) file.</P>
         <Ul>
           <Li>The exported HTML can be imported into your browser&apos;s bookmark manager.</Li>
           <Li>Memos are not included in exports.</Li>
         </Ul>
+        <H3>Delete All</H3>
+        <P>The same <Strong>Settings</Strong> dialog has a <Strong>Danger Zone</Strong> that permanently deletes all bookmarks and tags. To prevent mistakes, you must type <Strong>delete all</Strong> in the confirmation field before confirming. This action cannot be undone.</P>
       </section>
 
       <div className="border-t" />
@@ -561,12 +568,12 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("theme")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Theme</h2>
         <H3>How to Switch</H3>
-        <P>Click the theme switcher icon at the top of the page.</P>
+        <P>Open the gear (<Strong>Settings</Strong>) icon in the header and choose from <Strong>Theme</Strong>.</P>
         <H3>Options</H3>
         <Ul>
-          <Li>Sun icon (<Strong>Light</Strong>) — always light mode.</Li>
-          <Li>Monitor icon (<Strong>System</Strong>) — follows OS theme setting (default).</Li>
-          <Li>Moon icon (<Strong>Dark</Strong>) — always dark mode.</Li>
+          <Li><Strong>Light</Strong> — always light mode.</Li>
+          <Li><Strong>System</Strong> — follows OS theme setting (default).</Li>
+          <Li><Strong>Dark</Strong> — always dark mode.</Li>
         </Ul>
         <P>Settings are saved in <Strong>localStorage</Strong> and persist across sessions.</P>
       </section>

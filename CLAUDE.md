@@ -108,7 +108,7 @@ Two Next.js config files coexist: `next.config.ts` (empty, TypeScript) and `next
 
 ### Dark Mode
 
-Class-based (`darkMode: 'class'` in `tailwind.config.ts`). Theme options: light / system / dark, persisted in localStorage via `ThemeSwitcher` component.
+Class-based (`darkMode: 'class'` in `tailwind.config.ts`). Theme options: light / system / dark, persisted in localStorage via the `SettingsDialog` component (gear icon in the header).
 
 ### Fonts
 
