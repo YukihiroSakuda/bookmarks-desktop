@@ -353,8 +353,6 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>右上の <Strong>デベロッパーモード</Strong> をオンにする。</Li>
           <Li><Strong>パッケージ化されていない拡張機能を読み込む</Strong> をクリックし、解凍したフォルダを選択する。</Li>
         </Ul>
-        <H3>接続先の設定</H3>
-        <P>初回起動時に接続先URLの入力画面が表示されます。アプリのURLを入力して保存してください。設定後はポップアップ右上の歯車アイコンから変更できます。</P>
         <H3>起動時の案内について</H3>
         <P>この拡張機能はデベロッパーモードで未パッケージのまま読み込まれているため、Chrome / Edge の起動時に確認メッセージが表示されることがあります。継続利用する場合は、この拡張機能を有効のまま使用してください。拡張機能が無効になった場合や反応しない場合は <Strong>chrome://extensions</Strong> または <Strong>edge://extensions</Strong> を開き、再度有効化して必要に応じて <Strong>再読み込み</Strong> してください。</P>
         <H3>使い方</H3>
@@ -592,8 +590,6 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>Enable <Strong>Developer mode</Strong> (top-right toggle).</Li>
           <Li>Click <Strong>Load unpacked</Strong> and select the unzipped folder.</Li>
         </Ul>
-        <H3>Connection Setup</H3>
-        <P>On first launch, enter the app URL in the settings screen. This can be changed later via the gear icon in the extension popup.</P>
         <H3>Startup Notice</H3>
         <P>Because this extension is loaded unpacked with Developer mode enabled, Chrome or Edge may show a notice when the browser starts. To keep using the extension, leave it enabled. If it becomes disabled or stops responding, open <Strong>chrome://extensions</Strong> or <Strong>edge://extensions</Strong>, enable it again, and reload it if needed.</P>
         <H3>Usage</H3>
