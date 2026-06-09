@@ -10,7 +10,6 @@ import {
 import {
   findDuplicateBookmark,
   getAutoTagNames,
-  isHttpUrl,
   mergeBookmarkTags,
 } from "../../src/shared/bookmarks/form";
 
@@ -79,13 +78,6 @@ async function fetchBookmarks(baseUrl: string): Promise<BookmarkItem[]> {
     `${baseUrl}/api/bookmarks`
   );
   return data.map((b) => ({ id: b.id, title: b.title, url: b.url }));
-}
-
-async function fetchPageTitle(url: string, baseUrl: string): Promise<string> {
-  const data = await apiFetch<{ title?: string }>(
-    `${baseUrl}/api/bookmarks/title?url=${encodeURIComponent(url)}`
-  );
-  return data.title ?? "";
 }
 
 async function saveBookmark(
@@ -158,8 +150,7 @@ export function Popup() {
   const [duplicateBookmark, setDuplicateBookmark] = useState<
     BookmarkItem | undefined
   >(undefined);
-  const [isFetchingTitle, setIsFetchingTitle] = useState(false);
-  const [titleEdited, setTitleEdited] = useState(false);
+
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [isInvalidPage, setIsInvalidPage] = useState(false);
@@ -191,7 +182,6 @@ export function Popup() {
         }
         setUrl(tabUrl);
         setTitle(response.title);
-        setTitleEdited(false);
         setStatus("idle");
       }
     );
@@ -227,23 +217,6 @@ export function Popup() {
   useEffect(() => {
     setDuplicateBookmark(findDuplicateBookmark(existingBookmarks, url));
   }, [existingBookmarks, url]);
-
-  // Auto-fetch page title (debounced)
-  useEffect(() => {
-    if (!isHttpUrl(url) || titleEdited) return;
-    const timer = setTimeout(async () => {
-      setIsFetchingTitle(true);
-      try {
-        const nextTitle = await fetchPageTitle(url, APP_URL);
-        if (nextTitle && !titleEdited) setTitle(nextTitle);
-      } catch {
-        // ignore title fetch failures
-      } finally {
-        setIsFetchingTitle(false);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [titleEdited, url]);
 
   const handleTagToggle = useCallback((tagName: string) => {
     setTags((prev) =>
@@ -341,20 +314,16 @@ export function Popup() {
         </div>
 
         {/* Title */}
-        <div className="relative">
+        <div>
           <label className="block text-sm font-medium mb-1">Title</label>
           <input
             type="text"
             value={title}
             onChange={(e) => {
               setTitle(e.target.value);
-              setTitleEdited(true);
             }}
-            className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 pr-9 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
-          {isFetchingTitle && (
-            <Loader2 className="absolute right-3 top-9 size-4 animate-spin text-muted-foreground" />
-          )}
         </div>
 
         {/* Tags */}
