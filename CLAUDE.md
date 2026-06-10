@@ -40,10 +40,10 @@ In practice the app is deployed as a **Tauri desktop app** only. There are no Ne
 State is managed via custom hooks in `src/hooks/` (barrel-exported from `src/hooks/index.ts`):
 - `useUserSettings` — sort, columns (persisted via Tauri `get_settings`/`update_settings`)
 - `useBookmarks` — CRUD, fetch, pin toggle, bulk operations, memo
-- `useBookmarkFiltering` — search (title + URL), tag filter, sort
+- `useBookmarkFiltering` — search (title + URL + memo), tag filter, sort
 - `useBookmarkOrdering` — drag-and-drop reorder
 - `useTagManagement` — tags/rules CRUD
-- `useKeyboardShortcuts` — Ctrl+N (new bookmark), Escape
+- `useKeyboardShortcuts` — `/` (focus search), Escape (close/deselect)
 - `useSearchHistory` — localStorage-persisted search history (max 10 entries)
 - `useExplorerImport` — Windows Explorer drag-drop, right-click context menu (`--path` CLI arg), single-instance `open-path-bookmark` event
 
