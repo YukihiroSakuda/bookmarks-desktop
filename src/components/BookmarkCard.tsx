@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { Button } from './Button';
 import { Tag } from './Tag';
 import { MemoField } from './MemoField';
+import { formatAcceleratorForDisplay } from '@/lib/shortcut';
 import { useState, memo, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   AlertDialog,
@@ -157,19 +158,26 @@ const BookmarkCard = memo(function BookmarkCard({
         )}
       </div>
       {!isOrderingMode && (
-        <div className="flex items-center gap-1 shrink-0 ml-3 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            onClick={async (e) => { e.stopPropagation(); setIsPinLoading(true); try { await onTogglePin(bookmark.id); } finally { setIsPinLoading(false); } }}
-            variant="ghost" size="sm" icon={Pin} isActive={bookmark.isPinned} isLoading={isPinLoading}
-          />
-          <Button
-            onClick={(e) => { e.stopPropagation(); onEdit(bookmark); }}
-            variant="ghost" size="sm" icon={SquarePen}
-          />
-          <Button
-            onClick={(e) => { e.stopPropagation(); setDeleteConfirmOpen(true); }}
-            variant="ghost" size="sm" icon={Trash2}
-          />
+        <div className="flex items-center gap-1 shrink-0 ml-3">
+          {bookmark.shortcut && (
+            <kbd className="text-[10px] font-mono text-muted-foreground border rounded px-1.5 py-0.5 bg-muted whitespace-nowrap">
+              {formatAcceleratorForDisplay(bookmark.shortcut)}
+            </kbd>
+          )}
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              onClick={async (e) => { e.stopPropagation(); setIsPinLoading(true); try { await onTogglePin(bookmark.id); } finally { setIsPinLoading(false); } }}
+              variant="ghost" size="sm" icon={Pin} isActive={bookmark.isPinned} isLoading={isPinLoading}
+            />
+            <Button
+              onClick={(e) => { e.stopPropagation(); onEdit(bookmark); }}
+              variant="ghost" size="sm" icon={SquarePen}
+            />
+            <Button
+              onClick={(e) => { e.stopPropagation(); setDeleteConfirmOpen(true); }}
+              variant="ghost" size="sm" icon={Trash2}
+            />
+          </div>
         </div>
       )}
 

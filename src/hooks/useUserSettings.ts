@@ -3,10 +3,13 @@ import { SortOption, SortOrder } from "@/types/bookmark";
 import { UserSettingsUI } from "@/types/userSettings";
 import { tauriFetch as fetch } from "@/lib/tauriFetch";
 
+export const DEFAULT_SUMMON_SHORTCUT = "CmdOrCtrl+Alt+Space";
+
 const DEFAULT_SETTINGS: UserSettingsUI = {
   listColumns: 4,
   sortOption: "accessCount",
   sortOrder: "desc",
+  summonShortcut: DEFAULT_SUMMON_SHORTCUT,
 };
 
 export function useUserSettings() {
@@ -34,11 +37,16 @@ export function useUserSettings() {
           list_columns: settings.listColumns,
           sort_option: settings.sortOption,
           sort_order: settings.sortOrder,
+          summon_shortcut: settings.summonShortcut,
         }),
       });
       if (!res.ok) throw new Error("Failed to save settings");
+      // The backend re-registers the summon hotkey and reports any combo it
+      // could not claim in `failed`.
+      return (await res.json()) as { ok: boolean; failed?: string[] };
     } catch (error) {
       console.error("Error saving user settings:", error);
+      return undefined;
     }
   }, [syncSettingsState]);
 
@@ -48,7 +56,7 @@ export function useUserSettings() {
       ...patch,
     };
 
-    await saveUserSettings(nextSettings);
+    return saveUserSettings(nextSettings);
   }, [saveUserSettings]);
 
   const applySettings = useCallback((uiSettings: UserSettingsUI) => {
@@ -65,6 +73,7 @@ export function useUserSettings() {
         listColumns: data.list_columns,
         sortOption: data.sort_option,
         sortOrder: data.sort_order,
+        summonShortcut: data.summon_shortcut || DEFAULT_SUMMON_SHORTCUT,
       };
 
       applySettings(uiSettings);

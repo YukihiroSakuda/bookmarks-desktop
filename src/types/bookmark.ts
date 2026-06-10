@@ -13,6 +13,7 @@ export interface Bookmark {
   last_accessed_at?: string;
   custom_order?: number;
   memo?: string;
+  shortcut?: string;
 }
 
 export interface BookmarkUI {
@@ -29,6 +30,7 @@ export interface BookmarkUI {
   lastAccessedAt?: string;
   customOrder?: number;
   memo?: string;
+  shortcut?: string;
 }
 
 export type SortOption = 'accessCount' | 'title' | 'createdAt' | 'custom';
@@ -47,4 +49,5 @@ export const convertToUI = (bookmark: Bookmark & { tags: string[] }): BookmarkUI
   lastAccessedAt: bookmark.last_accessed_at || undefined,
   customOrder: bookmark.custom_order,
   memo: bookmark.memo || undefined,
+  shortcut: bookmark.shortcut || undefined,
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "./Button";
 import { X, Plus } from "lucide-react";
 import { TagRuleForm } from "./TagRuleForm";
@@ -23,6 +23,20 @@ export const TagRule = ({
 }: TagRuleProps) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<TagRuleType | undefined>();
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (isFormOpen) {
+        setIsFormOpen(false);
+        setEditingRule(undefined);
+      } else {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isFormOpen, onClose]);
 
   const handleSubmit = async (data: TagRuleFormData) => {
     await onSave(data);

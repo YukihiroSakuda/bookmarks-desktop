@@ -147,7 +147,7 @@ export function BookmarkList({
         />
       ));
     }
-    
+
     return bookmarks.map((bookmark) => (
       <BookmarkCard
         key={bookmark.id}

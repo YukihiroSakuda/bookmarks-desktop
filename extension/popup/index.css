@@ -57,8 +57,7 @@
   }
 
   body {
-    width: 380px;
-    min-height: 200px;
+    width: 512px;
     margin: 0;
     font-family: 'Outfit', 'Noto Sans JP', sans-serif;
     background-color: hsl(var(--background));

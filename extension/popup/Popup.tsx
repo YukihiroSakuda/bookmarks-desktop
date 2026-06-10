@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   AlertCircle,
   Loader2,
@@ -6,12 +6,14 @@ import {
   X,
   PowerOff,
   RefreshCw,
+  Keyboard,
 } from "lucide-react";
 import {
   findDuplicateBookmark,
   getAutoTagNames,
   mergeBookmarkTags,
 } from "../../src/shared/bookmarks/form";
+import { eventToAccelerator, formatAcceleratorForDisplay } from "../../src/lib/shortcut";
 
 const APP_URL = import.meta.env.VITE_APP_URL || "http://localhost:37373";
 
@@ -32,7 +34,7 @@ type TagRuleItem = {
   tagId: string;
   targetField: "title" | "url";
 };
-type BookmarkItem = { id: string; title: string; url: string };
+type BookmarkItem = { id: string; title: string; url: string; shortcut?: string | null };
 type Status = "loading" | "idle" | "saving" | "error";
 
 // ---------- Helpers ----------
@@ -74,10 +76,10 @@ async function fetchTagRules(baseUrl: string): Promise<TagRuleItem[]> {
 }
 
 async function fetchBookmarks(baseUrl: string): Promise<BookmarkItem[]> {
-  const data = await apiFetch<{ id: string; title: string; url: string }[]>(
+  const data = await apiFetch<{ id: string; title: string; url: string; shortcut?: string | null }[]>(
     `${baseUrl}/api/bookmarks`
   );
-  return data.map((b) => ({ id: b.id, title: b.title, url: b.url }));
+  return data.map((b) => ({ id: b.id, title: b.title, url: b.url, shortcut: b.shortcut }));
 }
 
 async function saveBookmark(
@@ -87,6 +89,7 @@ async function saveBookmark(
     url: string;
     tags: string[];
     memo: string;
+    shortcut: string | null;
     availableTags: TagApiItem[];
     tagRules: TagRuleItem[];
   }
@@ -108,6 +111,7 @@ async function saveBookmark(
       is_pinned: false,
       tags: finalTags,
       memo: payload.memo.trim() || null,
+      shortcut: payload.shortcut,
     }),
   });
 }
@@ -144,6 +148,8 @@ export function Popup() {
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [memo, setMemo] = useState("");
+  const [shortcut, setShortcut] = useState<string | null>(null);
+  const [isCapturingShortcut, setIsCapturingShortcut] = useState(false);
   const [availableTags, setAvailableTags] = useState<TagApiItem[]>([]);
   const [tagRules, setTagRules] = useState<TagRuleItem[]>([]);
   const [existingBookmarks, setExistingBookmarks] = useState<BookmarkItem[]>([]);
@@ -156,6 +162,19 @@ export function Popup() {
   const [isInvalidPage, setIsInvalidPage] = useState(false);
   const [serverDown, setServerDown] = useState(false);
   const [loadKey, setLoadKey] = useState(0);
+  const [showAssigned, setShowAssigned] = useState(false);
+  const assignedPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showAssigned) return;
+    const handler = (e: MouseEvent) => {
+      if (assignedPopoverRef.current && !assignedPopoverRef.current.contains(e.target as Node)) {
+        setShowAssigned(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showAssigned]);
 
   const handleRetry = useCallback(() => {
     setServerDown(false);
@@ -218,6 +237,25 @@ export function Popup() {
     setDuplicateBookmark(findDuplicateBookmark(existingBookmarks, url));
   }, [existingBookmarks, url]);
 
+  const shortcutConflict = shortcut
+    ? existingBookmarks.find((b) => b.shortcut === shortcut)
+    : undefined;
+
+  function handleShortcutKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    e.preventDefault();
+    if (e.key === "Escape") {
+      setIsCapturingShortcut(false);
+      e.currentTarget.blur();
+      return;
+    }
+    const accelerator = eventToAccelerator(e.nativeEvent);
+    if (accelerator) {
+      setShortcut(accelerator);
+      setIsCapturingShortcut(false);
+      e.currentTarget.blur();
+    }
+  }
+
   const handleTagToggle = useCallback((tagName: string) => {
     setTags((prev) =>
       prev.includes(tagName)
@@ -238,7 +276,7 @@ export function Popup() {
     setStatus("saving");
     setErrorMessage("");
     try {
-      await saveBookmark(APP_URL, { title, url, tags, memo, availableTags, tagRules });
+      await saveBookmark(APP_URL, { title, url, tags, memo, shortcut, availableTags, tagRules });
       setExistingBookmarks((prev) => [
         ...prev,
         { id: crypto.randomUUID(), title, url },
@@ -250,7 +288,7 @@ export function Popup() {
         error instanceof Error ? error.message : "Failed to save bookmark"
       );
     }
-  }, [availableTags, memo, tagRules, tags, title, url]);
+  }, [availableTags, memo, shortcut, tagRules, tags, title, url]);
 
   if (serverDown) {
     return <ServerDownView onRetry={handleRetry} />;
@@ -278,11 +316,34 @@ export function Popup() {
 
   return (
     <div className="bg-popover p-6">
-      <div className="mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold">
           <span className="text-blue-500">#</span>
           Add New Bookmark
         </h2>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => window.close()}
+            className="h-8 px-3 bg-secondary text-secondary-foreground text-sm font-medium rounded-md shadow-sm hover:bg-secondary/80 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={status === "saving" || !title || !url || !!shortcutConflict}
+            className="h-8 px-3 bg-primary text-primary-foreground text-sm font-medium rounded-md shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+          >
+            {status === "saving" ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Add Bookmark"
+            )}
+          </button>
+        </div>
       </div>
 
       {status === "error" && (
@@ -292,7 +353,7 @@ export function Popup() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {/* URL */}
         <div>
           <label className="block text-sm font-medium mb-1">URL</label>
@@ -324,6 +385,82 @@ export function Popup() {
             }}
             className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
+        </div>
+
+        {/* Shortcut */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium">Shortcut</label>
+            <div className="relative" ref={assignedPopoverRef}>
+              <button
+                type="button"
+                onClick={() => setShowAssigned((v) => !v)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {existingBookmarks.filter((b) => b.shortcut).length > 0
+                  ? `${existingBookmarks.filter((b) => b.shortcut).length} assigned`
+                  : "None assigned"}
+              </button>
+              {showAssigned && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-lg shadow-lg p-3 z-10">
+                  <p className="text-xs font-medium mb-2">Assigned Shortcuts</p>
+                  {existingBookmarks.filter((b) => b.shortcut).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No shortcuts assigned yet.</p>
+                  ) : (
+                    <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+                      {existingBookmarks.filter((b) => b.shortcut).map((b) => (
+                        <div key={b.id} className="flex items-center justify-between gap-2">
+                          <span className="text-xs truncate text-muted-foreground min-w-0">{b.title || b.url}</span>
+                          <kbd className="shrink-0 inline-flex items-center rounded border border-border bg-muted px-1.5 py-0.5 text-xs font-mono text-foreground">
+                            {formatAcceleratorForDisplay(b.shortcut!)}
+                          </kbd>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="relative flex gap-2">
+            <div className="relative flex-1">
+              <Keyboard className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                readOnly
+                value={
+                  isCapturingShortcut
+                    ? "Press a key combination…"
+                    : shortcut
+                    ? formatAcceleratorForDisplay(shortcut)
+                    : ""
+                }
+                placeholder="Click to assign"
+                onFocus={() => setIsCapturingShortcut(true)}
+                onBlur={() => setIsCapturingShortcut(false)}
+                onKeyDown={handleShortcutKeyDown}
+                className="h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring placeholder:text-muted-foreground cursor-pointer caret-transparent"
+              />
+            </div>
+            {shortcut && (
+              <button
+                type="button"
+                onClick={() => setShortcut(null)}
+                className="h-9 w-9 flex items-center justify-center rounded-md border border-input bg-transparent hover:bg-accent transition-colors"
+              >
+                <X className="size-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+          {shortcutConflict && (
+            <div className="flex items-center gap-1.5 mt-1 text-xs text-amber-500">
+              <TriangleAlert className="size-3.5 shrink-0" />
+              <span>Already used by &ldquo;{shortcutConflict.title || shortcutConflict.url}&rdquo;</span>
+            </div>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            Requires at least one modifier (Ctrl / Alt / Shift).
+          </p>
         </div>
 
         {/* Tags */}
@@ -389,7 +526,7 @@ export function Popup() {
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
             maxLength={10000}
-            rows={3}
+            rows={2}
             className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y placeholder:text-muted-foreground"
           />
           <p className="text-xs text-muted-foreground mt-1">
@@ -397,30 +534,6 @@ export function Popup() {
           </p>
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-end gap-2 mt-6">
-          <button
-            type="button"
-            onClick={() => window.close()}
-            className="h-9 px-4 bg-secondary text-secondary-foreground text-sm font-medium rounded-md shadow-sm hover:bg-secondary/80 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={status === "saving" || !title || !url}
-            className="h-9 px-4 bg-primary text-primary-foreground text-sm font-medium rounded-md shadow hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-          >
-            {status === "saving" ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Add Bookmark"
-            )}
-          </button>
-        </div>
       </div>
     </div>
   );

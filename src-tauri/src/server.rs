@@ -80,6 +80,8 @@ struct CreateBookmarkBody {
     tags: Vec<String>,
     #[serde(default)]
     memo: Option<String>,
+    #[serde(default)]
+    shortcut: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -119,7 +121,7 @@ async fn get_bookmarks(State(state): State<ServerState>) -> ApiResult {
         let mut stmt = conn
             .prepare(
                 "SELECT id, kind, title, url, favicon, is_pinned, access_count, custom_order, \
-                 memo, created_at, updated_at, last_accessed_at \
+                 memo, created_at, updated_at, last_accessed_at, shortcut \
                  FROM bookmarks ORDER BY custom_order ASC",
             )
             .map_err(|e| e.to_string())?;
@@ -139,6 +141,7 @@ async fn get_bookmarks(State(state): State<ServerState>) -> ApiResult {
                     "created_at": r.get::<_, String>(9)?,
                     "updated_at": r.get::<_, String>(10)?,
                     "last_accessed_at": r.get::<_, Option<String>>(11)?,
+                    "shortcut": r.get::<_, Option<String>>(12)?,
                 }))
             })
             .map_err(|e| e.to_string())?;
@@ -186,8 +189,8 @@ async fn post_bookmark(
 
         tx.execute(
             "INSERT INTO bookmarks (id, kind, title, url, favicon, is_pinned, access_count, \
-             custom_order, memo, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, ?10)",
+             custom_order, memo, shortcut, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, ?10, ?11)",
             rusqlite::params![
                 id,
                 kind,
@@ -197,6 +200,7 @@ async fn post_bookmark(
                 body.is_pinned as i64,
                 next_order,
                 body.memo,
+                body.shortcut,
                 ts,
                 ts
             ],

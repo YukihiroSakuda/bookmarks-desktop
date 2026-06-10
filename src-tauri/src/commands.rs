@@ -4,7 +4,8 @@ use rusqlite::OptionalExtension;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use tauri::State;
+use tauri::{AppHandle, Emitter, Manager, State};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use uuid::Uuid;
 
 fn now() -> String {
@@ -31,6 +32,8 @@ pub struct BookmarkInput {
     tags: Vec<String>,
     #[serde(default)]
     memo: Option<String>,
+    #[serde(default)]
+    shortcut: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -44,6 +47,7 @@ pub struct SettingsInput {
     list_columns: i64,
     sort_option: String,
     sort_order: String,
+    summon_shortcut: String,
 }
 
 #[derive(Deserialize)]
@@ -125,7 +129,7 @@ pub fn list_bookmarks(state: State<AppState>) -> Result<Value, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, kind, title, url, favicon, is_pinned, access_count, custom_order, \
-             memo, created_at, updated_at, last_accessed_at \
+             memo, created_at, updated_at, last_accessed_at, shortcut \
              FROM bookmarks ORDER BY custom_order ASC",
         )
         .map_err(|e| e.to_string())?;
@@ -145,6 +149,7 @@ pub fn list_bookmarks(state: State<AppState>) -> Result<Value, String> {
                 "created_at": r.get::<_, String>(9)?,
                 "updated_at": r.get::<_, String>(10)?,
                 "last_accessed_at": r.get::<_, Option<String>>(11)?,
+                "shortcut": r.get::<_, Option<String>>(12)?,
             }))
         })
         .map_err(|e| e.to_string())?;
@@ -173,8 +178,8 @@ pub fn create_bookmark(data: BookmarkInput, state: State<AppState>) -> Result<Va
         .map_err(|e| e.to_string())?;
 
     tx.execute(
-        "INSERT INTO bookmarks (id, kind, title, url, favicon, is_pinned, access_count, custom_order, memo, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, ?10)",
+        "INSERT INTO bookmarks (id, kind, title, url, favicon, is_pinned, access_count, custom_order, memo, shortcut, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, ?10, ?11)",
         rusqlite::params![
             id,
             kind,
@@ -184,6 +189,7 @@ pub fn create_bookmark(data: BookmarkInput, state: State<AppState>) -> Result<Va
             data.is_pinned as i64,
             next_order,
             data.memo,
+            data.shortcut,
             ts,
             ts
         ],
@@ -212,7 +218,7 @@ pub fn update_bookmark(
         Some(kind) => {
             tx.execute(
                 "UPDATE bookmarks SET kind = ?1, title = ?2, url = ?3, favicon = ?4, \
-                 is_pinned = ?5, memo = ?6, updated_at = ?7 WHERE id = ?8",
+                 is_pinned = ?5, memo = ?6, shortcut = ?7, updated_at = ?8 WHERE id = ?9",
                 rusqlite::params![
                     kind,
                     data.title,
@@ -220,6 +226,7 @@ pub fn update_bookmark(
                     data.favicon,
                     data.is_pinned as i64,
                     data.memo,
+                    data.shortcut,
                     ts,
                     id
                 ],
@@ -227,13 +234,14 @@ pub fn update_bookmark(
         }
         None => tx.execute(
             "UPDATE bookmarks SET title = ?1, url = ?2, favicon = ?3, \
-             is_pinned = ?4, memo = ?5, updated_at = ?6 WHERE id = ?7",
+             is_pinned = ?4, memo = ?5, shortcut = ?6, updated_at = ?7 WHERE id = ?8",
             rusqlite::params![
                 data.title,
                 data.url,
                 data.favicon,
                 data.is_pinned as i64,
                 data.memo,
+                data.shortcut,
                 ts,
                 id
             ],
@@ -306,6 +314,82 @@ pub fn reorder_bookmarks(order: Vec<OrderItem>, state: State<AppState>) -> Resul
     }
     tx.commit().map_err(|e| e.to_string())?;
     Ok(json!({ "ok": true }))
+}
+
+// ---------- Global shortcut commands ----------
+
+/// Invoked by the global-shortcut plugin's handler on key *press*. The only
+/// combo registered globally is the "summon" hotkey; when it fires we bring the
+/// window to the front and tell the frontend to focus the search field. Per-
+/// bookmark shortcuts are handled in-app (only while focused), not here.
+pub fn on_shortcut_pressed(app: &AppHandle, shortcut: &Shortcut) {
+    let state = app.state::<AppState>();
+    let is_summon = {
+        let summon = state.summon_shortcut.lock().unwrap();
+        summon.as_deref() == Some(&shortcut.to_string())
+    };
+    if is_summon {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
+        let _ = app.emit("summon", ());
+    }
+}
+
+/// Register (or re-register) the single global "summon" hotkey from settings:
+/// clears any current registration, then registers the stored combo. Returns
+/// `failed` carrying the combo when the OS/another app already owns it
+/// (Windows `RegisterHotKey` fails) or it fails to parse, so the caller can warn
+/// without leaving a stale registration behind.
+pub fn sync_summon_inner(app: &AppHandle) -> Result<Value, String> {
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+
+    let state = app.state::<AppState>();
+    let raw: String = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        conn.query_row(
+            "SELECT summon_shortcut FROM user_settings WHERE id = 1",
+            [],
+            |r| r.get::<_, String>(0),
+        )
+        .map_err(|e| e.to_string())?
+    };
+
+    let mut failed: Vec<String> = Vec::new();
+    let mut active: Option<String> = None;
+
+    if !raw.is_empty() {
+        match raw.parse::<Shortcut>() {
+            Ok(shortcut) => {
+                let canonical = shortcut.to_string();
+                if gs.register(shortcut).is_ok() {
+                    active = Some(canonical);
+                } else {
+                    failed.push(raw);
+                }
+            }
+            Err(_) => failed.push(raw),
+        }
+    }
+
+    *state.summon_shortcut.lock().map_err(|e| e.to_string())? = active;
+    Ok(json!({ "ok": true, "failed": failed }))
+}
+
+/// Pre-check used by the settings UI before saving the summon hotkey: reports
+/// whether the accelerator is free from this app's perspective. Note this only
+/// reflects registrations this app holds; a combo owned by another app still
+/// appears "available" here and is caught only when `sync_summon_inner` tries
+/// to register it.
+#[tauri::command]
+pub fn is_shortcut_available(app: AppHandle, accelerator: String) -> Result<bool, String> {
+    let shortcut: Shortcut = accelerator
+        .parse()
+        .map_err(|_| format!("invalid accelerator: {accelerator}"))?;
+    Ok(!app.global_shortcut().is_registered(shortcut))
 }
 
 // ---------- Tag commands ----------
@@ -443,13 +527,15 @@ pub fn get_settings(state: State<AppState>) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let value = conn
         .query_row(
-            "SELECT list_columns, sort_option, sort_order FROM user_settings WHERE id = 1",
+            "SELECT list_columns, sort_option, sort_order, summon_shortcut \
+             FROM user_settings WHERE id = 1",
             [],
             |r| {
                 Ok(json!({
                     "list_columns": r.get::<_, i64>(0)?,
                     "sort_option": r.get::<_, String>(1)?,
                     "sort_order": r.get::<_, String>(2)?,
+                    "summon_shortcut": r.get::<_, String>(3)?,
                 }))
             },
         )
@@ -458,14 +544,385 @@ pub fn get_settings(state: State<AppState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn update_settings(data: SettingsInput, state: State<AppState>) -> Result<Value, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    conn.execute(
-        "UPDATE user_settings SET list_columns = ?1, sort_option = ?2, sort_order = ?3 WHERE id = 1",
-        rusqlite::params![data.list_columns, data.sort_option, data.sort_order],
-    )
+pub fn update_settings(
+    app: AppHandle,
+    data: SettingsInput,
+    state: State<AppState>,
+) -> Result<Value, String> {
+    {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE user_settings SET list_columns = ?1, sort_option = ?2, sort_order = ?3, \
+             summon_shortcut = ?4 WHERE id = 1",
+            rusqlite::params![
+                data.list_columns,
+                data.sort_option,
+                data.sort_order,
+                data.summon_shortcut
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    // Re-register the summon hotkey so changes take effect immediately. Returns
+    // `failed` if the new combo is already taken, letting the caller warn.
+    sync_summon_inner(&app)
+}
+
+// ---------- JSON backup / restore ----------
+
+#[derive(Deserialize)]
+struct ImportBookmark {
+    id: String,
+    #[serde(default)]
+    kind: Option<String>,
+    title: String,
+    url: String,
+    #[serde(default)]
+    favicon: Option<String>,
+    #[serde(default)]
+    is_pinned: bool,
+    #[serde(default)]
+    access_count: i64,
+    #[serde(default)]
+    custom_order: i64,
+    #[serde(default)]
+    memo: Option<String>,
+    #[serde(default)]
+    shortcut: Option<String>,
+    created_at: String,
+    updated_at: String,
+    #[serde(default)]
+    last_accessed_at: Option<String>,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct ImportTag {
+    id: String,
+    name: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Deserialize)]
+struct ImportTagRule {
+    id: String,
+    match_type: String,
+    pattern: String,
+    tag_id: String,
+    target_field: String,
+    created_at: String,
+    updated_at: String,
+}
+
+#[derive(Deserialize)]
+struct ImportSettings {
+    list_columns: i64,
+    sort_option: String,
+    sort_order: String,
+    summon_shortcut: String,
+}
+
+#[derive(Deserialize)]
+struct ImportData {
+    #[serde(default)]
+    bookmarks: Vec<ImportBookmark>,
+    #[serde(default)]
+    tags: Vec<ImportTag>,
+    #[serde(default)]
+    tag_rules: Vec<ImportTagRule>,
+    #[serde(default)]
+    settings: Option<ImportSettings>,
+}
+
+/// Build a complete, versioned JSON snapshot of all app data (bookmarks with
+/// their tags/memo/shortcut, tags, tag rules, settings).
+fn build_export_snapshot(conn: &rusqlite::Connection) -> Result<Value, String> {
+    // Map bookmark_id -> [tag names]
+    let mut tag_map: HashMap<String, Vec<String>> = HashMap::new();
+    {
+        let mut stmt = conn
+            .prepare(
+                "SELECT bt.bookmark_id, t.name FROM bookmarks_tags bt \
+                 JOIN tags t ON t.id = bt.tag_id",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?;
+        for row in rows {
+            let (bid, name) = row.map_err(|e| e.to_string())?;
+            tag_map.entry(bid).or_default().push(name);
+        }
+    }
+
+    let mut bookmarks = Vec::new();
+    {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, kind, title, url, favicon, is_pinned, access_count, custom_order, \
+                 memo, shortcut, created_at, updated_at, last_accessed_at \
+                 FROM bookmarks ORDER BY custom_order ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(json!({
+                    "id": r.get::<_, String>(0)?,
+                    "kind": r.get::<_, String>(1)?,
+                    "title": r.get::<_, String>(2)?,
+                    "url": r.get::<_, String>(3)?,
+                    "favicon": r.get::<_, Option<String>>(4)?,
+                    "is_pinned": r.get::<_, i64>(5)? != 0,
+                    "access_count": r.get::<_, i64>(6)?,
+                    "custom_order": r.get::<_, i64>(7)?,
+                    "memo": r.get::<_, Option<String>>(8)?,
+                    "shortcut": r.get::<_, Option<String>>(9)?,
+                    "created_at": r.get::<_, String>(10)?,
+                    "updated_at": r.get::<_, String>(11)?,
+                    "last_accessed_at": r.get::<_, Option<String>>(12)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
+        for row in rows {
+            let mut obj = row.map_err(|e| e.to_string())?;
+            let id = obj["id"].as_str().unwrap_or_default().to_string();
+            let tags = tag_map.remove(&id).unwrap_or_default();
+            obj["tags"] = Value::Array(tags.into_iter().map(Value::String).collect());
+            bookmarks.push(obj);
+        }
+    }
+
+    let mut tags = Vec::new();
+    {
+        let mut stmt = conn
+            .prepare("SELECT id, name, created_at, updated_at FROM tags ORDER BY name ASC")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(json!({
+                    "id": r.get::<_, String>(0)?,
+                    "name": r.get::<_, String>(1)?,
+                    "created_at": r.get::<_, String>(2)?,
+                    "updated_at": r.get::<_, String>(3)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
+        for row in rows {
+            tags.push(row.map_err(|e| e.to_string())?);
+        }
+    }
+
+    let mut tag_rules = Vec::new();
+    {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, match_type, pattern, tag_id, target_field, created_at, updated_at \
+                 FROM tag_rules ORDER BY created_at ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| {
+                Ok(json!({
+                    "id": r.get::<_, String>(0)?,
+                    "match_type": r.get::<_, String>(1)?,
+                    "pattern": r.get::<_, String>(2)?,
+                    "tag_id": r.get::<_, String>(3)?,
+                    "target_field": r.get::<_, String>(4)?,
+                    "created_at": r.get::<_, String>(5)?,
+                    "updated_at": r.get::<_, String>(6)?,
+                }))
+            })
+            .map_err(|e| e.to_string())?;
+        for row in rows {
+            tag_rules.push(row.map_err(|e| e.to_string())?);
+        }
+    }
+
+    let settings = conn
+        .query_row(
+            "SELECT list_columns, sort_option, sort_order, summon_shortcut \
+             FROM user_settings WHERE id = 1",
+            [],
+            |r| {
+                Ok(json!({
+                    "list_columns": r.get::<_, i64>(0)?,
+                    "sort_option": r.get::<_, String>(1)?,
+                    "sort_order": r.get::<_, String>(2)?,
+                    "summon_shortcut": r.get::<_, String>(3)?,
+                }))
+            },
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(json!({
+        "version": 1,
+        "exported_at": now(),
+        "bookmarks": bookmarks,
+        "tags": tags,
+        "tag_rules": tag_rules,
+        "settings": settings,
+    }))
+}
+
+/// Wipe all existing data and re-insert from a parsed backup, inside a single
+/// transaction so a malformed file leaves the database untouched.
+fn apply_import(conn: &mut rusqlite::Connection, data: &ImportData) -> Result<Value, String> {
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    tx.execute("DELETE FROM bookmarks_tags", []).map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM tag_rules", []).map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM bookmarks", []).map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM tags", []).map_err(|e| e.to_string())?;
+
+    for t in &data.tags {
+        tx.execute(
+            "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
+            rusqlite::params![t.id, t.name, t.created_at, t.updated_at],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    for b in &data.bookmarks {
+        let kind = b.kind.clone().unwrap_or_else(|| "url".to_string());
+        tx.execute(
+            "INSERT INTO bookmarks (id, kind, title, url, favicon, is_pinned, access_count, \
+             custom_order, memo, shortcut, created_at, updated_at, last_accessed_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+            rusqlite::params![
+                b.id,
+                kind,
+                b.title,
+                b.url,
+                b.favicon,
+                b.is_pinned as i64,
+                b.access_count,
+                b.custom_order,
+                b.memo,
+                b.shortcut,
+                b.created_at,
+                b.updated_at,
+                b.last_accessed_at,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+        // Re-link tags by name (tags inserted above are found, not duplicated).
+        link_tags(&tx, &b.id, &b.tags, &b.updated_at)?;
+    }
+
+    for r in &data.tag_rules {
+        tx.execute(
+            "INSERT INTO tag_rules (id, match_type, pattern, tag_id, target_field, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            rusqlite::params![
+                r.id,
+                r.match_type,
+                r.pattern,
+                r.tag_id,
+                r.target_field,
+                r.created_at,
+                r.updated_at
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    if let Some(s) = &data.settings {
+        tx.execute(
+            "UPDATE user_settings SET list_columns = ?1, sort_option = ?2, sort_order = ?3, \
+             summon_shortcut = ?4 WHERE id = 1",
+            rusqlite::params![s.list_columns, s.sort_option, s.sort_order, s.summon_shortcut],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+
+    Ok(json!({
+        "ok": true,
+        "bookmarks": data.bookmarks.len(),
+        "tags": data.tags.len(),
+        "tag_rules": data.tag_rules.len(),
+    }))
+}
+
+#[tauri::command]
+pub async fn export_data(app: AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    // Build the snapshot string up front so the DB lock is never held across the
+    // (blocking) save dialog.
+    let json_string = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        let snapshot = build_export_snapshot(&conn)?;
+        serde_json::to_string_pretty(&snapshot).map_err(|e| e.to_string())?
+    };
+
+    let dest = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || {
+            app.dialog()
+                .file()
+                .set_file_name("bookmarks-backup.json")
+                .add_filter("JSON", &["json"])
+                .blocking_save_file()
+        }
+    })
+    .await
     .map_err(|e| e.to_string())?;
-    Ok(json!({ "ok": true }))
+
+    match dest {
+        None => Ok(json!({ "cancelled": true })),
+        Some(file_path) => {
+            let tauri_plugin_dialog::FilePath::Path(path) = file_path else {
+                return Err("expected a file path".to_string());
+            };
+            std::fs::write(&path, json_string).map_err(|e| e.to_string())?;
+            Ok(json!({ "ok": true }))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn import_data(app: AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let src = tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || {
+            app.dialog()
+                .file()
+                .add_filter("JSON", &["json"])
+                .blocking_pick_file()
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+
+    let path = match src {
+        None => return Ok(json!({ "cancelled": true })),
+        Some(file_path) => {
+            let tauri_plugin_dialog::FilePath::Path(path) = file_path else {
+                return Err("expected a file path".to_string());
+            };
+            path
+        }
+    };
+
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let data: ImportData =
+        serde_json::from_str(&content).map_err(|e| format!("Invalid backup file: {e}"))?;
+
+    let summary = {
+        let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+        apply_import(&mut conn, &data)?
+    };
+
+    // Settings (incl. the summon hotkey) may have changed — re-register it.
+    sync_summon_inner(&app)?;
+
+    Ok(summary)
 }
 
 // ---------- Title fetch ----------

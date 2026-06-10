@@ -1,7 +1,7 @@
 "use client";
 
 import { HelpCircle, Download, Loader2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   Dialog,
@@ -108,7 +108,7 @@ const SECTIONS_JA = [
   { id: "importex", label: "インポート / エクスポート" },
   { id: "explorer", label: "エクスプローラ連携" },
   { id: "memo",     label: "メモ" },
-  { id: "shortcuts", label: "ショートカット一覧" },
+  { id: "shortcuts", label: "ショートカット" },
   { id: "theme",    label: "テーマ" },
   { id: "extension", label: "ブラウザ拡張機能" },
 ];
@@ -255,7 +255,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
 
       <section ref={registerRef("importex")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">インポート / エクスポート</h2>
-        <P>インポート・エクスポートはヘッダー右上の歯車（<Strong>Settings</Strong>）アイコンを開き、<Strong>Data</Strong> セクションの <Strong>Import</Strong> / <Strong>Export</Strong> ボタンから実行します。</P>
+        <P>インポート・エクスポートはヘッダー右上の歯車（<Strong>Settings</Strong>）アイコンを開き、<Strong>Data</Strong> セクションのボタンから実行します。ブラウザと互換性のある <Strong>HTML</Strong> 形式と、すべての情報を保持する <Strong>JSON</Strong> 形式の2種類があります。</P>
         <H3>インポート（Import）</H3>
         <P>ブラウザからエクスポートしたHTMLファイルを取り込みます。</P>
         <Ul>
@@ -267,7 +267,13 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>現在のブックマーク一覧をNetscape Bookmark Format（HTML）でダウンロードします。</P>
         <Ul>
           <Li>エクスポートされたHTMLはブラウザのブックマーク管理からインポートできます。</Li>
-          <Li>メモはエクスポートされません。</Li>
+          <Li>メモ・タグ・ショートカットはエクスポートされません。</Li>
+        </Ul>
+        <H3>バックアップ（Backup） / 復元（Restore） — JSON</H3>
+        <P>HTML形式では失われる情報も含め、アプリのすべてのデータを <Strong>JSON</Strong> ファイルで保存・復元できます。PCの移行や定期バックアップに適しています。</P>
+        <Ul>
+          <Li><Strong>Backup</Strong> — ブックマーク（タグ・メモ・ショートカット・並び順を含む）、タグ、タグルール、設定をまとめてJSONファイルに書き出します。</Li>
+          <Li><Strong>Restore</Strong> — JSONバックアップファイルを選択して取り込みます。<Strong>現在のすべてのデータが置き換えられます</Strong>（この操作は取り消せません）。実行前に確認ダイアログが表示されます。</Li>
         </Ul>
         <H3>全件削除（Delete All）</H3>
         <P>同じ <Strong>Settings</Strong> ダイアログの <Strong>Danger Zone</Strong> から、すべてのブックマークとタグを完全に削除できます。誤操作を防ぐため、確認入力欄に <Strong>delete all</Strong> と入力した上で確認すると実行されます。この操作は取り消せません。</P>
@@ -313,11 +319,22 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <div className="border-t" />
 
       <section ref={registerRef("shortcuts")}>
-        <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">キーボードショートカット一覧</h2>
-        <div className="rounded-lg border overflow-hidden">
+        <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">ショートカット</h2>
+        <div className="rounded-lg border overflow-hidden mb-3">
           <ShortcutRow keys={["/"]} label="検索バーにフォーカス" />
           <ShortcutRow keys={["Esc"]} label="モーダルを閉じる / 操作をキャンセル" />
+          <ShortcutRow keys={["Ctrl", "Alt", "Space"]} label="アプリを前面に表示（グローバル、初期値）" />
         </div>
+        <P>前面表示ショートカットはシステム全体に登録される唯一のグローバルショートカットです。<Strong>設定</Strong>ダイアログの <Strong>Bring App to Front</Strong> 欄から変更できます。他アプリと衝突しにくい <Strong>Ctrl+Alt</Strong> または <Strong>Ctrl+Shift</Strong> の組み合わせを推奨します。</P>
+        <H3>ブックマークごとのショートカット（アプリ内）</H3>
+        <P>各ブックマークにキーを割り当てると、<Strong>アプリが表示されている間</Strong>にそのキーでページ／フォルダを開けます。割り当てたキーはカード右側に常時バッジ表示されます。</P>
+        <Ul>
+          <Li>追加／編集フォームの <Strong>Shortcut</Strong> 欄をクリックし、使いたいキーの組み合わせを押します。</Li>
+          <Li><Strong>修飾キー（Ctrl / Alt / Shift）が最低1つ必要</Strong>です。メインキーは英字・数字・ファンクションキー（F1〜F12）に対応します。</Li>
+          <Li>キー入力待ちの状態で <Kbd>Esc</Kbd> を押すとキャプチャを取り消します（既存の割り当ては変わりません）。<Strong>X</Strong> ボタンを押すと割り当てを解除します。</Li>
+          <Li>検索バーなど入力欄にフォーカスがある間は無効です（コピー等の編集キーを優先）。</Li>
+          <Li><Strong>重複不可</Strong> — 同じ組み合わせを複数のブックマークには割り当てられません（フォームで警告し保存をブロックします）。</Li>
+        </Ul>
       </section>
 
       <div className="border-t" />
@@ -360,6 +377,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>保存したいページでツールバーの拡張機能アイコンをクリック。</Li>
           <Li>URL とタイトルを確認し、必要に応じてタグやメモを入力する。</Li>
           <Li>既に保存済みのURLは重複として検知される。</Li>
+          <Li><Strong>Shortcut</Strong> 欄でブックマークにショートカットキーを割り当てることができる（アプリ内での動作と同じ）。</Li>
           <Li><Strong>Add Bookmark</Strong> を押すと、そのまま拡張内から保存できる。</Li>
         </Ul>
         <DownloadExtensionButton />
@@ -492,7 +510,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
 
       <section ref={registerRef("importex")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Import / Export</h2>
-        <P>Import and export are available from the gear (<Strong>Settings</Strong>) icon in the header, under the <Strong>Data</Strong> section&apos;s <Strong>Import</Strong> / <Strong>Export</Strong> buttons.</P>
+        <P>Import and export are available from the gear (<Strong>Settings</Strong>) icon in the header, under the <Strong>Data</Strong> section. There are two formats: browser-compatible <Strong>HTML</Strong>, and <Strong>JSON</Strong> which preserves everything.</P>
         <H3>Import</H3>
         <P>Import bookmarks from a browser-exported HTML file.</P>
         <Ul>
@@ -504,7 +522,13 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>Download your bookmarks as a Netscape Bookmark Format (HTML) file.</P>
         <Ul>
           <Li>The exported HTML can be imported into your browser&apos;s bookmark manager.</Li>
-          <Li>Memos are not included in exports.</Li>
+          <Li>Memos, tags, and shortcuts are not included in exports.</Li>
+        </Ul>
+        <H3>Backup / Restore — JSON</H3>
+        <P>Save and restore <Strong>all</Strong> app data as a <Strong>JSON</Strong> file, including information that HTML drops. Ideal for migrating to a new PC or keeping periodic backups.</P>
+        <Ul>
+          <Li><Strong>Backup</Strong> — writes bookmarks (including tags, memos, shortcuts, and order), tags, tag rules, and settings to a single JSON file.</Li>
+          <Li><Strong>Restore</Strong> — pick a JSON backup file to import. This <Strong>replaces all current data</Strong> (cannot be undone). A confirmation dialog is shown first.</Li>
         </Ul>
         <H3>Delete All</H3>
         <P>The same <Strong>Settings</Strong> dialog has a <Strong>Danger Zone</Strong> that permanently deletes all bookmarks and tags. To prevent mistakes, you must type <Strong>delete all</Strong> in the confirmation field before confirming. This action cannot be undone.</P>
@@ -550,11 +574,22 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <div className="border-t" />
 
       <section ref={registerRef("shortcuts")}>
-        <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Keyboard Shortcuts</h2>
-        <div className="rounded-lg border overflow-hidden">
+        <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Shortcuts</h2>
+        <div className="rounded-lg border overflow-hidden mb-3">
           <ShortcutRow keys={["/"]} label="Focus search bar" />
           <ShortcutRow keys={["Esc"]} label="Close modal / cancel action" />
+          <ShortcutRow keys={["Ctrl", "Alt", "Space"]} label="Bring app to front (global, default)" />
         </div>
+        <P>The bring-to-front shortcut is the one global shortcut registered system-wide. Change it in the <Strong>Settings</Strong> dialog under <Strong>Bring App to Front</Strong>. Prefer a <Strong>Ctrl+Alt</Strong> or <Strong>Ctrl+Shift</Strong> combo to avoid clashing with other apps.</P>
+        <H3>Per-Bookmark Shortcuts (In-App)</H3>
+        <P>Assign a key to a bookmark to open its page/folder <Strong>while the app is open</Strong>. Assigned keys are always shown as a badge on the right of the card.</P>
+        <Ul>
+          <Li>Click the <Strong>Shortcut</Strong> field in the add/edit form and press your desired key combination.</Li>
+          <Li><Strong>At least one modifier (Ctrl / Alt / Shift) is required.</Strong> The main key can be a letter, digit, or function key (F1–F12).</Li>
+          <Li>Press <Kbd>Esc</Kbd> while capturing to cancel without changing the current assignment. Press the <Strong>X</Strong> button to remove the assignment entirely.</Li>
+          <Li>Inactive while a text field is focused (so editing keys like copy/paste keep working).</Li>
+          <Li><Strong>Must be unique</Strong> — the same combo can&apos;t be assigned to multiple bookmarks (the form warns and blocks saving).</Li>
+        </Ul>
       </section>
 
       <div className="border-t" />
@@ -597,6 +632,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>Click the extension icon in the toolbar on any page you want to save.</Li>
           <Li>Review the URL and title, then add tags or memo if needed.</Li>
           <Li>Duplicate URLs are detected in the popup.</Li>
+          <Li>Use the <Strong>Shortcut</Strong> field to assign a key combo to the bookmark (works the same as in the main app).</Li>
           <Li>Click <Strong>Add Bookmark</Strong> to save directly from the extension.</Li>
         </Ul>
         <div className="mt-4">
@@ -624,8 +660,16 @@ export function HelpDialog() {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState("basic");
   const [lang, setLang] = useState<"ja" | "en">("ja");
-  const contentRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+  // State-backed container node: a callback ref guarantees the scroll-spy effect
+  // re-runs once the (portaled) content element is actually mounted in the DOM.
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  const setContentNode = useCallback((node: HTMLDivElement | null) => {
+    contentRef.current = node;
+    setContainerEl(node);
+  }, []);
 
   const SECTIONS = lang === "ja" ? SECTIONS_JA : SECTIONS_EN;
 
@@ -645,7 +689,7 @@ export function HelpDialog() {
 
   // Scroll spy: keep the sidebar entry in sync with the section in view.
   useEffect(() => {
-    const container = contentRef.current;
+    const container = containerEl;
     if (!open || !container) return;
 
     const handleScroll = () => {
@@ -667,9 +711,14 @@ export function HelpDialog() {
     };
 
     container.addEventListener("scroll", handleScroll, { passive: true });
-    handleScroll();
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, [open, SECTIONS]);
+    // Run once after layout settles (the dialog open animation transforms the
+    // content, so an immediate read can be off).
+    const raf = requestAnimationFrame(handleScroll);
+    return () => {
+      cancelAnimationFrame(raf);
+      container.removeEventListener("scroll", handleScroll);
+    };
+  }, [open, containerEl, SECTIONS]);
 
   const handleLangChange = (newLang: "ja" | "en") => {
     setLang(newLang);
@@ -737,7 +786,7 @@ export function HelpDialog() {
             </nav>
 
             {/* content */}
-            <div ref={contentRef} className="flex-1 overflow-y-auto px-7 py-5 space-y-2">
+            <div ref={setContentNode} className="flex-1 overflow-y-auto px-7 py-5 space-y-2">
               {lang === "ja" ? (
                 <ContentJA registerRef={registerRef} />
               ) : (

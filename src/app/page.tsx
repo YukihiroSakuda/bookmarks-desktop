@@ -29,7 +29,9 @@ import {
   useSearchHistory,
   useExplorerImport,
 } from "@/hooks";
+import { toast } from "sonner";
 import { readAppCache, writeAppCache } from "@/lib/appCache";
+import { eventToAccelerator, formatAcceleratorForDisplay } from "@/lib/shortcut";
 import { BookmarkUI } from "@/types/bookmark";
 
 export default function BookmarksPage() {
@@ -166,6 +168,45 @@ export default function BookmarksPage() {
     return () => { unlisten?.(); };
   }, [refreshData]);
 
+  // Per-bookmark shortcuts are handled in-app (only while the window is
+  // focused), so they never steal combos from other apps. A keydown listener
+  // matches the pressed combo against each bookmark's stored accelerator and
+  // opens it via the normal open + access-count path. Refs keep the listener
+  // stable while reading fresh state.
+  const bookmarksRef = useRef(bookmarks);
+  bookmarksRef.current = bookmarks;
+  const handleBookmarkClickRef = useRef(handleBookmarkClick);
+  handleBookmarkClickRef.current = handleBookmarkClick;
+  const isModalOpenRef = useRef(isModalOpen);
+  isModalOpenRef.current = isModalOpen;
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Don't hijack combos while the form is capturing a shortcut.
+      if (isModalOpenRef.current) return;
+      // Don't fire while typing in a field — this keeps editing combos
+      // (Ctrl+C/V/A) intact and avoids clashing with the Settings shortcut
+      // capture. Per-bookmark keys work when the list, not an input, has focus.
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+      const accelerator = eventToAccelerator(e);
+      if (!accelerator) return;
+      const bm = bookmarksRef.current.find((b) => b.shortcut === accelerator);
+      if (bm) {
+        e.preventDefault();
+        handleBookmarkClickRef.current(bm);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+
   useEffect(() => {
     if (searchParams.get("newBookmark") !== "1") return;
 
@@ -257,6 +298,17 @@ export default function BookmarksPage() {
         <div className="flex flex-col flex-1 min-h-0">
           <BookmarkHeader
             listColumns={settings.listColumns}
+            summonShortcut={settings.userSettings?.summonShortcut ?? "CmdOrCtrl+Alt+Space"}
+            onSummonShortcutChange={async (accelerator) => {
+              const result = await settings.updateUserSettings({ summonShortcut: accelerator });
+              if (result?.failed?.length) {
+                toast.warning(
+                  `Shortcut couldn't be registered (already in use): ${result.failed
+                    .map(formatAcceleratorForDisplay)
+                    .join(", ")}`
+                );
+              }
+            }}
             onListColumnsChange={async (columns) => {
               await settings.updateUserSettings({
                 listColumns: columns,
@@ -283,6 +335,7 @@ export default function BookmarksPage() {
             onSaveTagRule={handleSaveTagRule}
             onDeleteTagRule={handleDeleteTagRule}
             onDeleteAll={handleDeleteAll}
+            onRestoreComplete={refreshData}
             searchHistory={searchHistory}
             onRemoveHistory={removeFromHistory}
             onClearHistory={clearHistory}
@@ -337,7 +390,11 @@ export default function BookmarksPage() {
               }}
               availableTags={availableTags}
               onUpdateTags={handleUpdateTags}
-              existingBookmarks={selectedBookmark ? undefined : bookmarks}
+              existingBookmarks={
+                selectedBookmark
+                  ? bookmarks.filter((b) => b.id !== selectedBookmark.id)
+                  : bookmarks
+              }
             />
           )}
         </div>

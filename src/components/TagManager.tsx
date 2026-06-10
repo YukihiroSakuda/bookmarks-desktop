@@ -31,6 +31,19 @@ export function TagManager({
     setTags([...availableTags]);
   }, [availableTags]);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (editingTag) {
+        handleCancelEdit();
+      } else {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [editingTag, onClose]);
+
   const handleAddTag = async () => {
     const normalizedTag = newTag.trim();
     if (!normalizedTag) return;

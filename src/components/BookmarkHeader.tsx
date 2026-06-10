@@ -21,6 +21,8 @@ import { HelpDialog } from "./HelpDialog";
 interface BookmarkHeaderProps {
   listColumns: 1 | 2 | 3 | 4;
   onListColumnsChange: (columns: 1 | 2 | 3 | 4) => void;
+  summonShortcut: string;
+  onSummonShortcutChange: (accelerator: string) => void;
   selectedTags: string[];
   onAddBookmark: () => void;
   searchQuery: string;
@@ -38,6 +40,7 @@ interface BookmarkHeaderProps {
   onSaveTagRule: (data: TagRuleFormData) => Promise<void>;
   onDeleteTagRule: (ruleId: string, removeTags: boolean) => Promise<void>;
   onDeleteAll: () => void;
+  onRestoreComplete: () => void;
   searchHistory: string[];
   onRemoveHistory: (query: string) => void;
   onClearHistory: () => void;
@@ -53,6 +56,8 @@ interface BookmarkHeaderProps {
 export function BookmarkHeader({
   listColumns,
   onListColumnsChange,
+  summonShortcut,
+  onSummonShortcutChange,
   selectedTags,
   onAddBookmark,
   searchQuery,
@@ -70,6 +75,7 @@ export function BookmarkHeader({
   onSaveTagRule,
   onDeleteTagRule,
   onDeleteAll,
+  onRestoreComplete,
   searchHistory,
   onRemoveHistory,
   onClearHistory,
@@ -200,9 +206,12 @@ export function BookmarkHeader({
             <SettingsDialog
               listColumns={listColumns}
               onListColumnsChange={onListColumnsChange}
+              summonShortcut={summonShortcut}
+              onSummonShortcutChange={onSummonShortcutChange}
               bookmarks={bookmarks}
               onBookmarksUpdate={onBookmarksUpdate}
               onDeleteAll={onDeleteAll}
+              onRestoreComplete={onRestoreComplete}
               isOrderingMode={isOrderingMode}
             />
             <Button

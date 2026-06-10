@@ -5,6 +5,7 @@ mod server;
 use db::AppState;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::ShortcutState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -25,6 +26,16 @@ pub fn run() {
         }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    // Fire on press only; otherwise each combo would trigger twice.
+                    if event.state() == ShortcutState::Pressed {
+                        commands::on_shortcut_pressed(app, shortcut);
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -50,7 +61,14 @@ pub fn run() {
             app.manage(AppState {
                 conn: conn.clone(),
                 pending_path: Mutex::new(pending),
+                summon_shortcut: Mutex::new(None),
             });
+
+            // Register the global "summon" hotkey from settings so it is live
+            // from launch.
+            if let Err(e) = commands::sync_summon_inner(app.handle()) {
+                log::warn!("summon shortcut sync failed: {e}");
+            }
 
             // Auto-register right-click context menu entry
             #[cfg(target_os = "windows")]
@@ -73,6 +91,7 @@ pub fn run() {
             commands::toggle_pin,
             commands::increment_access,
             commands::reorder_bookmarks,
+            commands::is_shortcut_available,
             commands::list_tags,
             commands::create_tag,
             commands::update_tag,
@@ -83,6 +102,8 @@ pub fn run() {
             commands::delete_tag_rule,
             commands::get_settings,
             commands::update_settings,
+            commands::export_data,
+            commands::import_data,
             commands::fetch_title,
             commands::open_path,
             commands::get_pending_path,

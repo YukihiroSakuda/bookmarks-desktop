@@ -9,6 +9,7 @@ export interface BookmarkApiInput {
   isPinned: boolean;
   tags: string[];
   memo?: string;
+  shortcut?: string;
 }
 
 export interface TagApiItem {
@@ -114,6 +115,7 @@ export async function createBookmark(
       is_pinned: bookmark.isPinned,
       tags: mergeBookmarkTags(bookmark.tags, autoTagNames),
       memo: bookmark.memo ?? null,
+      shortcut: bookmark.shortcut ?? null,
     }),
   });
 }
@@ -144,6 +146,7 @@ export async function updateBookmark(
       is_pinned: bookmark.isPinned,
       tags: mergeBookmarkTags(bookmark.tags, autoTagNames),
       memo: bookmark.memo ?? null,
+      shortcut: bookmark.shortcut ?? null,
     }),
   });
 }
