@@ -1048,6 +1048,7 @@ pub fn register_context_menu() -> Result<Value, String> {
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let exe_str = exe.to_str().ok_or("invalid exe path")?;
     let cmd = format!("\"{}\" --path \"%1\"", exe_str);
+    let icon = format!("\"{}\",0", exe_str);
     let label = "Add to Bookmarks";
 
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -1060,6 +1061,7 @@ pub fn register_context_menu() -> Result<Value, String> {
             .create_subkey_with_flags(base, KEY_WRITE)
             .map_err(|e| e.to_string())?;
         parent.set_value("", &label).map_err(|e| e.to_string())?;
+        parent.set_value("Icon", &icon).map_err(|e| e.to_string())?;
 
         let (cmd_key, _) = hkcu
             .create_subkey_with_flags(format!("{}\\command", base), KEY_WRITE)

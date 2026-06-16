@@ -1,31 +1,41 @@
 ﻿# build.ps1 — 配布用の単一ファイルを生成する
 #
-#   powershell -ExecutionPolicy Bypass -File build.ps1            # HTML + PDF を生成
+#   powershell -ExecutionPolicy Bypass -File build.ps1            # LP: HTML + PDF を生成
 #   powershell -ExecutionPolicy Bypass -File build.ps1 -HtmlOnly  # 自己完結 HTML のみ
 #   powershell -ExecutionPolicy Bypass -File build.ps1 -PdfOnly   # PDF のみ
+#   powershell -ExecutionPolicy Bypass -File build.ps1 -Slides    # 投影用 16:9 スライド (slides.html)
 #
 # 生成物 (promo\dist\):
-#   bookmarks-promo.html … assets\*.png を base64 で埋め込んだ自己完結 HTML（画像は同梱、
-#                           フォントのみ Google Fonts CDN を参照。オフライン時は system-ui 表示）
-#   bookmarks-promo.pdf  … 上記 HTML から Chrome/Edge ヘッドレスで出力した PDF
-#                           （背景色・画像・使用フォントをすべて埋め込んだ完全な単一ファイル）
+#   bookmarks-promo.html  … index.html を元に assets\*.png を base64 埋め込みした自己完結 HTML
+#   bookmarks-promo.pdf   … 上記 HTML から Chrome/Edge ヘッドレスで出力した PDF（A4 縦・資料型）
+#   bookmarks-slides.html … -Slides 指定時。slides.html を元にした自己完結 HTML
+#   bookmarks-slides.pdf  … -Slides 指定時。16:9（1スライド = 1ページ）の投影・配布向け PDF
+#   いずれもフォントのみ Google Fonts CDN を参照（オフライン時は system-ui 表示）
 
 param(
     [switch]$HtmlOnly,
     [switch]$PdfOnly,
+    [switch]$Slides,
     [string]$ChromePath
 )
 
 $ErrorActionPreference = "Stop"
 
 $promoDir = Split-Path $PSScriptRoot -Parent
-$srcHtml  = Join-Path $promoDir "index.html"
 $assetDir = Join-Path $promoDir "assets"
 $distDir  = Join-Path $promoDir "dist"
 New-Item -ItemType Directory -Force $distDir | Out-Null
 
-$outHtml = Join-Path $distDir "bookmarks-promo.html"
-$outPdf  = Join-Path $distDir "bookmarks-promo.pdf"
+# -Slides 指定時はスライド版（16:9）、未指定時は LP（資料型）をビルドする。
+if ($Slides) {
+    $srcHtml = Join-Path $promoDir "slides.html"
+    $outHtml = Join-Path $distDir "bookmarks-slides.html"
+    $outPdf  = Join-Path $distDir "bookmarks-slides.pdf"
+} else {
+    $srcHtml = Join-Path $promoDir "index.html"
+    $outHtml = Join-Path $distDir "bookmarks-promo.html"
+    $outPdf  = Join-Path $distDir "bookmarks-promo.pdf"
+}
 
 # ---- 1. assets\*.png を base64 データ URI として埋め込む ----
 $html = [System.IO.File]::ReadAllText($srcHtml, [System.Text.Encoding]::UTF8)

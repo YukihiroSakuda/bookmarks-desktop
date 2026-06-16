@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bookmarks — 製品紹介スライド</title>
+<meta name="description" content="ブックマーク管理デスクトップアプリ（Windows）の製品紹介スライド。投影・プレゼン・PDF配布向けに 16:9 で構成。" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  /* ===== Design tokens (アプリ globals.css と同期) ===== */
+  :root {
+    --background: hsl(0 0% 100%);
+    --foreground: hsl(0 0% 0%);
+    --card: hsl(0 0% 100%);
+    --muted-foreground: hsl(0 0% 45.1%);
+    --secondary: hsl(0 0% 96.1%);
+    --border: hsl(0 0% 89.8%);
+    --blue: #3b82f6;
+    --blue-soft: rgba(59, 130, 246, 0.08);
+    --font-sans: "Outfit", "Noto Sans JP", system-ui, sans-serif;
+
+    /* 16:9 スライド寸法（= PowerPoint 標準の 13.33in × 7.5in @96dpi） */
+    --slide-w: 1280px;
+    --slide-h: 720px;
+    --pad: 72px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: var(--font-sans);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    background: #4b4f52; /* スライドビューア風のグレー（画面表示時のみ） */
+  }
+  img { max-width: 100%; display: block; }
+
+  .deck {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 28px; padding: 28px;
+  }
+
+  /* ===== Slide ===== */
+  .slide {
+    position: relative;
+    width: var(--slide-w);
+    height: var(--slide-h);
+    background: var(--background);
+    overflow: hidden;
+    box-shadow: 0 18px 50px -24px rgba(0, 0, 0, 0.5);
+  }
+  .slide-pad {
+    position: absolute; inset: 0;
+    padding: var(--pad);
+    display: flex; flex-direction: column;
+  }
+
+  /* スライド上部の小見出しラベル（# セクション名） */
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 0.95rem; font-weight: 700; letter-spacing: 0.01em;
+    color: var(--muted-foreground);
+  }
+  .eyebrow .hash { color: var(--blue); }
+
+  /* スライド下部の通し番号・ワードマーク */
+  .slide-foot {
+    position: absolute; left: var(--pad); right: var(--pad); bottom: 32px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 0.82rem; color: var(--muted-foreground);
+  }
+  .slide-foot .mark { font-weight: 700; letter-spacing: -0.02em; color: var(--foreground); }
+  .slide-foot .mark .accent { color: var(--blue); }
+
+  /* ===== 分割レイアウト（テキスト左 + 図版右） ===== */
+  .split { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+  .split.text-wide { grid-template-columns: 0.9fr 1.1fr; }
+
+  .panel-title {
+    font-size: 2rem; font-weight: 800; letter-spacing: -0.025em; line-height: 1.25;
+    margin: 48px 0 0;
+  }
+  .panel-rule {
+    width: 100%; height: 4px; border-radius: 2px;
+    background: var(--blue); margin: 20px 0 32px;
+  }
+  .panel-lead { font-size: 1rem; color: var(--muted-foreground); margin-bottom: 26px; }
+
+  ul.flist { list-style: none; display: flex; flex-direction: column; gap: 20px; }
+  ul.flist li h3 { font-size: 1.18rem; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 4px; }
+  ul.flist li h3 .hash { color: var(--blue); margin-right: 8px; }
+  ul.flist li p { font-size: 0.92rem; color: var(--muted-foreground); line-height: 1.6; }
+
+  kbd {
+    display: inline-block;
+    padding: 1px 7px; border-radius: 5px;
+    border: 1px solid var(--border); background: var(--secondary);
+    font-family: var(--font-sans); font-size: 0.82em; font-weight: 600;
+    box-shadow: 0 1px 0 var(--border);
+  }
+
+  /* 図版（グレーのパネルは置かず、スクショ自体を大きく見せる） */
+  .figure {
+    display: flex; align-items: flex-start; justify-content: center;
+    width: 100%; height: 100%;
+  }
+  .figure img {
+    max-width: 100%; max-height: 100%;
+    width: auto; height: auto;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: 0 20px 44px -22px rgba(0, 0, 0, 0.45);
+    background: #fff;
+  }
+
+  /* ===== Cover（表紙） ===== */
+  .slide.cover { background: var(--card); }
+  .slide.cover::before {
+    content: ""; position: absolute; inset: 0; z-index: 0;
+    background:
+      radial-gradient(60% 80% at 12% 4%, var(--blue-soft), transparent 55%),
+      radial-gradient(50% 70% at 4% 100%, rgba(59, 130, 246, 0.05), transparent 60%);
+  }
+  /* 表紙はメイン画面を右半分に大きくブリードさせる */
+  .cover .slide-pad { justify-content: center; z-index: 1; }
+  .cover-text { position: relative; z-index: 1; max-width: 50%; }
+  .cover-bleed {
+    position: absolute; top: 0; right: 0; bottom: 0; z-index: 0;
+    width: 52%; height: 100%;
+    object-fit: cover; object-position: left center;
+    border-left: 1px solid var(--border);
+    box-shadow: -34px 0 60px -44px rgba(0, 0, 0, 0.35);
+  }
+  /* 画像の左端をカード色へ自然に馴染ませるフェード */
+  .cover-bleed-fade {
+    position: absolute; top: 0; bottom: 0; right: 52%; z-index: 1;
+    width: 90px; pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--card));
+  }
+  .cover .eyebrow { margin-bottom: 20px; }
+  .cover .logo {
+    font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--muted-foreground);
+  }
+  .cover .logo .accent { color: var(--blue); }
+  .cover h1 {
+    font-size: 3.5rem; font-weight: 800; letter-spacing: -0.035em; line-height: 1.16;
+    margin: 16px 0 0;
+  }
+  .cover .cover-rule {
+    width: 100%; max-width: 460px; height: 4px; border-radius: 2px;
+    background: var(--blue); margin: 26px 0;
+  }
+  .cover .sub { font-size: 1.02rem; color: var(--muted-foreground); line-height: 1.85; }
+  .cover .badges { display: flex; gap: 10px; margin-top: 30px; flex-wrap: wrap; }
+  .cover .badge {
+    font-size: 0.82rem; font-weight: 600;
+    padding: 6px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--secondary);
+    color: var(--foreground);
+  }
+  .cover .badge .accent { color: var(--blue); }
+
+  /* ===== Closing（締め） ===== */
+  .slide.closing { background: var(--card); }
+  .closing .closing-pad {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: var(--pad);
+  }
+  .closing .mark-lg { font-size: 3rem; font-weight: 800; letter-spacing: -0.03em; }
+  .closing .mark-lg .accent { color: var(--blue); }
+  .closing .tagline { margin-top: 14px; font-size: 1.15rem; color: var(--muted-foreground); }
+  .closing .closing-note { margin-top: 28px; font-size: 0.98rem; line-height: 1.9; color: var(--muted-foreground); }
+
+  /* ===== Print / PDF（Chrome/Edge の --print-to-pdf 用） =====
+     @page を 16:9 寸法に合わせ、1スライド = 1ページに 1:1 で対応させる。 */
+  @page { size: 1280px 720px; margin: 0; }
+  @media print {
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { background: #fff; }
+    .deck { gap: 0; padding: 0; }
+    .slide {
+      box-shadow: none;
+      break-after: page; page-break-after: always;
+      break-inside: avoid; page-break-inside: avoid;
+    }
+    .slide:last-child { break-after: auto; page-break-after: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="deck">
+
+  <!-- ===== 1. 表紙 ===== -->
+  <section class="slide cover">
+    <img class="cover-bleed" src="assets/hero.png" alt="Bookmarks アプリのメイン画面" />
+    <div class="cover-bleed-fade"></div>
+    <div class="slide-pad">
+      <div class="cover-text">
+        <span class="eyebrow"><span class="hash">#</span>Windows デスクトップアプリ</span>
+        <div class="logo">Book<span class="accent">marks</span></div>
+        <h1>ブックマークを、<br />すばやく一元管理。</h1>
+        <div class="cover-rule"></div>
+        <p class="sub">グローバルホットキーで呼び出し、<br />URL・ファイル・フォルダをタグとメモで一元管理。<br />Chrome / Edge 拡張やエクスプローラから追加し、<br />リアルタイム検索とショートカットで素早くアクセス。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 2. すばやく呼び出す・探す ===== -->
+  <section class="slide">
+    <div class="slide-pad">
+      <span class="eyebrow"><span class="hash">#</span>主な機能 ①</span>
+      <h2 class="panel-title">すばやくアクセス</h2>
+      <div class="panel-rule"></div>
+      <div class="split text-wide">
+        <div>
+          <ul class="flist">
+            <li>
+              <h3><span class="hash">#</span>グローバルホットキー</h3>
+              <p>どのアプリで作業中でも <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> で前面に呼び出し。ブックマークごとにショートカットキーを割り当てれば、すばやく目的のページへアクセスできます。</p>
+            </li>
+            <li>
+              <h3><span class="hash">#</span>リアルタイム検索 + 履歴</h3>
+              <p>タイトル・URL・メモを横断してリアルタイムに絞り込み。<kbd>/</kbd> キーで検索バーへ即フォーカス。検索履歴は最大 10 件まで保存されます。</p>
+            </li>
+            <li>
+              <h3><span class="hash">#</span>ピン留め &amp; 並べ替え</h3>
+              <p>よく使うブックマークは上部に固定表示。ドラッグ&amp;ドロップによるカスタム並べ替えや、アクセス回数・作成日でのソートに対応します。</p>
+            </li>
+          </ul>
+        </div>
+        <div class="figure compact">
+          <img src="assets/shortcut.png" alt="ブックマークごとの個別キーボードショートカット" />
+        </div>
+      </div>
+    </div>
+    <div class="slide-foot">
+      <span class="mark">Book<span class="accent">marks</span></span>
+      <span>2 / 5</span>
+    </div>
+  </section>
+
+  <!-- ===== 3. 整理する ===== -->
+  <section class="slide">
+    <div class="slide-pad">
+      <span class="eyebrow"><span class="hash">#</span>主な機能 ②</span>
+      <h2 class="panel-title">手間なく整理</h2>
+      <div class="panel-rule"></div>
+      <div class="split text-wide">
+        <div>
+          <ul class="flist">
+            <li>
+              <h3><span class="hash">#</span>タグ &amp; 自動タグ付けルール</h3>
+              <p>複数タグでのフィルタリングに加え、URL やタイトルのパターンに基づく自動タグ付けルールを設定可能。追加するだけで自動的に整理されます。</p>
+            </li>
+            <li>
+              <h3><span class="hash">#</span>メモ</h3>
+              <p>ブックマークごとに最大 10,000 文字のメモを添付。カードの Memo バッジにホバーでプレビュー、クリックでコピー。</p>
+            </li>
+            <li>
+              <h3><span class="hash">#</span>重複チェック</h3>
+              <p>インポートや追加の際に既存のブックマークと URL を照合し、重複の登録を防ぎます。</p>
+            </li>
+          </ul>
+        </div>
+        <div class="figure">
+          <img src="assets/tagrule.png" alt="自動タグ付けルールの設定ダイアログ" />
+        </div>
+      </div>
+    </div>
+    <div class="slide-foot">
+      <span class="mark">Book<span class="accent">marks</span></span>
+      <span>3 / 5</span>
+    </div>
+  </section>
+
+  <!-- ===== 4. どこからでも追加する ===== -->
+  <section class="slide">
+    <div class="slide-pad">
+      <span class="eyebrow"><span class="hash">#</span>主な機能 ③</span>
+      <h2 class="panel-title">手軽に追加</h2>
+      <div class="panel-rule"></div>
+      <div class="split text-wide">
+        <div>
+          <ul class="flist">
+            <li>
+              <h3><span class="hash">#</span>ブラウザ拡張</h3>
+              <p>Chrome / Edge 拡張から、開いているページをワンクリックでブックマークに追加できます。</p>
+            </li>
+            <li>
+              <h3><span class="hash">#</span>エクスプローラ連携</h3>
+              <p>エクスプローラのドラッグ&amp;ドロップや右クリックメニューから、ファイル・フォルダも登録できます。</p>
+            </li>
+            <li>
+              <h3><span class="hash">#</span>インポート / エクスポート</h3>
+              <p>ブラウザからエクスポートした HTML をそのままインポート。HTML エクスポートや JSON バックアップ / 復元にも対応します。</p>
+            </li>
+          </ul>
+        </div>
+        <div class="figure">
+          <img src="assets/extension.png" alt="ブラウザ拡張のポップアップからブックマークを追加" />
+        </div>
+      </div>
+    </div>
+    <div class="slide-foot">
+      <span class="mark">Book<span class="accent">marks</span></span>
+      <span>4 / 5</span>
+    </div>
+  </section>
+
+  <!-- ===== 5. 締め ===== -->
+  <section class="slide closing">
+    <div class="closing-pad">
+      <div class="mark-lg">Book<span class="accent">marks</span></div>
+      <p class="closing-note">細かい使い方はアプリ内のヘルプをご覧ください。</p>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

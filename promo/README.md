@@ -1,7 +1,17 @@
-# promo/ — アプリ訴求用ランディングページ
+# promo/ — アプリ訴求用ランディングページ / スライド
 
-`index.html` はビルド不要のスタンドアロン HTML。ブラウザで直接開けます。
+ビルド不要のスタンドアロン HTML（ブラウザで直接開ける）が2種類あります。
 このディレクトリは Tauri ビルド対象外です(`public/` に置くとインストーラに同梱されるため不可)。
+
+| ファイル | 形式 | 用途 |
+|----------|------|------|
+| `index.html` | 縦スクロール LP（A4 縦・資料型 PDF） | Web 掲載・読ませる／印刷して配る |
+| `slides.html` | 16:9 スライド（1スライド = 1ページ PDF・全5枚） | 投影・プレゼン・PDF をめくって配る |
+
+`slides.html` は表紙 →「呼び出しと検索」→「整理」→「追加と保存」→ 締め、の5枚構成。
+**本文は `index.html` の記載内容をそのまま使用**（言い換えず転記）し、同じデザイントークン
+（モノクロ + 青アクセント）と `assets/` の画像（`hero` / `tagrule` / `extension` / `shortcut`
+の4枚）を共有します。`index.html` を更新したら本ファイルの文言も合わせてください。
 
 ## 必要なスクリーンショット(`assets/` に配置)
 
@@ -37,21 +47,24 @@
 スクリーンショットを `assets/` に揃えたら、`tools/build.ps1` で配布用の単一ファイルを生成します。
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\build.ps1            # HTML + PDF
-powershell -ExecutionPolicy Bypass -File tools\build.ps1 -PdfOnly   # PDF のみ
-powershell -ExecutionPolicy Bypass -File tools\build.ps1 -HtmlOnly  # HTML のみ
+powershell -ExecutionPolicy Bypass -File tools\build.ps1            # LP: HTML + PDF
+powershell -ExecutionPolicy Bypass -File tools\build.ps1 -PdfOnly   # LP: PDF のみ
+powershell -ExecutionPolicy Bypass -File tools\build.ps1 -HtmlOnly  # LP: HTML のみ
+powershell -ExecutionPolicy Bypass -File tools\build.ps1 -Slides    # スライド: 16:9 HTML + PDF
 ```
 
 生成物は `dist/`（Git 管理外）に出力されます。
 
 | ファイル | 内容 | 配布のしやすさ |
 |----------|------|------|
-| `dist/bookmarks-promo.html` | `assets/*.png` を base64 で埋め込んだ自己完結 HTML。フォントのみ Google Fonts CDN を参照（オフライン時は system-ui で表示） | 1ファイル。ブラウザで開く |
-| `dist/bookmarks-promo.pdf` | 上記 HTML から Chrome/Edge ヘッドレスで出力。**背景色・画像・使用フォントをすべて埋め込んだ完全な単一ファイル** | 1ファイル。どこでも開ける・印刷できる |
+| `dist/bookmarks-promo.html` | `index.html` を元に `assets/*.png` を base64 埋め込みした自己完結 HTML。フォントのみ Google Fonts CDN を参照（オフライン時は system-ui で表示） | 1ファイル。ブラウザで開く |
+| `dist/bookmarks-promo.pdf` | 上記 HTML から出力した A4 縦・資料型 PDF。**背景色・画像・フォントをすべて埋め込んだ単一ファイル** | 1ファイル。どこでも開ける・印刷できる |
+| `dist/bookmarks-slides.pdf` | `-Slides` 指定時。**16:9（1スライド = 1ページ・全5枚）の投影／配布向け PDF** | 1ファイル。投影・めくって配る |
 
 > PDF は背景色を保持するため `agent-browser`（Playwright）ではなく Chrome/Edge の
-> `--print-to-pdf` を使用します。`index.html` の `@media print` で改ページ位置（カードを
-> 分断しない）とアニメ無効化を制御しています。
+> `--print-to-pdf` を使用します。`index.html` の `@media print` は改ページ位置（カードを
+> 分断しない）を、`slides.html` は `@page { size: 1280px 720px }` で 1スライド = 1ページの
+> 16:9 を制御しています。
 
 ## ツール
 
