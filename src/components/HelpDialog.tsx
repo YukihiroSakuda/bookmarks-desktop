@@ -152,7 +152,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>ゴミ箱アイコン</Strong> — 確認ダイアログ（Delete bookmark?）が表示され、Delete で削除します。</Li>
         </Ul>
         <H3>ピン留め</H3>
-        <P>ピンアイコンをクリックするとブックマークが一覧の最上部に固定されます。ピン留めされたブックマークは <Strong>Pinned Bookmarks</Strong> セクションにまとめて表示されます。再度クリックで解除できます。</P>
+        <P>ピンアイコンをクリックするとブックマークが一覧の最上部に固定されます。ピン留めされたブックマークは <Strong>Pinned Bookmarks</Strong> セクションにまとめて表示されます。再度クリックで解除できます。ピン留め／解除するとカードがセクション間を移動し、移動先まで自動でスクロールするので、状態の変化を見失いません。</P>
       </section>
 
       <div className="border-t" />
@@ -161,8 +161,8 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">検索</h2>
         <H3>キーワード検索</H3>
         <P>ヘッダーの検索バーにキーワードを入力すると、<Strong>タイトル・URL・メモ</Strong> を対象に絞り込まれます。</P>
-        <H3>検索バーへのフォーカス</H3>
-        <P>どこにいても <Kbd>/</Kbd> キーを押すと検索バーに即座にフォーカスが移ります（入力欄にいるときは無効）。</P>
+        <H3>キー入力で検索を開始</H3>
+        <P>一覧のどこにフォーカスがあっても、文字キーを打ち始めるだけで検索バーにフォーカスが移り、その文字から入力が始まります。<Kbd>/</Kbd> を押す必要はありません。入力欄にフォーカスがあるときや、修飾キー（Ctrl / Alt / ⌘）付きの組み合わせを押したときは無効です（ブックマークのショートカットや編集キーを優先）。</P>
         <H3>検索履歴</H3>
         <Ul>
           <Li>ブックマークをクリックしたときの検索キーワードが履歴として保存されます。</Li>
@@ -321,7 +321,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("shortcuts")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">ショートカット</h2>
         <div className="rounded-lg border overflow-hidden mb-3">
-          <ShortcutRow keys={["/"]} label="検索バーにフォーカス" />
+          <ShortcutRow keys={["文字キー"]} label="検索バーにフォーカスして入力開始" />
           <ShortcutRow keys={["Esc"]} label="モーダルを閉じる / 操作をキャンセル" />
           <ShortcutRow keys={["Ctrl", "Alt", "Space"]} label="アプリを前面に表示（グローバル、初期値）" />
         </div>
@@ -407,7 +407,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Trash icon</Strong> — shows a confirmation dialog; click Delete to remove.</Li>
         </Ul>
         <H3>Pinning</H3>
-        <P>Click the pin icon to fix a bookmark at the top of the list. Pinned bookmarks are grouped under the <Strong>Pinned Bookmarks</Strong> section. Click again to unpin.</P>
+        <P>Click the pin icon to fix a bookmark at the top of the list. Pinned bookmarks are grouped under the <Strong>Pinned Bookmarks</Strong> section. Click again to unpin. Pinning or unpinning moves the card between sections and scrolls it into view, so the change is easy to follow.</P>
       </section>
 
       <div className="border-t" />
@@ -416,8 +416,8 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Search</h2>
         <H3>Keyword Search</H3>
         <P>Type in the search bar to filter bookmarks by <Strong>title, URL, and memo</Strong>.</P>
-        <H3>Focus the Search Bar</H3>
-        <P>Press <Kbd>/</Kbd> anywhere to instantly focus the search bar (disabled when already in an input field).</P>
+        <H3>Type to Search</H3>
+        <P>Wherever focus is in the list, just start typing — the search bar takes focus and your keystroke goes into it. There&apos;s no need to press <Kbd>/</Kbd> first. This is disabled while a text field is focused, or when you press a modifier combo (Ctrl / Alt / ⌘), so bookmark shortcuts and editing keys keep working.</P>
         <H3>Search History</H3>
         <Ul>
           <Li>Keywords are saved when you click a bookmark while searching.</Li>
@@ -576,7 +576,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("shortcuts")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Shortcuts</h2>
         <div className="rounded-lg border overflow-hidden mb-3">
-          <ShortcutRow keys={["/"]} label="Focus search bar" />
+          <ShortcutRow keys={["Any key"]} label="Focus search and start typing" />
           <ShortcutRow keys={["Esc"]} label="Close modal / cancel action" />
           <ShortcutRow keys={["Ctrl", "Alt", "Space"]} label="Bring app to front (global, default)" />
         </div>
