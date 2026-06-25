@@ -26,6 +26,7 @@ import {
   useBookmarkFiltering,
   useBookmarkOrdering,
   useKeyboardShortcuts,
+  useBookmarkTabNavigation,
   useSearchHistory,
   useExplorerImport,
 } from "@/hooks";
@@ -83,9 +84,9 @@ export default function BookmarksPage() {
   >(undefined);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  useKeyboardShortcuts({
-    onEscape: () => {},
-  });
+  // Tab key cycles focus through bookmark cards only (disabled while a modal
+  // is open or the list is in drag-to-reorder mode).
+  useBookmarkTabNavigation({ enabled: !isModalOpen && !isOrderingMode });
 
   const { isDragging } = useExplorerImport({
     isModalOpen,
@@ -101,6 +102,18 @@ export default function BookmarksPage() {
     currentSort: settings.currentSort,
     currentOrder: settings.currentOrder,
     isOrderingMode,
+  });
+
+  useKeyboardShortcuts({
+    // Escape clears all active search conditions (query + selected tags).
+    // Skipped while a modal is open so it doesn't clear filters underneath
+    // a dialog the user is just closing.
+    onEscape: () => {
+      if (isModalOpen) return;
+      filtering.setSearchQuery("");
+      filtering.setSelectedTags([]);
+    },
+    onFocusSearch: () => searchInputRef.current?.focus(),
   });
 
   const ordering = useBookmarkOrdering({
