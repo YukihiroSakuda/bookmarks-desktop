@@ -26,6 +26,7 @@ import {
   useBookmarkFiltering,
   useBookmarkOrdering,
   useKeyboardShortcuts,
+  useBookmarkTabNavigation,
   useSearchHistory,
   useExplorerImport,
 } from "@/hooks";
@@ -87,6 +88,10 @@ export default function BookmarksPage() {
     onEscape: () => {},
     onFocusSearch: () => searchInputRef.current?.focus(),
   });
+
+  // Tab key cycles focus through bookmark cards only (disabled while a modal
+  // is open or the list is in drag-to-reorder mode).
+  useBookmarkTabNavigation({ enabled: !isModalOpen && !isOrderingMode });
 
   const { isDragging } = useExplorerImport({
     isModalOpen,

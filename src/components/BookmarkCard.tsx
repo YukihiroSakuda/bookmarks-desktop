@@ -133,6 +133,7 @@ const BookmarkCard = memo(function BookmarkCard({
             href={isPath ? undefined : bookmark.url}
             target={isPath ? undefined : "_blank"}
             rel={isPath ? undefined : "noopener noreferrer"}
+            data-bookmark-card-link
             className="flex-1 min-w-0 overflow-hidden cursor-pointer"
             onClick={(e) => {
               e.preventDefault();
