@@ -107,6 +107,17 @@ export function useBookmarks(options: UseBookmarksOptions) {
       setBookmarks((prev) =>
         prev.map((b) => b.id === id ? { ...b, isPinned: is_pinned } : b)
       );
+      // Pinning/unpinning moves the card between the Pinned and Other
+      // sections. Scroll it into view after the list re-renders so the change
+      // is visible even when its new position was off-screen. Two rAFs let the
+      // moved DOM settle before scrolling.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          document
+            .querySelector(`[data-bookmark-id="${id}"]`)
+            ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        });
+      });
     } catch (error) {
       console.error("Error toggling pin:", error);
       toast.error(error instanceof Error ? error.message : "Failed to toggle pin");
