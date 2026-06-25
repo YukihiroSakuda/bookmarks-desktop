@@ -191,6 +191,8 @@ export default function BookmarksPage() {
   handleBookmarkClickRef.current = handleBookmarkClick;
   const isModalOpenRef = useRef(isModalOpen);
   isModalOpenRef.current = isModalOpen;
+  const setSearchQueryRef = useRef(filtering.setSearchQuery);
+  setSearchQueryRef.current = filtering.setSearchQuery;
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       // Don't hijack combos while the form is capturing a shortcut.
@@ -207,12 +209,24 @@ export default function BookmarksPage() {
         return;
       }
       const accelerator = eventToAccelerator(e);
-      if (!accelerator) return;
-      const bm = bookmarksRef.current.find((b) => b.shortcut === accelerator);
-      if (bm) {
-        e.preventDefault();
-        handleBookmarkClickRef.current(bm);
+      if (accelerator) {
+        const bm = bookmarksRef.current.find((b) => b.shortcut === accelerator);
+        if (bm) {
+          e.preventDefault();
+          handleBookmarkClickRef.current(bm);
+        }
+        return;
       }
+      // Type-to-search: a plain printable character (no Ctrl/Cmd/Alt — those
+      // are reserved for shortcuts) focuses the search box and starts typing
+      // there, so the user never has to reach for "/" first. Per-bookmark
+      // shortcuts always carry a modifier (see eventToAccelerator), so a bare
+      // key can never collide with them.
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.length !== 1) return;
+      e.preventDefault();
+      searchInputRef.current?.focus();
+      setSearchQueryRef.current((prev) => prev + e.key);
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
