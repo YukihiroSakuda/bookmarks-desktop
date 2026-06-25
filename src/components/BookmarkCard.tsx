@@ -108,6 +108,7 @@ const BookmarkCard = memo(function BookmarkCard({
   return (
     <div
       ref={cardRef}
+      data-bookmark-id={bookmark.id}
       className={`backdrop-blur-sm rounded-lg bg-card border-y border-r ${
         bookmark.isPinned ? 'border-l-2 border-l-amber-400' : 'border-l-2 border-l-blue-500'
       } ${
