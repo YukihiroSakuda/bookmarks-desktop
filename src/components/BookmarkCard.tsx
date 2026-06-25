@@ -164,7 +164,7 @@ const BookmarkCard = memo(function BookmarkCard({
               {formatAcceleratorForDisplay(bookmark.shortcut)}
             </kbd>
           )}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity">
             <Button
               onClick={async (e) => { e.stopPropagation(); setIsPinLoading(true); try { await onTogglePin(bookmark.id); } finally { setIsPinLoading(false); } }}
               variant="ghost" size="sm" icon={Pin} isActive={bookmark.isPinned} isLoading={isPinLoading}
