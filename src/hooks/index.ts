@@ -7,3 +7,5 @@ export { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 export { useBookmarkTabNavigation } from "./useBookmarkTabNavigation";
 export { useSearchHistory } from "./useSearchHistory";
 export { useExplorerImport } from "./useExplorerImport";
+export { useBookmarkHotkeys } from "./useBookmarkHotkeys";
+export { useNewBookmarkFromUrl } from "./useNewBookmarkFromUrl";

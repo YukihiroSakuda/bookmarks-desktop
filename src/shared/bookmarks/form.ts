@@ -62,6 +62,24 @@ export function findDuplicateBookmark<T extends BookmarkUrlLike>(
   return bookmarks.find((bookmark) => normalizeBookmarkUrl(bookmark.url) === normalizedUrl);
 }
 
+/**
+ * Whether `value` satisfies the rule's match strategy against `pattern`.
+ * Comparison is case-insensitive. Shared by auto-tagging and tag-rule application.
+ */
+export function matchesPattern(
+  matchType: TagRuleLike["matchType"],
+  value: string,
+  pattern: string
+): boolean {
+  const v = value.toLowerCase();
+  const p = pattern.toLowerCase();
+
+  if (matchType === "starts_with") return v.startsWith(p);
+  if (matchType === "contains") return v.includes(p);
+  if (matchType === "ends_with") return v.endsWith(p);
+  return false;
+}
+
 export function getAutoTagNames(
   rules: TagRuleLike[],
   availableTags: TagLike[],
@@ -70,13 +88,7 @@ export function getAutoTagNames(
   const autoTagIds = rules
     .filter((rule) => {
       const target = rule.targetField === "title" ? bookmark.title : bookmark.url;
-      const pattern = rule.pattern.toLowerCase();
-      const value = target.toLowerCase();
-
-      if (rule.matchType === "starts_with") return value.startsWith(pattern);
-      if (rule.matchType === "contains") return value.includes(pattern);
-      if (rule.matchType === "ends_with") return value.endsWith(pattern);
-      return false;
+      return matchesPattern(rule.matchType, target, rule.pattern);
     })
     .map((rule) => rule.tagId);
 

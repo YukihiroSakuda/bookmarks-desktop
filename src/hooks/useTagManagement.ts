@@ -1,8 +1,56 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Tag } from "@/types/tag";
-import { TagRule, TagRuleDB, TagRuleFormData, convertTagRuleToUI } from "@/types/tagRule";
+import { MatchType, TagRule, TagRuleDB, TagRuleFormData, TargetField, convertTagRuleToUI } from "@/types/tagRule";
+import { matchesPattern } from "@/shared/bookmarks/form";
 import { tauriFetch as fetch } from "@/lib/tauriFetch";
+
+interface RuleMatcher {
+  matchType: MatchType;
+  pattern: string;
+  targetField: TargetField;
+}
+
+/**
+ * Fetch all bookmarks and add/remove `tagName` on every bookmark whose
+ * title/url matches the rule. Shared by tag-rule create (add) and delete (remove).
+ */
+async function applyTagToMatchingBookmarks(
+  rule: RuleMatcher,
+  tagName: string,
+  mode: "add" | "remove"
+) {
+  const bmRes = await fetch("/api/bookmarks");
+  const bookmarks = await bmRes.json();
+
+  for (const bm of bookmarks) {
+    const target = rule.targetField === "title" ? bm.title : bm.url;
+    if (!matchesPattern(rule.matchType, target, rule.pattern)) continue;
+
+    const currentTags = bm.tags as string[];
+    let nextTags: string[];
+    if (mode === "add") {
+      if (currentTags.includes(tagName)) continue;
+      nextTags = [...currentTags, tagName];
+    } else {
+      nextTags = currentTags.filter((n) => n !== tagName);
+    }
+
+    await fetch(`/api/bookmarks/${bm.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: bm.title,
+        url: bm.url,
+        kind: bm.kind,
+        favicon: bm.favicon,
+        is_pinned: bm.is_pinned,
+        memo: bm.memo,
+        tags: nextTags,
+      }),
+    });
+  }
+}
 
 export function useTagManagement() {
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
@@ -125,39 +173,9 @@ export function useTagManagement() {
     await fetchTagRules();
 
     // Apply rule to existing bookmarks
-    const bmRes = await fetch("/api/bookmarks");
-    const bookmarks = await bmRes.json();
-    const pattern = data.pattern.toLowerCase();
-    const matchFn = (value: string) => {
-      if (data.matchType === "starts_with") return value.startsWith(pattern);
-      if (data.matchType === "contains") return value.includes(pattern);
-      if (data.matchType === "ends_with") return value.endsWith(pattern);
-      return false;
-    };
     const tagObj = availableTags.find((t) => t.id === data.tagId);
     if (!tagObj) return;
-
-    for (const bm of bookmarks) {
-      const target = (data.targetField === "title" ? bm.title : bm.url).toLowerCase();
-      if (matchFn(target)) {
-        const currentTags = bm.tags as string[];
-        if (!currentTags.includes(tagObj.name)) {
-          await fetch(`/api/bookmarks/${bm.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: bm.title,
-              url: bm.url,
-              kind: bm.kind,
-              favicon: bm.favicon,
-              is_pinned: bm.is_pinned,
-              memo: bm.memo,
-              tags: [...currentTags, tagObj.name],
-            }),
-          });
-        }
-      }
-    }
+    await applyTagToMatchingBookmarks(data, tagObj.name, "add");
   }, [fetchTagRules, availableTags]);
 
   const deleteTagRule = useCallback(
@@ -168,36 +186,9 @@ export function useTagManagement() {
       await fetch(`/api/tag-rules/${ruleId}`, { method: "DELETE" });
 
       if (removeTags) {
-        const bmRes = await fetch("/api/bookmarks");
-        const bookmarks = await bmRes.json();
-        const pattern = rule.pattern.toLowerCase();
-        const matchFn = (value: string) => {
-          if (rule.matchType === "starts_with") return value.startsWith(pattern);
-          if (rule.matchType === "contains") return value.includes(pattern);
-          if (rule.matchType === "ends_with") return value.endsWith(pattern);
-          return false;
-        };
         const tagObj = availableTags.find((t) => t.id === rule.tagId);
         if (tagObj) {
-          for (const bm of bookmarks) {
-            const target = (rule.targetField === "title" ? bm.title : bm.url).toLowerCase();
-            if (matchFn(target)) {
-              const currentTags = (bm.tags as string[]).filter((n: string) => n !== tagObj.name);
-              await fetch(`/api/bookmarks/${bm.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  title: bm.title,
-                  url: bm.url,
-                  kind: bm.kind,
-                  favicon: bm.favicon,
-                  is_pinned: bm.is_pinned,
-                  memo: bm.memo,
-                  tags: currentTags,
-                }),
-              });
-            }
-          }
+          await applyTagToMatchingBookmarks(rule, tagObj.name, "remove");
         }
       }
 
