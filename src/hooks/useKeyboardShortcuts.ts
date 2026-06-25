@@ -2,12 +2,10 @@ import { useEffect, useCallback } from "react";
 
 interface UseKeyboardShortcutsOptions {
   onEscape: () => void;
-  onFocusSearch?: () => void;
 }
 
 export function useKeyboardShortcuts({
   onEscape,
-  onFocusSearch,
 }: UseKeyboardShortcutsOptions) {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -16,17 +14,10 @@ export function useKeyboardShortcuts({
         onEscape();
         return;
       }
-
-      // / → Focus search (only when not typing in an input/textarea)
-      if (e.key === "/" && onFocusSearch) {
-        const tag = (e.target as HTMLElement).tagName;
-        if (tag !== "INPUT" && tag !== "TEXTAREA") {
-          e.preventDefault();
-          onFocusSearch();
-        }
-      }
+      // Focusing the search box from anywhere is handled by the type-to-search
+      // listener in page.tsx, which starts typing on the first plain key.
     },
-    [onEscape, onFocusSearch]
+    [onEscape]
   );
 
   useEffect(() => {
