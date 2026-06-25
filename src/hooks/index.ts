@@ -6,3 +6,5 @@ export { useBookmarkOrdering } from "./useBookmarkOrdering";
 export { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 export { useSearchHistory } from "./useSearchHistory";
 export { useExplorerImport } from "./useExplorerImport";
+export { useBookmarkHotkeys } from "./useBookmarkHotkeys";
+export { useNewBookmarkFromUrl } from "./useNewBookmarkFromUrl";

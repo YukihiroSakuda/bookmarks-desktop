@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { BookmarkList } from "@/components/BookmarkList";
 import { BookmarkHeader } from "@/components/BookmarkHeader";
 import { BookmarkForm } from "@/components/BookmarkForm";
@@ -28,16 +27,15 @@ import {
   useKeyboardShortcuts,
   useSearchHistory,
   useExplorerImport,
+  useBookmarkHotkeys,
+  useNewBookmarkFromUrl,
 } from "@/hooks";
 import { toast } from "sonner";
 import { readAppCache, writeAppCache } from "@/lib/appCache";
-import { eventToAccelerator, formatAcceleratorForDisplay } from "@/lib/shortcut";
+import { formatAcceleratorForDisplay } from "@/lib/shortcut";
 import { BookmarkUI } from "@/types/bookmark";
 
 export default function BookmarksPage() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { fetchUserSettings, applySettings, ...settings } = useUserSettings();
   const {
     availableTags,
@@ -168,66 +166,17 @@ export default function BookmarksPage() {
     return () => { unlisten?.(); };
   }, [refreshData]);
 
-  // Per-bookmark shortcuts are handled in-app (only while the window is
-  // focused), so they never steal combos from other apps. A keydown listener
-  // matches the pressed combo against each bookmark's stored accelerator and
-  // opens it via the normal open + access-count path. Refs keep the listener
-  // stable while reading fresh state.
-  const bookmarksRef = useRef(bookmarks);
-  bookmarksRef.current = bookmarks;
-  const handleBookmarkClickRef = useRef(handleBookmarkClick);
-  handleBookmarkClickRef.current = handleBookmarkClick;
-  const isModalOpenRef = useRef(isModalOpen);
-  isModalOpenRef.current = isModalOpen;
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      // Don't hijack combos while the form is capturing a shortcut.
-      if (isModalOpenRef.current) return;
-      // Don't fire while typing in a field — this keeps editing combos
-      // (Ctrl+C/V/A) intact and avoids clashing with the Settings shortcut
-      // capture. Per-bookmark keys work when the list, not an input, has focus.
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-      const accelerator = eventToAccelerator(e);
-      if (!accelerator) return;
-      const bm = bookmarksRef.current.find((b) => b.shortcut === accelerator);
-      if (bm) {
-        e.preventDefault();
-        handleBookmarkClickRef.current(bm);
-      }
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+  useBookmarkHotkeys({
+    bookmarks,
+    isModalOpen,
+    onActivate: handleBookmarkClick,
+  });
 
-
-  useEffect(() => {
-    if (searchParams.get("newBookmark") !== "1") return;
-
-    const initialUrl = searchParams.get("url") ?? "";
-    const initialTitle = searchParams.get("title") ?? "";
-
+  useNewBookmarkFromUrl((values) => {
     setSelectedBookmark(undefined);
-    setNewBookmarkInitialValues({
-      url: initialUrl,
-      title: initialTitle,
-    });
+    setNewBookmarkInitialValues(values);
     setIsModalOpen(true);
-
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.delete("newBookmark");
-    nextParams.delete("url");
-    nextParams.delete("title");
-
-    const nextUrl = nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname;
-    router.replace(nextUrl, { scroll: false });
-  }, [pathname, router, searchParams, setIsModalOpen, setSelectedBookmark]);
+  });
 
   // Tag operation handlers (compose tag mutations + bookmark refresh)
   const handleAddTag = useCallback(
