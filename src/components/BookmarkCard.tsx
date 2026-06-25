@@ -108,6 +108,7 @@ const BookmarkCard = memo(function BookmarkCard({
   return (
     <div
       ref={cardRef}
+      data-bookmark-id={bookmark.id}
       className={`backdrop-blur-sm rounded-lg bg-card border-y border-r ${
         bookmark.isPinned ? 'border-l-2 border-l-amber-400' : 'border-l-2 border-l-blue-500'
       } ${
@@ -133,6 +134,7 @@ const BookmarkCard = memo(function BookmarkCard({
             href={isPath ? undefined : bookmark.url}
             target={isPath ? undefined : "_blank"}
             rel={isPath ? undefined : "noopener noreferrer"}
+            data-bookmark-card-link
             className="flex-1 min-w-0 overflow-hidden cursor-pointer"
             onClick={(e) => {
               e.preventDefault();
@@ -164,7 +166,7 @@ const BookmarkCard = memo(function BookmarkCard({
               {formatAcceleratorForDisplay(bookmark.shortcut)}
             </kbd>
           )}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity">
             <Button
               onClick={async (e) => { e.stopPropagation(); setIsPinLoading(true); try { await onTogglePin(bookmark.id); } finally { setIsPinLoading(false); } }}
               variant="ghost" size="sm" icon={Pin} isActive={bookmark.isPinned} isLoading={isPinLoading}
