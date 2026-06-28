@@ -67,21 +67,33 @@
   }
 }
 
-/* Brief blue flash applied to a bookmark card after it moves between the
-   Pinned and Other sections (pin toggle), so the user can spot where it went. */
+/* Blue pulse applied to a bookmark card after it moves between the Pinned and
+   Other sections (pin toggle), so the user can spot where it went. Pulses a few
+   times with a strong ring + fill, then fades, to stay clearly noticeable. */
 @keyframes bookmark-flash {
-  0% {
-    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.9);
-    background-color: rgb(59 130 246 / 0.12);
-  }
+  0%,
   100% {
-    box-shadow: 0 0 0 2px rgb(59 130 246 / 0);
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0);
     background-color: rgb(59 130 246 / 0);
+  }
+  15%,
+  45%,
+  75% {
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.95);
+    background-color: rgb(59 130 246 / 0.28);
+  }
+  30%,
+  60%,
+  90% {
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.25);
+    background-color: rgb(59 130 246 / 0.08);
   }
 }
 
 .bookmark-flash {
-  animation: bookmark-flash 1.4s ease-out;
+  animation: bookmark-flash 2.2s ease-in-out;
+  position: relative;
+  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
