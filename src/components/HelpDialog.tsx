@@ -162,7 +162,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <H3>キーワード検索</H3>
         <P>ヘッダーの検索バーにキーワードを入力すると、<Strong>タイトル・URL・メモ</Strong> を対象に絞り込まれます。</P>
         <H3>キー入力で検索を開始</H3>
-        <P>一覧のどこにフォーカスがあっても、文字キーを打ち始めるだけで検索バーにフォーカスが移り、その文字から入力が始まります。<Kbd>/</Kbd> を押す必要はありません。入力欄にフォーカスがあるときや、修飾キー（Ctrl / Alt / ⌘）付きの組み合わせを押したときは無効です（ブックマークのショートカットや編集キーを優先）。</P>
+        <P>一覧のどこにフォーカスがあっても、文字キーを打ち始めるだけで検索バーにフォーカスが移り、その文字から入力が始まります。入力欄にフォーカスがあるときや、修飾キー（Ctrl / Alt / Shift / ⌘）付きの組み合わせを押したときは無効です（ブックマークのショートカットや編集キーを優先）。</P>
         <H3>検索履歴</H3>
         <Ul>
           <Li>ブックマークをクリックしたときの検索キーワードが履歴として保存されます。</Li>
@@ -417,7 +417,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <H3>Keyword Search</H3>
         <P>Type in the search bar to filter bookmarks by <Strong>title, URL, and memo</Strong>.</P>
         <H3>Type to Search</H3>
-        <P>Wherever focus is in the list, just start typing — the search bar takes focus and your keystroke goes into it. There&apos;s no need to press <Kbd>/</Kbd> first. This is disabled while a text field is focused, or when you press a modifier combo (Ctrl / Alt / ⌘), so bookmark shortcuts and editing keys keep working.</P>
+        <P>Wherever focus is in the list, just start typing — the search bar takes focus and your keystroke goes into it. This is disabled while a text field is focused, or when you press a modifier combo (Ctrl / Alt / Shift / ⌘), so bookmark shortcuts and editing keys keep working.</P>
         <H3>Search History</H3>
         <Ul>
           <Li>Keywords are saved when you click a bookmark while searching.</Li>
