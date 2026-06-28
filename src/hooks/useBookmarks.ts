@@ -109,13 +109,23 @@ export function useBookmarks(options: UseBookmarksOptions) {
       );
       // Pinning/unpinning moves the card between the Pinned and Other
       // sections. Scroll it into view after the list re-renders so the change
-      // is visible even when its new position was off-screen. Two rAFs let the
-      // moved DOM settle before scrolling.
+      // is visible even when its new position was off-screen, then flash it so
+      // the user can spot the moved card. Two rAFs let the moved DOM settle.
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          document
-            .querySelector(`[data-bookmark-id="${id}"]`)
-            ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          const el = document.querySelector(`[data-bookmark-id="${id}"]`);
+          el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          if (el) {
+            el.classList.remove("bookmark-flash");
+            // Force reflow so re-adding the class restarts the animation.
+            void (el as HTMLElement).offsetWidth;
+            el.classList.add("bookmark-flash");
+            el.addEventListener(
+              "animationend",
+              () => el.classList.remove("bookmark-flash"),
+              { once: true }
+            );
+          }
         });
       });
     } catch (error) {

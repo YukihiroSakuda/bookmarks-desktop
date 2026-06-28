@@ -66,3 +66,26 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Brief blue flash applied to a bookmark card after it moves between the
+   Pinned and Other sections (pin toggle), so the user can spot where it went. */
+@keyframes bookmark-flash {
+  0% {
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0.9);
+    background-color: rgb(59 130 246 / 0.12);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgb(59 130 246 / 0);
+    background-color: rgb(59 130 246 / 0);
+  }
+}
+
+.bookmark-flash {
+  animation: bookmark-flash 1.4s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bookmark-flash {
+    animation: none;
+  }
+}
