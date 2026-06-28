@@ -8,4 +8,5 @@ export { useBookmarkTabNavigation } from "./useBookmarkTabNavigation";
 export { useSearchHistory } from "./useSearchHistory";
 export { useExplorerImport } from "./useExplorerImport";
 export { useBookmarkHotkeys } from "./useBookmarkHotkeys";
+export { useTypeToSearch } from "./useTypeToSearch";
 export { useNewBookmarkFromUrl } from "./useNewBookmarkFromUrl";

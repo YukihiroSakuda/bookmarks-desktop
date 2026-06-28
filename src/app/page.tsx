@@ -29,6 +29,7 @@ import {
   useSearchHistory,
   useExplorerImport,
   useBookmarkHotkeys,
+  useTypeToSearch,
   useNewBookmarkFromUrl,
 } from "@/hooks";
 import { toast } from "sonner";
@@ -111,7 +112,6 @@ export default function BookmarksPage() {
       filtering.setSearchQuery("");
       filtering.setSelectedTags([]);
     },
-    onFocusSearch: () => searchInputRef.current?.focus(),
   });
 
   const ordering = useBookmarkOrdering({
@@ -182,6 +182,15 @@ export default function BookmarksPage() {
     bookmarks,
     isModalOpen,
     onActivate: handleBookmarkClick,
+    searchInputRef,
+  });
+
+  // Type any plain character to focus the search box and start searching.
+  useTypeToSearch({
+    isModalOpen,
+    searchInputRef,
+    onTypeCharacter: (char) =>
+      filtering.setSearchQuery((prev) => prev + char),
   });
 
   useNewBookmarkFromUrl((values) => {
