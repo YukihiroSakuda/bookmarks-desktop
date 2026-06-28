@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { eventToAccelerator } from "@/lib/shortcut";
 
 interface UseTypeToSearchOptions {
   /** Disabled while a modal/form is open. */
@@ -10,11 +11,13 @@ interface UseTypeToSearchOptions {
 }
 
 /**
- * Type-to-search: pressing any plain printable character (no Ctrl/Cmd/Alt —
- * those are reserved for shortcuts) focuses the search box and starts typing
- * there, so the user never has to reach for a dedicated focus key first. Bare
- * keys can never collide with per-bookmark shortcuts, which always carry a
- * modifier (see useBookmarkHotkeys / eventToAccelerator).
+ * Type-to-search: pressing any plain printable character focuses the search box
+ * and starts typing there, so the user never has to reach for a dedicated focus
+ * key first.
+ *
+ * Any key combo that forms a per-bookmark accelerator (i.e. carries a modifier,
+ * including a lone Shift) is skipped, so a shortcut that opens a bookmark never
+ * also leaks its character into the search box — useBookmarkHotkeys owns those.
  *
  * Refs keep the listener stable while reading fresh state.
  */
@@ -40,7 +43,10 @@ export function useTypeToSearch({
       ) {
         return;
       }
-      // Modifier combos are reserved for shortcuts; only bare keys start a search.
+      // Any recognized shortcut combo (carries a modifier, incl. lone Shift) is
+      // reserved for useBookmarkHotkeys — don't also type it into the search box.
+      if (eventToAccelerator(e)) return;
+      // Other modifier combos with an unsupported main key still aren't text.
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // A single printable character (ignores Tab, Enter, arrows, etc.).
       if (e.key.length !== 1) return;
