@@ -28,7 +28,9 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --radius: 0.5rem
+    --radius: 0.5rem;
+    /* Card background while flashing after a pin-toggle move (light blue). */
+    --card-highlight: 213 94% 84%
   }
   .dark {
     --background: 0 0% 4%;
@@ -54,7 +56,9 @@
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
+    --chart-5: 340 75% 55%;
+    /* Card background while flashing after a pin-toggle move (deep blue). */
+    --card-highlight: 217 60% 32%
   }
 }
 
@@ -67,29 +71,25 @@
   }
 }
 
-/* Soft blue glow applied to a bookmark card after it moves between the Pinned
-   and Other sections (pin toggle), so the user can spot where it went. A single
-   gentle rise-and-fade — noticeable but understated. */
+/* Background highlight applied to a bookmark card after it moves between the
+   Pinned and Other sections (pin toggle), so the user can spot where it went.
+   The card's own background turns blue, holds briefly, then fades back — opaque
+   throughout (theme-aware) so text stays readable and bg-card never drops out. */
 @keyframes bookmark-flash {
   0% {
-    box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
-    background-color: rgb(59 130 246 / 0);
+    background-color: hsl(var(--card));
   }
-  20%,
-  40% {
-    box-shadow: 0 0 22px 3px rgb(59 130 246 / 0.8);
-    background-color: rgb(59 130 246 / 0.2);
+  15%,
+  45% {
+    background-color: hsl(var(--card-highlight));
   }
   100% {
-    box-shadow: 0 0 0 0 rgb(59 130 246 / 0);
-    background-color: rgb(59 130 246 / 0);
+    background-color: hsl(var(--card));
   }
 }
 
 .bookmark-flash {
   animation: bookmark-flash 2s ease-out;
-  position: relative;
-  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
