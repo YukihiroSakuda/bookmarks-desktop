@@ -104,8 +104,20 @@ export function useBookmarks(options: UseBookmarksOptions) {
       const res = await fetch(`/api/bookmarks/${id}/pin`, { method: "PATCH" });
       if (!res.ok) throw new Error("Failed to toggle pin");
       const { is_pinned } = await res.json();
+      let movedTitle = "";
       setBookmarks((prev) =>
-        prev.map((b) => b.id === id ? { ...b, isPinned: is_pinned } : b)
+        prev.map((b) => {
+          if (b.id === id) {
+            movedTitle = b.title;
+            return { ...b, isPinned: is_pinned };
+          }
+          return b;
+        })
+      );
+      toast(
+        is_pinned
+          ? `Pinned "${movedTitle}"`
+          : `Unpinned "${movedTitle}"`
       );
       // Pinning/unpinning moves the card between the Pinned and Other
       // sections. Scroll it into view after the list re-renders so the change
