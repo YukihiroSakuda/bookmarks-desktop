@@ -5,7 +5,7 @@ Tauri v2 デスクトップアプリ + ブラウザ拡張機能によるブッ�
 
 ## ダウンロード
 
-ビルド済みインストーラーは [Releases](https://github.com/YukihiroSakuda/bookmarks/releases) から入手できます（`.exe` / `.msi`）。
+ビルド済みインストーラーは [Releases](https://github.com/YukihiroSakuda/bookmarks-desktop/releases) から入手できます（`.exe` / `.msi`）。
 
 > 現時点ではコード署名を行っていないため、インストール時に Windows SmartScreen の警告が表示される場合があります。「詳細情報」→「実行」で続行してください。
 
