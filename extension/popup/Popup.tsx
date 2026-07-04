@@ -14,6 +14,7 @@ import {
   mergeBookmarkTags,
 } from "../../src/shared/bookmarks/form";
 import { eventToAccelerator, formatAcceleratorForDisplay } from "../../src/lib/shortcut";
+import { getToken, clearToken } from "../lib/pairing";
 
 const APP_URL = import.meta.env.VITE_APP_URL || "http://localhost:37373";
 
@@ -45,8 +46,18 @@ function isNetworkError(error: unknown): boolean {
 
 // ---------- API helpers ----------
 
+async function withAuth(init?: RequestInit): Promise<RequestInit> {
+  const token = await getToken(APP_URL);
+  return { ...init, headers: { ...init?.headers, "X-Bookmarks-Token": token } };
+}
+
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, init);
+  let res = await fetch(url, await withAuth(init));
+  if (res.status === 401) {
+    // Stored token was rejected (e.g. app data reset) — re-pair once and retry.
+    await clearToken();
+    res = await fetch(url, await withAuth(init));
+  }
   if (!res.ok) {
     let msg = `HTTP ${res.status}`;
     try {

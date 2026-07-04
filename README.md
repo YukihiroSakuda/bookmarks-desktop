@@ -5,6 +5,12 @@ Tauri v2 デスクトップアプリ + ブラウザ拡張機能によるブッ�
 
 紹介ページ: [promo/index.html](promo/index.html)（スタンドアロン HTML、ブラウザで直接開けます）
 
+## ダウンロード
+
+ビルド済みインストーラーは [Releases](https://github.com/YukihiroSakuda/bookmarks/releases) から入手できます（`.exe` / `.msi`）。
+
+> 現時点ではコード署名を行っていないため、インストール時に Windows SmartScreen の警告が表示される場合があります。「詳細情報」→「実行」で続行してください。
+
 ## 機能一覧
 
 ### ブックマーク管理
@@ -174,4 +180,4 @@ public/
 
 ## ライセンス
 
-MIT License
+[MIT License](LICENSE)

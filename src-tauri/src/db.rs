@@ -1,6 +1,7 @@
-use rusqlite::Connection;
+use rusqlite::{Connection, OptionalExtension};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
+use uuid::Uuid;
 
 pub struct AppState {
     pub conn: Arc<Mutex<Connection>>,
@@ -90,8 +91,32 @@ pub fn init_db(app: &AppHandle) -> Result<Connection, String> {
         "summon_shortcut",
         "TEXT NOT NULL DEFAULT 'CmdOrCtrl+Alt+Space'",
     )?;
+    add_column_if_missing(&conn, "user_settings", "api_token", "TEXT")?;
+    ensure_api_token(&conn)?;
 
     Ok(conn)
+}
+
+/// Generate a random pairing token for the local HTTP API (used by the
+/// browser extension) on first run, so the server has something to check
+/// requests against instead of trusting any local caller.
+fn ensure_api_token(conn: &Connection) -> Result<(), String> {
+    let existing: Option<String> = conn
+        .query_row("SELECT api_token FROM user_settings WHERE id = 1", [], |r| {
+            r.get::<_, Option<String>>(0)
+        })
+        .optional()
+        .map_err(|e| e.to_string())?
+        .flatten();
+    if existing.is_none() {
+        let token = Uuid::new_v4().simple().to_string();
+        conn.execute(
+            "UPDATE user_settings SET api_token = ?1 WHERE id = 1",
+            [&token],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 /// Add a column to an existing table when it is not already present. SQLite has

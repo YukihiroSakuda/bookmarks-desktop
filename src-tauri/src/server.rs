@@ -1,7 +1,9 @@
 use axum::{
     Router,
-    extract::{Json, Query, State},
-    http::StatusCode,
+    extract::{Json, Query, Request, State},
+    http::{HeaderMap, HeaderValue, Method, StatusCode},
+    middleware::{self, Next},
+    response::{IntoResponse, Response},
     routing::get,
 };
 use chrono::{SecondsFormat, Utc};
@@ -11,15 +13,23 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tauri::Emitter;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
 pub type SharedDb = Arc<Mutex<Connection>>;
+
+/// Extension ID derived from the public key embedded in
+/// `extension/public/manifest.json`'s `key` field. Pinning the key keeps this
+/// ID stable across unpacked (dev) loads and store-published installs, so the
+/// CORS allowlist below always matches the real extension and nothing else.
+/// Changing that manifest key changes this ID and requires updating both.
+const EXTENSION_ORIGIN: &str = "chrome-extension://bgmjbpabbplohlimpahhllgaddbkfofg";
 
 #[derive(Clone)]
 struct ServerState {
     db: SharedDb,
     app: tauri::AppHandle,
+    token: String,
 }
 
 type ApiResult = Result<Json<Value>, (StatusCode, Json<Value>)>;
@@ -381,13 +391,54 @@ async fn get_title(Query(q): Query<TitleQuery>) -> ApiResult {
     Ok(Json(json!({ "title": title })))
 }
 
+/// Hands the pairing token to the extension. Only reachable cross-origin from
+/// `EXTENSION_ORIGIN` (enforced by the CORS layer below), so no other site
+/// can retrieve it.
+async fn pair(State(state): State<ServerState>) -> ApiResult {
+    Ok(Json(json!({ "token": state.token })))
+}
+
+/// Rejects any request that doesn't carry the correct `X-Bookmarks-Token`
+/// header. Defense-in-depth alongside the CORS origin allowlist: this also
+/// blocks non-browser local callers that don't go through CORS at all.
+async fn require_token(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+    request: Request,
+    next: Next,
+) -> Response {
+    let provided = headers
+        .get("x-bookmarks-token")
+        .and_then(|v| v.to_str().ok());
+    if provided != Some(state.token.as_str()) {
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({ "error": "unauthorized" })),
+        )
+            .into_response();
+    }
+    next.run(request).await
+}
+
 // ---------- Server entry point ----------
 
 pub async fn start(db: SharedDb, app_handle: tauri::AppHandle) {
-    let cors = CorsLayer::permissive();
-    let state = ServerState { db, app: app_handle };
+    let token: String = {
+        let conn = db.lock().expect("db mutex poisoned");
+        conn.query_row("SELECT api_token FROM user_settings WHERE id = 1", [], |r| r.get(0))
+            .unwrap_or_default()
+    };
+    let state = ServerState { db, app: app_handle, token };
 
-    let app = Router::new()
+    let origin: HeaderValue = EXTENSION_ORIGIN
+        .parse()
+        .expect("EXTENSION_ORIGIN must be a valid header value");
+    let cors = CorsLayer::new()
+        .allow_origin(origin)
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(Any);
+
+    let protected = Router::new()
         .route(
             "/api/bookmarks",
             get(get_bookmarks).post(post_bookmark),
@@ -395,6 +446,11 @@ pub async fn start(db: SharedDb, app_handle: tauri::AppHandle) {
         .route("/api/bookmarks/title", get(get_title))
         .route("/api/tags", get(get_tags).post(post_tag))
         .route("/api/tag-rules", get(get_tag_rules))
+        .route_layer(middleware::from_fn_with_state(state.clone(), require_token));
+
+    let app = Router::new()
+        .route("/api/pair", get(pair))
+        .merge(protected)
         .layer(cors)
         .with_state(state);
 
