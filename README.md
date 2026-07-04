@@ -1,137 +1,137 @@
 # Bookmarks
 
-Tauri v2 デスクトップアプリ + ブラウザ拡張機能によるブックマーク管理ツール（Windows）。  
-データは SQLite に保存されるため、外部サーバー不要でオフライン利用可能。
+A bookmark manager built as a Tauri v2 desktop app + browser extension (Windows).
+Data is stored in SQLite, so it works fully offline with no external server required.
 
-## ダウンロード
+## Download
 
-ビルド済みインストーラーは [Releases](https://github.com/YukihiroSakuda/bookmarks-desktop/releases) から入手できます（`.exe` / `.msi`）。
+Prebuilt installers are available from [Releases](https://github.com/YukihiroSakuda/bookmarks-desktop/releases) (`.exe` / `.msi`).
 
-> 現時点ではコード署名を行っていないため、インストール時に Windows SmartScreen の警告が表示される場合があります。「詳細情報」→「実行」で続行してください。
+> The installer isn't code-signed yet, so Windows SmartScreen may show a warning during installation. Click "More info" → "Run anyway" to continue.
 
-## 機能一覧
+## Features
 
-### ブックマーク管理
+### Bookmark management
 
-- ブックマークの追加・編集・削除
-- URL 入力時のタイトル自動取得
-- ピン留め機能（上部に固定表示、ピン／解除時はカードの移動先まで自動スクロール）
-- アクセス回数の自動記録
-- ドラッグ&ドロップによるカスタム並べ替え
-- リスト表示（1〜4 カラム）
-- 全ブックマーク・タグの一括削除（`delete all` 入力による確認付き）
+- Add, edit, and delete bookmarks
+- Automatic title fetching when entering a URL
+- Pin bookmarks (shown fixed at the top; pinning/unpinning auto-scrolls to the card's new position)
+- Automatic access-count tracking
+- Custom reordering via drag and drop
+- List view (1–4 columns)
+- Bulk delete all bookmarks and tags (with a `delete all` confirmation prompt)
 
-### デスクトップパスブックマーク
+### Desktop path bookmarks
 
-- ファイル・フォルダのパスをブックマークとして登録
-- ファイルはデフォルトアプリで開く、フォルダはエクスプローラで開く
-- Windows エクスプローラからファイル・フォルダをドラッグ&ドロップして追加
-- エクスプローラの右クリックメニュー（「Add to Bookmarks」）から直接登録
+- Bookmark local files and folders by path
+- Files open with the default app; folders open in Explorer
+- Add files/folders by dragging them from Windows Explorer
+- Add directly from Explorer's right-click menu ("Add to Bookmarks")
 
-### メモ
+### Memo
 
-- ブックマークごとにメモを添付可能（最大 10,000 文字）
-- カード上の「Memo」バッジにホバーで内容をプレビュー、クリックでクリップボードへコピー
+- Attach a memo to any bookmark (up to 10,000 characters)
+- Hover the "Memo" badge on a card to preview it, click to copy to clipboard
 
-### ショートカット
+### Shortcuts
 
-- **呼び出しショートカット（グローバル）** — システム全体に登録される唯一のグローバルキー。どのアプリからでも押すとアプリが前面に出て検索バーにフォーカスする。初期値は `Ctrl+Alt+Space`、設定ダイアログで変更可能
-- **ブックマークごとのショートカット（アプリ内）** — 各ブックマークに割り当てたキーで、アプリ表示中にページ／フォルダを開く。グローバル登録しないため他アプリのショートカット（コピー等）を奪わない
-- 修飾キー（Ctrl / Alt / Shift）が最低 1 つ必要。メインキーは英字・数字・F1〜F12。割り当てた組み合わせはカードに常時バッジ表示
-- 個別キーは重複不可（フォームで警告してブロック）。呼び出しキーが他アプリ／OS と競合する場合は登録失敗時に警告
+- **Summon shortcut (global)** — the single global hotkey registered system-wide. Pressing it from any app brings the window to the front and focuses the search bar. Defaults to `Ctrl+Alt+Space`, changeable in Settings
+- **Per-bookmark shortcuts (in-app)** — a key combo assigned to a bookmark opens its page/folder while the app is focused. Not registered globally, so it never steals shortcuts from other apps (e.g. copy/paste)
+- Requires at least one modifier (Ctrl / Alt / Shift). The main key can be a letter, digit, or F1–F12. Assigned combos are always shown as a badge on the card
+- Per-bookmark shortcuts can't be duplicated (blocked with a warning in the form). If the summon shortcut conflicts with another app/OS shortcut, registration fails with a warning
 
-### タグ管理
+### Tag management
 
-- タグの追加・編集・削除
-- タグによるフィルタリング（単一 / 複数選択）
-- タグルール: URL やタイトルのパターンに基づく自動タグ付け
+- Add, edit, and delete tags
+- Filter by tag (single or multiple selection)
+- Tag rules: automatic tagging based on URL/title patterns
 
-### 検索
+### Search
 
-- タイトル・URL・メモによるリアルタイム検索
-- 検索履歴（最大 10 件、localStorage 保存）
-- 文字キーを打ち始めるだけで検索バーにフォーカスして入力開始（`/` キーは不要。入力欄フォーカス中や修飾キー付きの組み合わせでは無効）、`Esc` でモーダルを閉じる
+- Real-time search across title, URL, and memo
+- Search history (up to 10 entries, stored in localStorage)
+- Just start typing to focus the search bar and begin typing (no need to press `/`; disabled while an input is focused or when modifier-key combos are used), `Esc` closes the modal
 
-### インポート / エクスポート
+### Import / export
 
-- HTML ファイル形式でのエクスポート
-- ブラウザからエクスポートした HTML ファイルのインポート（重複チェック付き）
+- Export to an HTML file
+- Import an HTML file exported from a browser (with duplicate detection)
 
-### ブラウザ拡張機能
+### Browser extension
 
-- Chrome / Edge 対応（Manifest V3）
-- アプリ内蔵の HTTP サーバー（localhost:37373）経由で連携（外部サービス不要）
-- ワンクリックで現在のページをブックマーク追加
-- 重複 URL の自動検知
-- 拡張機能から追加したブックマークはアプリ画面にリアルタイム反映
+- Works with Chrome / Edge (Manifest V3)
+- Talks to the app's built-in HTTP server (localhost:37373) — no external service required
+- Bookmark the current page in one click
+- Automatic duplicate URL detection
+- Bookmarks added from the extension appear in the app in real time
 
 ### UI / UX
 
-- shadcn/ui ベースのモダンなデザイン（モノクロ + 青アクセント）
-- ダークモード対応（Light / System / Dark）
-- レスポンシブ対応
-- ファビコンの自動取得・表示
+- Modern design based on shadcn/ui (monochrome + a single blue accent)
+- Dark mode support (Light / System / Dark)
+- Responsive layout
+- Automatic favicon fetching and display
 
-## 技術スタック
+## Tech stack
 
-| カテゴリ          | 技術                                                   |
-| ----------------- | ------------------------------------------------------ |
-| デスクトップ      | Tauri v2                                               |
-| バックエンド      | Rust / rusqlite (SQLite bundled) / Axum                |
-| フレームワーク    | Next.js 15 (App Router)                                |
-| 言語              | TypeScript / Rust                                      |
-| UI                | React 19 / Tailwind CSS 3 / shadcn/ui (New York style) |
-| ドラッグ&ドロップ | dnd-kit                                                |
-| アイコン          | Lucide React                                           |
-| 拡張機能          | Vite + React (Manifest V3)                             |
+| Category      | Technology                                             |
+| ------------- | ------------------------------------------------------- |
+| Desktop       | Tauri v2                                               |
+| Backend       | Rust / rusqlite (SQLite bundled) / Axum                |
+| Framework     | Next.js 15 (App Router)                                |
+| Language      | TypeScript / Rust                                      |
+| UI            | React 19 / Tailwind CSS 3 / shadcn/ui (New York style) |
+| Drag and drop | dnd-kit                                                |
+| Icons         | Lucide React                                           |
+| Extension     | Vite + React (Manifest V3)                             |
 
-## セットアップ
+## Setup
 
-### 前提条件
+### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+
 - [Rust](https://www.rust-lang.org/tools/install) (rustup)
-- [Tauri v2 前提条件](https://v2.tauri.app/start/prerequisites/)（Windows: Microsoft Visual Studio C++ Build Tools）
+- [Tauri v2 prerequisites](https://v2.tauri.app/start/prerequisites/) (Windows: Microsoft Visual Studio C++ Build Tools)
 
-### 1. リポジトリのクローン
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YukihiroSakuda/bookmarks.git
-cd bookmarks
+git clone https://github.com/YukihiroSakuda/bookmarks-desktop.git
+cd bookmarks-desktop
 ```
 
-### 2. 依存関係のインストール
+### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 3. 開発サーバーの起動
+### 3. Start the dev server
 
 ```bash
 npm run tauri:dev
 ```
 
-Tauri ウィンドウが起動します。SQLite データベースは初回起動時にアプリデータフォルダへ自動作成されます。
+The Tauri window launches. The SQLite database is created automatically in the app data folder on first run.
 
-### 4. プロダクションビルド
+### 4. Production build
 
 ```bash
 npm run tauri:build
 ```
 
-`src-tauri/target/release/bundle/` にインストーラーが生成されます。
+The installer is generated under `src-tauri/target/release/bundle/`.
 
-### 5. ブラウザ拡張機能
+### 5. Browser extension
 
-アプリのヘルプダイアログから `extension.zip` をダウンロードし、解凍後に拡張機能として読み込みます。
+Download `extension.zip` from the app's Help dialog, unzip it, and load it as an unpacked extension.
 
-- Chrome: `chrome://extensions` → 「パッケージ化されていない拡張機能を読み込む」→ 解凍フォルダを選択
-- Edge: `edge://extensions` → 「展開して読み込み」→ 解凍フォルダを選択
+- Chrome: `chrome://extensions` → "Load unpacked" → select the unzipped folder
+- Edge: `edge://extensions` → "Load unpacked" → select the unzipped folder
 
-拡張機能はアプリ起動中に自動起動する HTTP サーバー（localhost:37373）に接続します。**アプリを起動した状態で**ブラウザ拡張機能を使用してください。
+The extension connects to the HTTP server (localhost:37373) that starts automatically while the app is running. **Keep the app running** while using the browser extension.
 
-拡張機能を手動でビルドする場合:
+To build the extension manually:
 
 ```bash
 cd extension
@@ -139,43 +139,43 @@ npm install
 npm run build
 ```
 
-## プロジェクト構造
+## Project structure
 
 ```
 src/
-  ├── app/                # Next.js App Router（page / layout のみ、API ルートなし）
-  │   └── page.tsx        # メインページ（ブックマーク一覧）
-  ├── components/         # UI コンポーネント
-  │   └── ui/             # shadcn/ui ベースコンポーネント
-  ├── hooks/              # カスタムフック（状態管理の中心）
-  ├── lib/                # tauriFetch、ユーティリティ
-  ├── shared/             # ブックマーク API・フォームロジック
-  ├── types/              # 型定義（DB ↔ UI 変換関数含む）
-  └── utils/              # エクスポート等のユーティリティ
+  ├── app/                # Next.js App Router (page/layout only, no API routes)
+  │   └── page.tsx        # Main page (bookmark list)
+  ├── components/         # UI components
+  │   └── ui/             # shadcn/ui-based components
+  ├── hooks/              # Custom hooks (the core of state management)
+  ├── lib/                # tauriFetch, utilities
+  ├── shared/             # Bookmark API and form logic
+  ├── types/              # Type definitions (incl. DB <-> UI conversion functions)
+  └── utils/              # Export and other utilities
 src-tauri/
   ├── src/
-  │   ├── commands.rs     # Tauri IPC コマンド（CRUD・設定・パス操作）
-  │   ├── db.rs           # SQLite 初期化・スキーマ
-  │   ├── lib.rs          # Tauri アプリエントリ・シングルインスタンス
-  │   └── server.rs       # 内蔵 HTTP サーバー (Axum, :37373)
+  │   ├── commands.rs     # Tauri IPC commands (CRUD, settings, path operations)
+  │   ├── db.rs           # SQLite init and schema
+  │   ├── lib.rs          # Tauri app entry point, single-instance handling
+  │   └── server.rs       # Built-in HTTP server (Axum, :37373)
   └── Cargo.toml
-extension/                # ブラウザ拡張機能（別プロジェクト）
-docs/                     # 仕様書・テストチェックリスト
+extension/                # Browser extension (separate project)
+docs/                     # Specs and test checklists
 public/
-  └── extension.zip       # ビルド済み拡張機能（ヘルプからダウンロード）
+  └── extension.zip       # Prebuilt extension (downloadable from Help)
 ```
 
-## コマンド
+## Commands
 
-| コマンド                        | 説明                               |
-| ------------------------------- | ---------------------------------- |
-| `npm run tauri:dev`             | Tauri 開発モード起動               |
-| `npm run tauri:build`           | Tauri プロダクションビルド         |
-| `npm run dev`                   | Next.js 開発サーバーのみ起動       |
-| `npm run build`                 | Next.js ビルド                     |
-| `npm run lint`                  | ESLint 実行                        |
-| `cd extension && npm run build` | 拡張機能ビルド                     |
+| Command                         | Description                        |
+| -------------------------------- | ----------------------------------- |
+| `npm run tauri:dev`              | Start Tauri dev mode                |
+| `npm run tauri:build`            | Production Tauri build              |
+| `npm run dev`                    | Start the Next.js dev server only   |
+| `npm run build`                  | Next.js build                       |
+| `npm run lint`                   | Run ESLint                          |
+| `cd extension && npm run build`  | Build the browser extension         |
 
-## ライセンス
+## License
 
 [MIT License](LICENSE)
