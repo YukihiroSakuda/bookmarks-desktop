@@ -1,6 +1,0 @@
-# build.ps1 が生成する配布用の単一ファイル（再生成可能）
-dist/
-
-# 撮影セッションの一時ファイル
-tools/_*.png
-tools/demo-ids.json

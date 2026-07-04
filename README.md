@@ -3,8 +3,6 @@
 Tauri v2 デスクトップアプリ + ブラウザ拡張機能によるブックマーク管理ツール（Windows）。  
 データは SQLite に保存されるため、外部サーバー不要でオフライン利用可能。
 
-紹介ページ: [promo/index.html](promo/index.html)（スタンドアロン HTML、ブラウザで直接開けます）
-
 ## ダウンロード
 
 ビルド済みインストーラーは [Releases](https://github.com/YukihiroSakuda/bookmarks/releases) から入手できます（`.exe` / `.msi`）。
