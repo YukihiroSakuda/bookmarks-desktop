@@ -112,7 +112,7 @@ const BookmarkCard = memo(function BookmarkCard({
       className={`backdrop-blur-sm rounded-lg bg-card border-y border-r ${
         bookmark.isPinned ? 'border-l-2 border-l-amber-400' : 'border-l-2 border-l-blue-500'
       } ${
-        isOrderingMode ? 'cursor-grab active:cursor-grabbing' : 'hover:bg-accent'
+        isOrderingMode ? 'cursor-grab active:cursor-grabbing' : 'hover:bg-accent focus-within:bg-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background'
       } flex items-center justify-between p-2 group`}
     >
       <div className="flex items-center flex-1 min-w-0 gap-2">
@@ -134,11 +134,18 @@ const BookmarkCard = memo(function BookmarkCard({
             href={isPath ? undefined : bookmark.url}
             target={isPath ? undefined : "_blank"}
             rel={isPath ? undefined : "noopener noreferrer"}
+            tabIndex={0}
             data-bookmark-card-link
-            className="flex-1 min-w-0 overflow-hidden cursor-pointer"
+            className="flex-1 min-w-0 overflow-hidden cursor-pointer outline-none"
             onClick={(e) => {
               e.preventDefault();
               onClick();
+            }}
+            onKeyDown={(e) => {
+              if (isPath && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                onClick();
+              }
             }}
           >
             <h3 className="font-medium text-sm truncate">{bookmark.title}</h3>
