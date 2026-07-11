@@ -26,6 +26,7 @@ import {
   useBookmarkOrdering,
   useKeyboardShortcuts,
   useBookmarkTabNavigation,
+  useBookmarkArrowNavigation,
   useSearchHistory,
   useExplorerImport,
   useBookmarkHotkeys,
@@ -86,6 +87,10 @@ export default function BookmarksPage() {
   // Tab key cycles focus through bookmark cards only (disabled while a modal
   // is open or the list is in drag-to-reorder mode).
   useBookmarkTabNavigation({ enabled: !isModalOpen && !isOrderingMode });
+
+  // Arrow keys move focus between bookmark cards (Left/Right in document
+  // order, Up/Down to the nearest card in the adjacent row).
+  useBookmarkArrowNavigation({ enabled: !isModalOpen && !isOrderingMode });
 
   const { isDragging } = useExplorerImport({
     isModalOpen,

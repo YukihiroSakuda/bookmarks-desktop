@@ -5,6 +5,7 @@ export { useBookmarkFiltering } from "./useBookmarkFiltering";
 export { useBookmarkOrdering } from "./useBookmarkOrdering";
 export { useKeyboardShortcuts } from "./useKeyboardShortcuts";
 export { useBookmarkTabNavigation } from "./useBookmarkTabNavigation";
+export { useBookmarkArrowNavigation } from "./useBookmarkArrowNavigation";
 export { useSearchHistory } from "./useSearchHistory";
 export { useExplorerImport } from "./useExplorerImport";
 export { useBookmarkHotkeys } from "./useBookmarkHotkeys";
