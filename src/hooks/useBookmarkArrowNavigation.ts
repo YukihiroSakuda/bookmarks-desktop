@@ -11,9 +11,10 @@ const ARROW_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
  * Makes the arrow keys move focus between bookmark cards.
  *
  * Left/Right step through cards in document order (same order as Tab).
- * Up/Down jump to the nearest card in the row above/below, matched by
- * horizontal position — computed from actual layout so it stays correct
- * across responsive column counts and the pinned/unpinned sections.
+ * Up/Down jump to the card below/above that's closest overall (combined
+ * row + column distance), matched from actual layout so it stays correct
+ * across responsive column counts, incomplete rows, and the pinned/unpinned
+ * sections.
  *
  * Each focusable card link is identified by the `data-bookmark-card-link`
  * attribute set in BookmarkCard.
@@ -61,36 +62,45 @@ export function useBookmarkArrowNavigation({
         return;
       }
 
-      // ArrowUp / ArrowDown: focus the nearest card in the row above/below.
+      // ArrowUp / ArrowDown: focus the closest matching card above/below.
       e.preventDefault();
       if (currentIndex === -1) {
         cards[0]?.focus();
         return;
       }
 
-      const current = cards[currentIndex].getBoundingClientRect();
+      // Measure the outer card (the actual CSS grid cell) rather than the
+      // inner link. The link's own box is vertically centered inside the
+      // card, so it drifts up/down depending on that specific card's content
+      // (e.g. a missing domain line makes the link one line shorter) even
+      // when the card itself sits in the same grid row as its neighbors.
+      const cardRect = (el: HTMLElement) =>
+        (el.closest<HTMLElement>("[data-bookmark-id]") ?? el).getBoundingClientRect();
+
+      const current = cardRect(cards[currentIndex]);
       const direction = e.key === "ArrowDown" ? 1 : -1;
 
+      // Score every card strictly ahead in the target direction by combined
+      // row + column distance, rather than picking the nearest row first.
+      // Otherwise a short row (e.g. the last row of the pinned section, or
+      // the final row of the grid) would win purely for being one row
+      // closer, even when its only card sits in a completely different
+      // column — visually "sliding" the focus down-and-sideways instead of
+      // landing on the well-aligned card a row or two further on.
       let best: HTMLElement | null = null;
-      let bestRowDelta = Infinity;
-      let bestXDelta = Infinity;
+      let bestScore = Infinity;
 
       for (const card of cards) {
         if (card === cards[currentIndex]) continue;
-        const rect = card.getBoundingClientRect();
+        const rect = cardRect(card);
         const rowDelta = (rect.top - current.top) * direction;
         if (rowDelta <= 0.5) continue; // must be strictly in the target direction
 
-        if (rowDelta < bestRowDelta - 0.5) {
-          bestRowDelta = rowDelta;
-          bestXDelta = Math.abs(rect.left - current.left);
+        const xDelta = Math.abs(rect.left - current.left);
+        const score = rowDelta + xDelta;
+        if (score < bestScore) {
+          bestScore = score;
           best = card;
-        } else if (Math.abs(rowDelta - bestRowDelta) < 0.5) {
-          const xDelta = Math.abs(rect.left - current.left);
-          if (xDelta < bestXDelta) {
-            bestXDelta = xDelta;
-            best = card;
-          }
         }
       }
 
