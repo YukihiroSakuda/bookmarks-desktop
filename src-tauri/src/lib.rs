@@ -4,7 +4,11 @@ mod server;
 
 use db::AppState;
 use std::sync::{Arc, Mutex};
-use tauri::{Emitter, Manager};
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
+    Emitter, Manager, WindowEvent,
+};
 use tauri_plugin_global_shortcut::ShortcutState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -18,8 +22,9 @@ pub fn run() {
                     let _ = app.emit("open-path-bookmark", path.clone());
                 }
             }
-            // Bring the existing window to front
+            // Bring the existing window to front (it may be hidden in the tray)
             if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
@@ -70,12 +75,72 @@ pub fn run() {
                 log::warn!("summon shortcut sync failed: {e}");
             }
 
-            // Auto-register right-click context menu entry
+            // Auto-register right-click context menu entry and launch-at-login
             #[cfg(target_os = "windows")]
             {
                 if let Err(e) = commands::register_context_menu() {
                     log::warn!("context menu registration failed: {e}");
                 }
+                if let Err(e) = commands::register_autostart() {
+                    log::warn!("autostart registration failed: {e}");
+                }
+            }
+
+            // Launched via the autostart entry (`--hidden`): stay in the tray
+            // instead of popping the window open right after login.
+            if args.iter().any(|a| a == "--hidden") {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
+
+            // System tray icon: closing the window hides it instead of quitting,
+            // so the app keeps running in the tray. The tray menu/icon click is
+            // the way back in, and "Quit" is the only way to actually exit.
+            let show_item = MenuItem::with_id(app, "show", "Open Bookmarks", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("Bookmarks")
+                .menu(&tray_menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "quit" => app.exit(0),
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        if let Some(window) = tray.app_handle().get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.unminimize();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            if let Some(window) = app.get_webview_window("main") {
+                let window_handle = window.clone();
+                window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_handle.hide();
+                    }
+                });
             }
 
             let handle = app.handle().clone();
