@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "bookmarks",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "identifier": "com.yukihirosakuda.bookmarks",
   "build": {
     "frontendDist": "../out",
@@ -39,7 +39,8 @@
     "copyright": "Copyright © 2026 Yukihiro Sakuda",
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "installerHooks": "installer-hooks.nsh"
       }
     }
   }
