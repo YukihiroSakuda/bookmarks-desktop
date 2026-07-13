@@ -331,7 +331,7 @@ export default function BookmarksPage() {
             isSavingOrder={ordering.isSavingOrder}
           />
 
-          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <div className="flex-1 min-h-0 overflow-y-auto p-1.5">
             <BookmarkList
               pinnedBookmarks={filtering.filteredAndSortedBookmarks.pinned}
               unpinnedBookmarks={filtering.filteredAndSortedBookmarks.unpinned}

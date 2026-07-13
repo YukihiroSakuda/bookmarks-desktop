@@ -21,12 +21,10 @@ const getRuleSentence = (rule: TagRule, availableTags: Tag[]) => {
       : "ends with";
   const tag = availableTags.find((t) => t.id === rule.tagId);
   return (
-    <div className="text-sm text-muted-foreground flex items-center flex-wrap">
-      <span>
-        If the {field} {match} &quot;{rule.pattern}&quot;, add tag:
-      </span>
+    <div className="text-sm text-muted-foreground">
+      If the {field} {match} &quot;{rule.pattern}&quot;, add tag:
       {tag && (
-        <span className="ml-1 inline-block">
+        <span className="ml-1 inline-block align-middle">
           <TagComponent tag={tag.name} isSelected={true} />
         </span>
       )}
