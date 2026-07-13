@@ -1097,6 +1097,29 @@ pub fn unregister_context_menu() -> Result<Value, String> {
     Err("context menu is only supported on Windows".to_string())
 }
 
+// ---------- Launch at Windows startup ----------
+
+/// Registers the app to launch (hidden, to the system tray) when the current
+/// user logs in, via the standard per-user `Run` registry key. Idempotent —
+/// safe to call on every launch.
+#[cfg(target_os = "windows")]
+pub fn register_autostart() -> Result<(), String> {
+    use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
+    use winreg::RegKey;
+
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    let exe_str = exe.to_str().ok_or("invalid exe path")?;
+    let cmd = format!("\"{}\" --hidden", exe_str);
+
+    let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+    let (run_key, _) = hkcu
+        .create_subkey_with_flags("Software\\Microsoft\\Windows\\CurrentVersion\\Run", KEY_WRITE)
+        .map_err(|e| e.to_string())?;
+    run_key.set_value("Bookmarks", &cmd).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 // ---------- Open a folder/file path in the OS file explorer ----------
 
 #[tauri::command]
