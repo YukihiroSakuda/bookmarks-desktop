@@ -43,9 +43,11 @@ State is managed via custom hooks in `src/hooks/` (barrel-exported from `src/hoo
 - `useBookmarkFiltering` — search (title + URL + memo), tag filter, sort
 - `useBookmarkOrdering` — drag-and-drop reorder
 - `useTagManagement` — tags/rules CRUD
-- `useKeyboardShortcuts` — `/` (focus search), Escape (close/deselect)
+- `useKeyboardShortcuts` — Escape (close/deselect). Focus-the-search-box-and-start-typing is handled separately, inline in `page.tsx`, on the first plain keystroke
 - `useSearchHistory` — localStorage-persisted search history (max 10 entries)
 - `useExplorerImport` — Windows Explorer drag-drop, right-click context menu (`--path` CLI arg), single-instance `open-path-bookmark` event
+- `useBookmarkTabNavigation` — Tab/Shift+Tab cycles focus through bookmark cards only, skipping other focusable elements
+- `useBookmarkArrowNavigation` — arrow keys move focus between cards: Left/Right by Tab order, Up/Down to the closest card in the row above/below whose column best lines up
 
 `src/app/page.tsx` composes hooks and passes handlers to child components. No external state management library.
 
@@ -65,7 +67,7 @@ Written in Rust. Key files:
 
 **SQLite schema** (5 tables): `bookmarks` (includes `kind`, `memo`), `tags`, `bookmarks_tags`, `user_settings`, `tag_rules`. Schema defined in `src-tauri/src/db.rs`.
 
-**Windows features**: On startup, automatically registers a Windows right-click context menu entry. Accepts `--path <filepath>` CLI arg to pre-fill the bookmark form from Explorer. Single-instance plugin ensures a second launch focuses the existing window and forwards the path.
+**Windows features**: On startup, automatically registers a Windows right-click context menu entry, and registers itself (idempotently) in the per-user `Run` registry key so it launches on login via `<exe> --hidden`. Accepts `--path <filepath>` CLI arg to pre-fill the bookmark form from Explorer. Single-instance plugin ensures a second launch focuses the existing window and forwards the path. Closing the main window hides it to a system tray icon instead of quitting (`CloseRequested` is intercepted); the tray's "Open Bookmarks"/left-click restores the window and "Quit" is the only way to actually exit. A `--hidden` launch (from autostart) starts with the window hidden in the tray.
 
 ### Local HTTP Server (port 37373)
 

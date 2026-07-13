@@ -153,6 +153,8 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         </Ul>
         <H3>ピン留め</H3>
         <P>ピンアイコンをクリックするとブックマークが一覧の最上部に固定されます。ピン留めされたブックマークは <Strong>Pinned Bookmarks</Strong> セクションにまとめて表示されます。再度クリックで解除できます。ピン留め／解除するとカードがセクション間を移動し、移動先まで自動でスクロールするので、状態の変化を見失いません。</P>
+        <H3>常駐（システムトレイ）</H3>
+        <P>ウィンドウを閉じてもアプリは終了せず、システムトレイに常駐します。トレイアイコンをクリックするか、右クリックメニューの <Strong>Open Bookmarks</Strong> を選ぶとウィンドウが復元されます。完全に終了する場合はトレイメニューの <Strong>Quit</Strong> を選んでください。また、Windowsへのログイン時にもトレイに隠れた状態で自動的に起動します。</P>
       </section>
 
       <div className="border-t" />
@@ -322,10 +324,19 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">ショートカット</h2>
         <div className="rounded-lg border overflow-hidden mb-3">
           <ShortcutRow keys={["文字キー"]} label="検索バーにフォーカスして入力開始" />
+          <ShortcutRow keys={["Tab"]} label="次のブックマークカードへフォーカス移動" />
+          <ShortcutRow keys={["Shift", "Tab"]} label="前のブックマークカードへフォーカス移動" />
           <ShortcutRow keys={["Esc"]} label="モーダルを閉じる / 操作をキャンセル" />
           <ShortcutRow keys={["Ctrl", "Alt", "Space"]} label="アプリを前面に表示（グローバル、初期値）" />
         </div>
         <P>前面表示ショートカットはシステム全体に登録される唯一のグローバルショートカットです。<Strong>設定</Strong>ダイアログの <Strong>Bring App to Front</Strong> 欄から変更できます。他アプリと衝突しにくい <Strong>Ctrl+Alt</Strong> または <Strong>Ctrl+Shift</Strong> の組み合わせを推奨します。</P>
+        <H3>矢印キーでのカード移動</H3>
+        <P>カードにフォーカスがある状態で矢印キーを押すと、別のカードへフォーカスを移動できます。</P>
+        <Ul>
+          <Li><Strong>←→</Strong> — Tabキーと同じ表示順で前後のカードに移動します。</Li>
+          <Li><Strong>↑↓</Strong> — 列の位置がなるべく揃った直近の行のカードに移動します。列数の変更やピン留め／未ピン留めの区切りをまたいでも正しく動作します。</Li>
+          <Li>入力欄にフォーカスがある間やダイアログ表示中は無効です。</Li>
+        </Ul>
         <H3>ブックマークごとのショートカット（アプリ内）</H3>
         <P>各ブックマークにキーを割り当てると、<Strong>アプリが表示されている間</Strong>にそのキーでページ／フォルダを開けます。割り当てたキーはカード右側に常時バッジ表示されます。</P>
         <Ul>
@@ -408,6 +419,8 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         </Ul>
         <H3>Pinning</H3>
         <P>Click the pin icon to fix a bookmark at the top of the list. Pinned bookmarks are grouped under the <Strong>Pinned Bookmarks</Strong> section. Click again to unpin. Pinning or unpinning moves the card between sections and scrolls it into view, so the change is easy to follow.</P>
+        <H3>Tray &amp; Startup</H3>
+        <P>Closing the window doesn&apos;t quit the app — it keeps running in the system tray. Click the tray icon, or choose <Strong>Open Bookmarks</Strong> from its right-click menu, to bring the window back. Choose <Strong>Quit</Strong> from the tray menu to exit completely. The app also launches automatically (hidden in the tray) when you log in to Windows.</P>
       </section>
 
       <div className="border-t" />
@@ -577,10 +590,19 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Shortcuts</h2>
         <div className="rounded-lg border overflow-hidden mb-3">
           <ShortcutRow keys={["Any key"]} label="Focus search and start typing" />
+          <ShortcutRow keys={["Tab"]} label="Move focus to the next bookmark card" />
+          <ShortcutRow keys={["Shift", "Tab"]} label="Move focus to the previous bookmark card" />
           <ShortcutRow keys={["Esc"]} label="Close modal / cancel action" />
           <ShortcutRow keys={["Ctrl", "Alt", "Space"]} label="Bring app to front (global, default)" />
         </div>
         <P>The bring-to-front shortcut is the one global shortcut registered system-wide. Change it in the <Strong>Settings</Strong> dialog under <Strong>Bring App to Front</Strong>. Prefer a <Strong>Ctrl+Alt</Strong> or <Strong>Ctrl+Shift</Strong> combo to avoid clashing with other apps.</P>
+        <H3>Arrow Key Card Navigation</H3>
+        <P>With a card focused, arrow keys move focus to another card.</P>
+        <Ul>
+          <Li><Strong>Left/Right</Strong> — move to the previous/next card in the same order as Tab.</Li>
+          <Li><Strong>Up/Down</Strong> — jump to the closest card in the row above/below whose column lines up best. Works correctly across column-count changes and the pinned/unpinned section boundary.</Li>
+          <Li>Disabled while a text field is focused or a dialog is open.</Li>
+        </Ul>
         <H3>Per-Bookmark Shortcuts (In-App)</H3>
         <P>Assign a key to a bookmark to open its page/folder <Strong>while the app is open</Strong>. Assigned keys are always shown as a badge on the right of the card.</P>
         <Ul>
