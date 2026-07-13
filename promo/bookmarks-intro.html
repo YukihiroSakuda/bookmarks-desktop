@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bookmarks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* ===========================================
+   VIEWPORT FITTING: MANDATORY BASE STYLES
+   =========================================== */
+html, body { height: 100%; overflow-x: hidden; }
+html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+
+.slide {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.slide-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-height: 100%;
+  overflow: hidden;
+  padding: var(--slide-padding);
+  max-width: min(92vw, 1100px);
+  margin: 0 auto;
+  width: 100%;
+}
+
+:root {
+  --title-size: clamp(1.5rem, 5vw, 3.6rem);
+  --h2-size: clamp(1.25rem, 3.5vw, 2.2rem);
+  --h3-size: clamp(1rem, 2.5vw, 1.4rem);
+  --body-size: clamp(0.78rem, 1.5vw, 1.05rem);
+  --small-size: clamp(0.65rem, 1vw, 0.85rem);
+  --slide-padding: clamp(1rem, 4vw, 4rem);
+  --content-gap: clamp(0.5rem, 2vw, 1.75rem);
+  --element-gap: clamp(0.25rem, 1vw, 0.9rem);
+
+  /* Theme: restrained white base + Bookmarks brand blue (monochrome + single accent) */
+  --bg: #fdfdfc;
+  --ink: #1c1c22;
+  --ink-soft: #55555f;
+  --line: #e3e3e0;
+  --blue: #3b82f6;
+  --blue-deep: #1d4ed8;
+  --gold: #f2c94c;
+  --card-bg: #f6f6f4;
+}
+
+@media (max-height: 700px) {
+  :root {
+    --slide-padding: clamp(0.75rem, 3vw, 2rem);
+    --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+    --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+    --h2-size: clamp(1rem, 3vw, 1.75rem);
+  }
+}
+@media (max-height: 600px) {
+  :root {
+    --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+    --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+    --title-size: clamp(1.1rem, 4vw, 2rem);
+    --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+  }
+  .nav-dots, .keyboard-hint { display: none; }
+}
+@media (max-height: 500px) {
+  :root {
+    --slide-padding: clamp(0.4rem, 2vw, 1rem);
+    --title-size: clamp(1rem, 3.5vw, 1.5rem);
+    --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+    --body-size: clamp(0.65rem, 1vw, 0.85rem);
+  }
+}
+@media (max-width: 600px) {
+  :root { --title-size: clamp(1.25rem, 7vw, 2.5rem); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.2s !important;
+  }
+  html { scroll-behavior: auto; }
+}
+
+/* =========== Theme =========== */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Outfit', 'Noto Sans JP', 'Yu Gothic UI', 'Meiryo', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.6;
+  font-size: var(--body-size);
+}
+
+/* Kicker: small numbered section label */
+.kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-family: 'Outfit', 'Noto Sans JP', sans-serif;
+  font-size: var(--small-size);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  color: var(--blue);
+  text-transform: uppercase;
+  margin-bottom: var(--element-gap);
+}
+.kicker::before {
+  content: '';
+  width: 2.2em;
+  height: 2px;
+  background: var(--blue);
+}
+
+h1 {
+  font-size: var(--title-size);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+h1 .accent { color: var(--blue); }
+h2 {
+  font-size: var(--h2-size);
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: var(--content-gap);
+}
+h3 { font-size: var(--h3-size); font-weight: 700; }
+p.lead { color: var(--ink-soft); max-width: 46em; }
+p.supplement {
+  color: var(--ink-soft);
+  font-size: var(--small-size);
+  margin-top: var(--element-gap);
+}
+
+/* Title slide */
+.title-slide .slide-content { align-items: flex-start; }
+.title-mark {
+  width: clamp(44px, 7vw, 72px);
+  height: clamp(44px, 7vw, 72px);
+  margin-bottom: var(--content-gap);
+}
+.title-slide .subtitle {
+  color: var(--ink-soft);
+  font-size: var(--h3-size);
+  font-weight: 400;
+  margin-top: 0.5em;
+}
+
+/* Bullet list */
+.bullet-list { list-style: none; display: flex; flex-direction: column; gap: clamp(0.4rem, 1vh, 1rem); }
+.bullet-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  font-size: var(--body-size);
+  line-height: 1.5;
+}
+.bullet-list li::before {
+  content: '';
+  width: 0.55em;
+  height: 0.55em;
+  border: 2px solid var(--blue);
+  border-radius: 2px;
+  flex: none;
+}
+.bullet-list li > span { flex: 1; min-width: 0; }
+
+kbd.key {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: #fff;
+  padding: 0.06em 0.5em;
+  font-family: 'Outfit', monospace;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Steps (install) */
+.steps { list-style: none; counter-reset: step; display: flex; flex-direction: column; gap: clamp(0.5rem, 1.2vh, 1rem); }
+.steps li { counter-increment: step; display: flex; gap: 0.9em; align-items: baseline; }
+.steps li::before {
+  content: counter(step);
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  color: #fff;
+  background: var(--blue);
+  border-radius: 50%;
+  width: 1.7em;
+  height: 1.7em;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85em;
+  transform: translateY(0.2em);
+}
+.steps .note { color: var(--ink-soft); font-size: var(--small-size); display: block; }
+
+/* Reveal animation (restrained: fade + small rise) */
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity 0.45s ease, transform 0.45s ease; }
+.slide.in-view .reveal { opacity: 1; transform: none; }
+.slide.in-view .reveal:nth-child(2) { transition-delay: 0.07s; }
+.slide.in-view .reveal:nth-child(3) { transition-delay: 0.14s; }
+.slide.in-view .reveal:nth-child(4) { transition-delay: 0.21s; }
+.slide.in-view .reveal:nth-child(5) { transition-delay: 0.28s; }
+
+/* Footer rail on each slide */
+.slide-footer {
+  position: absolute;
+  bottom: clamp(0.6rem, 2vh, 1.4rem);
+  left: var(--slide-padding);
+  right: var(--slide-padding);
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--small-size);
+  color: var(--ink-soft);
+  pointer-events: none;
+}
+
+/* Fixed navigation UI */
+.nav-dots {
+  position: fixed;
+  right: clamp(0.6rem, 1.5vw, 1.4rem);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  z-index: 10;
+}
+.nav-dots button {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: var(--line);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.25s, transform 0.25s;
+}
+.nav-dots button.active { background: var(--blue); transform: scale(1.35); }
+.keyboard-hint {
+  position: fixed;
+  bottom: clamp(0.5rem, 1.5vh, 1rem);
+  right: clamp(0.8rem, 1.8vw, 1.6rem);
+  font-size: var(--small-size);
+  color: var(--ink-soft);
+  z-index: 10;
+}
+.progress {
+  position: fixed;
+  top: 0; left: 0;
+  height: 3px;
+  background: var(--blue);
+  width: 0;
+  z-index: 11;
+  transition: width 0.3s ease;
+}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<main id="deck">
+
+  <!-- 1. Title -->
+  <section class="slide title-slide">
+    <div class="slide-content">
+      <!-- Bookmarks icon: blue ribbon bookmark with a thin gold edge, matching the app icon -->
+      <svg class="title-mark reveal" viewBox="0 0 512 512" role="img" aria-label="Bookmarks アイコン">
+        <defs>
+          <linearGradient id="bm" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#60a5fa"/><stop offset="1" stop-color="#1d4ed8"/>
+          </linearGradient>
+        </defs>
+        <path d="M120 60 H392 V452 L256 356 L120 452 Z" fill="var(--gold)"/>
+        <path d="M104 60 H376 V452 L240 356 L104 452 Z" fill="url(#bm)"/>
+      </svg>
+      <h1 class="reveal">Book<span class="accent">marks</span></h1>
+      <p class="subtitle reveal">URL・ファイル・フォルダをまとめて管理するデスクトップアプリです。</p>
+    </div>
+    <div class="slide-footer"><span></span><span>1 / 9</span></div>
+  </section>
+
+  <!-- 2. Overview -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="kicker reveal">01 — Overview</div>
+      <h2 class="reveal">Bookmarks でできること</h2>
+      <ul class="bullet-list reveal">
+        <li><span>URL とローカルのファイル・フォルダを、まとめて管理できます。</span></li>
+        <li><span>タイトル・URL・メモのキーワード検索や、タグで簡単に見つかります。</span></li>
+        <li><span><kbd class="key">Ctrl</kbd> + <kbd class="key">Alt</kbd> + <kbd class="key">Space</kbd>（変更可）で、どこからでも呼び出せます。</span></li>
+        <li><span>ブックマークごとに、任意のショートカットキーを割り当てられます。</span></li>
+        <li><span>ブラウザ拡張機能やエクスプローラ連携で、簡単に追加できます。</span></li>
+      </ul>
+    </div>
+    <div class="slide-footer"><span>Bookmarks</span><span>2 / 9</span></div>
+  </section>
+
+  <!-- 3. Organize -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="kicker reveal">02 — Organize</div>
+      <h2 class="reveal">整理して使う</h2>
+      <ul class="bullet-list reveal">
+        <li><span>ピン留めで、よく使うブックマークを最上部に固定できます。</span></li>
+        <li><span>カラム数は1〜4列で切り替えられ、自動保存されます。</span></li>
+        <li><span>追加日時・タイトル・アクセス数・カスタム順で並び替えられます。</span></li>
+        <li><span>ドラッグ＆ドロップで、順序を自由に並び替えられます。</span></li>
+      </ul>
+    </div>
+    <div class="slide-footer"><span>Bookmarks</span><span>3 / 9</span></div>
+  </section>
+
+  <!-- 4. Search & Tag -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="kicker reveal">03 — Search &amp; Tag</div>
+      <h2 class="reveal">検索とタグ</h2>
+      <ul class="bullet-list reveal">
+        <li><span>タイトル・URL・メモを対象にキーワード検索できます。</span></li>
+        <li><span>文字キーを打ち始めるだけで、検索欄にフォーカスして入力が始まります。</span></li>
+        <li><span>タグをクリックで絞り込み、Ctrl + クリックで複数選択もできます。</span></li>
+        <li><span>URL やタイトルの条件に応じて、タグが自動で付くルールを設定できます。</span></li>
+      </ul>
+    </div>
+    <div class="slide-footer"><span>Bookmarks</span><span>4 / 9</span></div>
+  </section>
+
+  <!-- 5. Import / Export -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="kicker reveal">04 — Import / Export</div>
+      <h2 class="reveal">インポート・エクスポート・バックアップ</h2>
+      <ul class="bullet-list reveal">
+        <li><span>ブラウザのブックマークHTMLをインポートできます。</span></li>
+        <li><span>現在の一覧をHTML形式でエクスポートできます。</span></li>
+        <li><span>全データをJSONでバックアップ・復元できます。</span></li>
+        <li><span>確認入力付きで、全データを削除できます。</span></li>
+      </ul>
+    </div>
+    <div class="slide-footer"><span>Bookmarks</span><span>5 / 9</span></div>
+  </section>
+
+  <!-- 6. Integrations -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="kicker reveal">05 — Integrations</div>
+      <h2 class="reveal">連携機能</h2>
+      <ul class="bullet-list reveal">
+        <li><span>右クリックやドラッグ＆ドロップで、ファイル・フォルダを登録できます。</span></li>
+        <li><span>ブラウザ拡張機能から、閲覧中のページをワンクリックで保存できます。</span></li>
+        <li><span>拡張機能では、保存済みURLの重複も自動で検知します。</span></li>
+        <li><span>各ブックマークにメモを添付でき、検索対象にもなります。</span></li>
+      </ul>
+    </div>
+    <div class="slide-footer"><span>Bookmarks</span><span>6 / 9</span></div>
+  </section>
+
+  <!-- 7. Shortcuts -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="kicker reveal">06 — Shortcuts</div>
+      <h2 class="reveal">キーボードショートカット</h2>
+      <ul class="bullet-list reveal">
+        <li><span><kbd class="key">Ctrl</kbd> + <kbd class="key">Alt</kbd> + <kbd class="key">Space</kbd> で、アプリを前面に表示します。</span></li>
+        <li><span>文字キーを打つと、検索欄にフォーカスして入力が始まります。</span></li>
+        <li><span><kbd class="key">Tab</kbd> や矢印キーで、カード間をフォーカス移動します。</span></li>
+        <li><span><kbd class="key">Esc</kbd> で、モーダルを閉じたり操作を取り消せます。</span></li>
+      </ul>
+      <p class="supplement reveal">ブックマークごとに個別のショートカットキーも設定できます（修飾キーが1つ以上必要です）。</p>
+    </div>
+    <div class="slide-footer"><span>Bookmarks</span><span>7 / 9</span></div>
+  </section>
+
+  <!-- 8. Always available -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="kicker reveal">07 — Always Available</div>
+      <h2 class="reveal">常駐と自動起動</h2>
+      <ul class="bullet-list reveal">
+        <li><span>ウィンドウを閉じてもアプリは終了せず、システムトレイに常駐します。</span></li>
+        <li><span>トレイアイコンやショートカットで、いつでも呼び出せます。</span></li>
+        <li><span>Windows のログイン時にも自動的に起動します。</span></li>
+        <li><span>トレイメニューの「Quit」を選ぶと、完全に終了できます。</span></li>
+      </ul>
+    </div>
+    <div class="slide-footer"><span>Bookmarks</span><span>8 / 9</span></div>
+  </section>
+
+  <!-- 9. Getting started -->
+  <section class="slide">
+    <div class="slide-content">
+      <div class="kicker reveal">08 — Getting Started</div>
+      <h2 class="reveal">導入方法</h2>
+      <ol class="steps reveal">
+        <li>配布されたインストーラ（NSIS / MSI）を実行します。</li>
+        <li>インストール後、タスクトレイに Bookmarks のアイコンが表示されます。</li>
+        <li><kbd class="key">Ctrl</kbd> + <kbd class="key">Alt</kbd> + <kbd class="key">Space</kbd>（初期値）を押して、最初のブックマークを追加してみてください。</li>
+      </ol>
+      <p class="supplement reveal">詳しい使い方はアプリ内のヘルプ（? ボタン）をご覧ください。ブラウザ拡張機能も、ヘルプページからダウンロードできます。</p>
+    </div>
+    <div class="slide-footer"><span>Bookmarks</span><span>9 / 9</span></div>
+  </section>
+
+</main>
+
+<nav class="nav-dots" id="dots" aria-label="スライド移動"></nav>
+<div class="keyboard-hint">←→ / スクロールで移動</div>
+
+<script>
+// Minimal presentation controller: keyboard, wheel (native scroll-snap), touch, dots, progress.
+(function () {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const dots = document.getElementById('dots');
+  const progress = document.getElementById('progress');
+  let current = 0;
+
+  slides.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.setAttribute('aria-label', 'スライド ' + (i + 1));
+    b.addEventListener('click', () => go(i));
+    dots.appendChild(b);
+  });
+  const dotEls = Array.from(dots.children);
+
+  function go(i) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    slides[i].scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function setActive(i) {
+    current = i;
+    dotEls.forEach((d, j) => d.classList.toggle('active', j === i));
+    progress.style.width = ((i + 1) / slides.length * 100) + '%';
+  }
+
+  // Reveal animations + active slide tracking
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        e.target.classList.add('in-view');
+        setActive(slides.indexOf(e.target));
+      }
+    });
+  }, { threshold: 0.55 });
+  slides.forEach((s) => io.observe(s));
+
+  // Keyboard navigation
+  window.addEventListener('keydown', (e) => {
+    if (['ArrowDown', 'ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(current + 1); }
+    else if (['ArrowUp', 'ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(current - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); go(0); }
+    else if (e.key === 'End') { e.preventDefault(); go(slides.length - 1); }
+  });
+
+  // Touch swipe (vertical)
+  let touchY = null;
+  window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener('touchend', (e) => {
+    if (touchY === null) return;
+    const dy = touchY - e.changedTouches[0].clientY;
+    if (Math.abs(dy) > 60) go(current + (dy > 0 ? 1 : -1));
+    touchY = null;
+  }, { passive: true });
+
+  setActive(0);
+})();
+</script>
+</body>
+</html>
