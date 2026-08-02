@@ -4,8 +4,9 @@
   Identity values below are from Partner Center (Dashboard > App identity)
   for the reserved product "YukihiroSakuda.BookmarksTags".
 
-  Version must stay 4-part (Major.Minor.Build.Revision). Keep it in sync
-  with the "version" field in ../tauri.conf.json (append ".0").
+  Version must stay 4-part (Major.Minor.Build.Revision) and in sync with
+  the "version" field in ../tauri.conf.json (append ".0"). Bump both
+  together whenever a new Store submission goes out.
 
   Built with scripts/build-msix.ps1 from the repo root.
 -->
@@ -18,10 +19,10 @@
   <Identity
     Name="YukihiroSakuda.BookmarksTags"
     Publisher="CN=2B8E7D66-F9F9-4697-A28E-23DF034A4A87"
-    Version="0.1.5.0" />
+    Version="0.1.6.0" />
 
   <Properties>
-    <DisplayName>Bookmarks</DisplayName>
+    <DisplayName>Bookmarks &amp; Tags</DisplayName>
     <PublisherDisplayName>Yukihiro Sakuda</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -41,7 +42,7 @@
   <Applications>
     <Application Id="Bookmarks" Executable="app.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="Bookmarks"
+        DisplayName="Bookmarks &amp; Tags"
         Description="Save and organize bookmarks with tags, memos, and drag-and-drop ordering."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"

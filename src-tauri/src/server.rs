@@ -18,12 +18,17 @@ use uuid::Uuid;
 
 pub type SharedDb = Arc<Mutex<Connection>>;
 
-/// Extension ID derived from the public key embedded in
-/// `extension/public/manifest.json`'s `key` field. Pinning the key keeps this
-/// ID stable across unpacked (dev) loads and store-published installs, so the
-/// CORS allowlist below always matches the real extension and nothing else.
-/// Changing that manifest key changes this ID and requires updating both.
-const EXTENSION_ORIGIN: &str = "chrome-extension://bgmjbpabbplohlimpahhllgaddbkfofg";
+/// Allowed extension origins. Store submissions strip the `key` field from
+/// extension/public/manifest.json (Edge/Chrome both reject a pinned key), so
+/// each store assigns its own extension ID at publish time — these can't all
+/// share one fixed ID the way unpacked dev loads can. Add each store's real
+/// published ID here once known.
+const EXTENSION_ORIGINS: &[&str] = &[
+    // Unpacked (dev) load — stable because extension/public/manifest.json pins `key` there.
+    "chrome-extension://bgmjbpabbplohlimpahhllgaddbkfofg",
+    // Microsoft Edge Add-ons (published CRX ID).
+    "chrome-extension://jppmhgioeccjkicfjkddfofellogpjoa",
+];
 
 #[derive(Clone)]
 struct ServerState {
@@ -430,11 +435,12 @@ pub async fn start(db: SharedDb, app_handle: tauri::AppHandle) {
     };
     let state = ServerState { db, app: app_handle, token };
 
-    let origin: HeaderValue = EXTENSION_ORIGIN
-        .parse()
-        .expect("EXTENSION_ORIGIN must be a valid header value");
+    let origins: Vec<HeaderValue> = EXTENSION_ORIGINS
+        .iter()
+        .map(|o| o.parse().expect("EXTENSION_ORIGINS entries must be valid header values"))
+        .collect();
     let cors = CorsLayer::new()
-        .allow_origin(origin)
+        .allow_origin(origins)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any);
 

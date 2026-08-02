@@ -39,6 +39,7 @@ yarn-error.log*
 
 # extension build artifacts
 extension/dist.zip
+extension/dist-store/
 
 # MSIX packaging artifacts
 src-tauri/msix/staging/
