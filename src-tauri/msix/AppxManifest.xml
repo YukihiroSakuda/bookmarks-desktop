@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX package manifest for Microsoft Store submission.
+  Identity values below are from Partner Center (Dashboard > App identity)
+  for the reserved product "YukihiroSakuda.BookmarksTags".
+
+  Version must stay 4-part (Major.Minor.Build.Revision). Keep it in sync
+  with the "version" field in ../tauri.conf.json (append ".0").
+
+  Built with scripts/build-msix.ps1 from the repo root.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="YukihiroSakuda.BookmarksTags"
+    Publisher="CN=2B8E7D66-F9F9-4697-A28E-23DF034A4A87"
+    Version="0.1.5.0" />
+
+  <Properties>
+    <DisplayName>Bookmarks</DisplayName>
+    <PublisherDisplayName>Yukihiro Sakuda</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <Application Id="Bookmarks" Executable="app.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Bookmarks"
+        Description="Save and organize bookmarks with tags, memos, and drag-and-drop ordering."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Square71x71Logo="Assets\Square71x71Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+</Package>

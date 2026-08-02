@@ -5,7 +5,7 @@
   "description": "Save bookmarks to your Bookmarks app with one click",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvJDf8oYcs/7KfvvPK1VU4AEHyYfokt0J/R4go9Vl1jVq/ZhhBfSA341+DnQ6CF4oEYlVs/VocJwuHESBaB79n6x0YCllk+t98khC6+c6p/ksOTHGDoxcpHAgyfsE0Ef5xlaHjyMeA84aCK6ehoWH4VqCRojJ40BIwY2To3LVUJ6WdE68fLyyWx4kHjPP5rh6hdNPUTmRb+uNfTuSZvzoiOGhMnpz6qOaas5kvwHx1OprKjT6PHJKmIO3V/MjY6tELdbvs+QLYP5jQqGE+1C0wixE+J53wP1OHpaUYhRqaYnj1Zipq/Kbztj2/wc8hNux+SvRATZ3zQXcyQbt5cBepQIDAQAB",
   "permissions": ["activeTab", "tabs", "storage"],
-  "host_permissions": ["http://*/*", "https://*/*"],
+  "host_permissions": ["http://localhost:37373/*"],
   "action": {
     "default_popup": "popup/index.html",
     "default_icon": {

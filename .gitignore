@@ -40,6 +40,11 @@ yarn-error.log*
 # extension build artifacts
 extension/dist.zip
 
+# MSIX packaging artifacts
+src-tauri/msix/staging/
+src-tauri/msix/output/
+src-tauri/msix/*.pfx
+
 # vercel
 .vercel
 
