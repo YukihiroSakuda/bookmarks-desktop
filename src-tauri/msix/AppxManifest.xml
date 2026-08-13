@@ -9,6 +9,7 @@
   together whenever a new Store submission goes out.
 
   Built with scripts/build-msix.ps1 from the repo root.
+  Full release procedure: docs/msix-release.md
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"

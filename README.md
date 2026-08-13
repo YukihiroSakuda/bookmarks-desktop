@@ -163,6 +163,14 @@ npm install
 npm run build
 ```
 
+### 6. Microsoft Store package (MSIX)
+
+```powershell
+powershell -File scripts/build-msix.ps1
+```
+
+Produces the unsigned `src-tauri/msix/output/bookmarks.msix` for Partner Center. See [docs/msix-release.md](docs/msix-release.md) for the full release procedure — version rules, local test signing, WACK validation, and submission.
+
 ## Project structure
 
 ```
