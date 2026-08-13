@@ -1,11 +1,23 @@
-import { useEffect } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 interface UseBookmarkArrowNavigationOptions {
   /** Disable while a modal/form is open or the list is in ordering mode. */
   enabled: boolean;
+  /**
+   * The search box. Pressing ArrowDown while it's focused jumps straight to
+   * the first bookmark card, unlike other inputs which keep native behavior.
+   */
+  searchInputRef?: RefObject<HTMLInputElement | null>;
 }
 
-const ARROW_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+const NAV_KEYS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Home",
+  "End",
+]);
 
 /**
  * Makes the arrow keys move focus between bookmark cards.
@@ -14,23 +26,43 @@ const ARROW_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
  * Up/Down jump to the card below/above that's closest overall (combined
  * row + column distance), matched from actual layout so it stays correct
  * across responsive column counts, incomplete rows, and the pinned/unpinned
- * sections.
+ * sections. Home/End jump straight to the first/last card overall.
  *
  * Each focusable card link is identified by the `data-bookmark-card-link`
  * attribute set in BookmarkCard.
  */
 export function useBookmarkArrowNavigation({
   enabled,
+  searchInputRef,
 }: UseBookmarkArrowNavigationOptions) {
+  const searchInputRefHolder = useRef(searchInputRef);
+  searchInputRefHolder.current = searchInputRef;
+
   useEffect(() => {
     if (!enabled) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!ARROW_KEYS.has(e.key) || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (!NAV_KEYS.has(e.key) || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+
+      const target = e.target as HTMLElement;
+
+      // From the search box, ArrowDown jumps to the first card instead of
+      // moving the text cursor.
+      if (
+        e.key === "ArrowDown" &&
+        !!searchInputRefHolder.current?.current &&
+        target === searchInputRefHolder.current.current
+      ) {
+        const firstCard = document.querySelector<HTMLElement>("[data-bookmark-card-link]");
+        if (firstCard) {
+          e.preventDefault();
+          firstCard.focus();
+        }
+        return;
+      }
 
       // Let native behavior work inside dialogs and while typing/interacting
       // with form fields, so those keep their own arrow-key handling.
-      const target = e.target as HTMLElement;
       if (
         target.tagName === "INPUT" ||
         target.tagName === "TEXTAREA" ||
@@ -46,6 +78,13 @@ export function useBookmarkArrowNavigation({
         document.querySelectorAll<HTMLElement>("[data-bookmark-card-link]")
       );
       if (cards.length === 0) return;
+
+      if (e.key === "Home" || e.key === "End") {
+        e.preventDefault();
+        const edgeCard = e.key === "Home" ? cards[0] : cards[cards.length - 1];
+        edgeCard?.focus();
+        return;
+      }
 
       const currentIndex = cards.indexOf(document.activeElement as HTMLElement);
 

@@ -7,6 +7,8 @@ import {
   History,
 } from "lucide-react";
 import { useState, useEffect, useRef, useMemo, RefObject } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { cn } from "@/lib/utils";
 import { TagManager } from "./TagManager";
 import { Tag as TagComponent } from "./Tag";
 import { Button } from "./Button";
@@ -90,6 +92,7 @@ export function BookmarkHeader({
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
   const [isTagRuleOpen, setIsTagRuleOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [activeHistoryIndex, setActiveHistoryIndex] = useState(-1);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const filteredHistory = useMemo(() => {
@@ -102,6 +105,12 @@ export function BookmarkHeader({
 
   const showHistory = isHistoryOpen && filteredHistory.length > 0 && !isOrderingMode;
 
+  // Keep the keyboard-highlighted row valid as the list changes (typing
+  // narrows it, or it closes) — don't carry a stale index across a new list.
+  useEffect(() => {
+    setActiveHistoryIndex(-1);
+  }, [showHistory, filteredHistory]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -113,6 +122,18 @@ export function BookmarkHeader({
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // The search input can still hold DOM focus from before the window was
+  // last hidden, so being summoned back via the global shortcut must also
+  // explicitly close the history dropdown — otherwise it reopens over the
+  // cards without any new focus/click to trigger it.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen("summon", () => {
+      setIsHistoryOpen(false);
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
   }, []);
 
   return (
@@ -132,6 +153,30 @@ export function BookmarkHeader({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               onFocus={() => setIsHistoryOpen(true)}
+              onBlur={(e) => {
+                if (!searchContainerRef.current?.contains(e.relatedTarget as Node)) {
+                  setIsHistoryOpen(false);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (!showHistory) return;
+                // Alt+Down/Up (not the plain arrow keys) walk the history
+                // list — plain ArrowDown/Up are reserved for the card-grid
+                // navigation flow and must keep jumping to the cards.
+                if (e.altKey && e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setActiveHistoryIndex((i) =>
+                    Math.min(i + 1, filteredHistory.length - 1)
+                  );
+                } else if (e.altKey && e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setActiveHistoryIndex((i) => Math.max(i - 1, -1));
+                } else if (e.key === "Enter" && activeHistoryIndex >= 0) {
+                  e.preventDefault();
+                  onSearchChange(filteredHistory[activeHistoryIndex]);
+                  setIsHistoryOpen(false);
+                }
+              }}
               className="w-full px-3 py-2 pl-8 rounded-md border border-input bg-transparent text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-base disabled:opacity-50 disabled:cursor-not-allowed md:text-sm"
               disabled={isOrderingMode}
             />
@@ -168,10 +213,13 @@ export function BookmarkHeader({
                   </button>
                 </div>
                 <ul>
-                  {filteredHistory.map((query) => (
+                  {filteredHistory.map((query, index) => (
                     <li
                       key={query}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-accent cursor-pointer group transition-colors"
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2 hover:bg-accent cursor-pointer group transition-colors",
+                        index === activeHistoryIndex && "bg-accent"
+                      )}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         onSearchChange(query);

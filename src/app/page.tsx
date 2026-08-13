@@ -90,7 +90,10 @@ export default function BookmarksPage() {
 
   // Arrow keys move focus between bookmark cards (Left/Right in document
   // order, Up/Down to the nearest card in the adjacent row).
-  useBookmarkArrowNavigation({ enabled: !isModalOpen && !isOrderingMode });
+  useBookmarkArrowNavigation({
+    enabled: !isModalOpen && !isOrderingMode,
+    searchInputRef,
+  });
 
   const { isDragging } = useExplorerImport({
     isModalOpen,
@@ -182,6 +185,17 @@ export default function BookmarksPage() {
     }).then((fn) => { unlisten = fn; });
     return () => { unlisten?.(); };
   }, [refreshData]);
+
+  // Clear the search box whenever the window is summoned via the global
+  // shortcut, so it doesn't reopen with a stale query from last time.
+  const setSearchQuery = filtering.setSearchQuery;
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    listen("summon", () => {
+      setSearchQuery("");
+    }).then((fn) => { unlisten = fn; });
+    return () => { unlisten?.(); };
+  }, [setSearchQuery]);
 
   useBookmarkHotkeys({
     bookmarks,
