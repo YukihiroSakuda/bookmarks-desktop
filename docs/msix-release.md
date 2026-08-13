@@ -9,10 +9,11 @@ Store 版の更新手順。GitHub Releases 側（`.exe` / `.msi`）は `npm run 
 
 | ファイル | 形式 | 例 |
 | -------- | ---- | -- |
-| `src-tauri/tauri.conf.json` | `X.Y.Z` | `0.1.8` |
-| `package.json` | `X.Y.Z` | `0.1.8` |
-| `src-tauri/Cargo.toml` | `X.Y.Z` | `0.1.8` |
-| `src-tauri/msix/AppxManifest.xml` | `X.Y.Z.0` | `0.1.8.0` |
+| `src-tauri/tauri.conf.json` | `X.Y.Z` | `0.1.9` |
+| `package.json` | `X.Y.Z` | `0.1.9` |
+| `src-tauri/Cargo.toml` | `X.Y.Z` | `0.1.9` |
+| `src-tauri/context-menu/Cargo.toml` | `X.Y.Z` | `0.1.9` |
+| `src-tauri/msix/AppxManifest.xml` | `X.Y.Z.0` | `0.1.9.0` |
 
 MSIX のバージョンは4桁で、**末尾は必ず 0**（Store の予約枠）。かつ公開中のバージョンより大きい必要がある。AppxManifest の更新漏れが起きやすいので、リリース前に必ず確認すること。
 
