@@ -5,9 +5,30 @@ Data is stored in SQLite, so it works fully offline with no external server requ
 
 ## Download
 
-Prebuilt installers are available from [Releases](https://github.com/YukihiroSakuda/bookmarks-desktop/releases) (`.exe` / `.msi`).
+- App: [Microsoft Store](https://apps.microsoft.com/detail/9MT8VDHDB2Z9?hl=ja-jp&gl=JP&ocid=pdpshare)
+- App: [GitHub Releases](https://github.com/YukihiroSakuda/bookmarks-desktop/releases) (`.exe` / `.msi`)
+- Extension: [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/bookmarks/jppmhgioeccjkicfjkddfofellogpjoa)
 
-> The installer isn't code-signed yet, so Windows SmartScreen may show a warning during installation. Click "More info" → "Run anyway" to continue.
+> The GitHub Releases installer isn't code-signed, so Windows SmartScreen may show a warning during installation. Click "More info" → "Run anyway" to continue. The Microsoft Store version doesn't have this issue.
+
+## Where data is stored
+
+All data lives on your own PC — nothing is sent to an external server. The database is a single SQLite file (`bookmarks.db`):
+
+| What | Location |
+| ---- | -------- |
+| Database (bookmarks, tags, tag rules, settings) | `%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db`<br>(= `C:\Users\<user>\AppData\Roaming\com.yukihirosakuda.bookmarks\`) |
+| WebView2 profile — theme, search history, list cache (localStorage) | `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\EBWebView\` |
+| Logs | `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\` |
+
+**The Microsoft Store build and the GitHub Releases build share these same folders**, so your bookmarks carry over when you switch between them. (The Store build is a plain MSIX package with only the `runFullTrust` capability and no Package Support Framework, so Windows does not redirect its `%APPDATA%` writes into the package container.) Only the executable differs:
+
+| Installed from | Executable |
+| -------------- | ---------- |
+| GitHub Releases (`.exe` / `.msi`) | `%LOCALAPPDATA%\bookmarks\app.exe` |
+| Microsoft Store (MSIX) | `C:\Program Files\WindowsApps\YukihiroSakuda.BookmarksTags_<version>_neutral__qvmk1q0kegjem\app.exe` (managed by Windows) |
+
+Because the data folders sit outside the package, **uninstalling either build leaves your data in place**. Delete the two folders above manually if you want to erase everything. To move to another PC, use **Settings → Data → Backup** to write a JSON file and **Restore** it there.
 
 ## Features
 
@@ -60,6 +81,7 @@ Prebuilt installers are available from [Releases](https://github.com/YukihiroSak
 ### Browser extension
 
 - Works with Chrome / Edge (Manifest V3)
+- Published on [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/bookmarks/jppmhgioeccjkicfjkddfofellogpjoa) (also installable unpacked from the app's Help dialog)
 - Talks to the app's built-in HTTP server (localhost:37373) — no external service required
 - Bookmark the current page in one click
 - Automatic duplicate URL detection
@@ -124,7 +146,9 @@ The installer is generated under `src-tauri/target/release/bundle/`.
 
 ### 5. Browser extension
 
-Download `extension.zip` from the app's Help dialog, unzip it, and load it as an unpacked extension.
+For everyday use, install it from [Microsoft Edge Add-ons](https://microsoftedge.microsoft.com/addons/detail/bookmarks/jppmhgioeccjkicfjkddfofellogpjoa).
+
+To run a local build, download `extension.zip` from the app's Help dialog, unzip it, and load it as an unpacked extension.
 
 - Chrome: `chrome://extensions` → "Load unpacked" → select the unzipped folder
 - Edge: `edge://extensions` → "Load unpacked" → select the unzipped folder

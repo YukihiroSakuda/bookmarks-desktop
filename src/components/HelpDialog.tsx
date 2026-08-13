@@ -1,8 +1,9 @@
 "use client";
 
-import { HelpCircle, Download, Loader2 } from "lucide-react";
+import { HelpCircle, Download, Loader2, ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Dialog,
   DialogContent,
@@ -67,7 +68,31 @@ function Strong({ children }: { children: React.ReactNode }) {
   return <span className="font-medium text-foreground">{children}</span>;
 }
 
-function DownloadExtensionButton() {
+const EDGE_ADDON_URL =
+  "https://microsoftedge.microsoft.com/addons/detail/bookmarks/jppmhgioeccjkicfjkddfofellogpjoa";
+/**
+ * Primary call to action for the recommended (store) install path. External
+ * links go through the opener plugin — a plain <a> navigates the Tauri webview.
+ */
+function StoreButton({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-3 mb-1">
+      <button
+        type="button"
+        onClick={() => {
+          openUrl(href).catch((e) => console.error(e));
+        }}
+        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
+      >
+        <ExternalLink size={16} />
+        {children}
+      </button>
+    </div>
+  );
+}
+
+/** Secondary action — the manual ZIP install is a fallback, so keep it quiet. */
+function DownloadExtensionButton({ label }: { label: string }) {
   const [saving, setSaving] = useState(false);
 
   const handleClick = async () => {
@@ -82,14 +107,14 @@ function DownloadExtensionButton() {
   };
 
   return (
-    <div className="mt-4">
+    <div className="mt-3 mb-1">
       <button
         onClick={handleClick}
         disabled={saving}
-        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+        className="inline-flex items-center gap-2 px-3 py-1.5 border border-border text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-60 text-xs font-medium rounded-md transition-colors"
       >
-        {saving ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-        Download Extension
+        {saving ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+        {label}
       </button>
     </div>
   );
@@ -169,6 +194,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <Ul>
           <Li>ブックマークをクリックしたときの検索キーワードが履歴として保存されます。</Li>
           <Li>検索バーをクリックすると過去の検索候補が表示され、クリックで再利用できます。</Li>
+          <Li>履歴が表示されている間は <Kbd>Alt</Kbd>+<Kbd>↓</Kbd> / <Kbd>Alt</Kbd>+<Kbd>↑</Kbd> で候補を選択し、<Kbd>Enter</Kbd> で確定できます（無印の <Kbd>↓</Kbd> はカードへの移動に使うため、履歴の選択には使いません）。</Li>
           <Li>履歴は個別に削除するか、「Clear all」で一括削除できます。</Li>
         </Ul>
       </section>
@@ -277,6 +303,14 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Backup</Strong> — ブックマーク（タグ・メモ・ショートカット・並び順を含む）、タグ、タグルール、設定をまとめてJSONファイルに書き出します。</Li>
           <Li><Strong>Restore</Strong> — JSONバックアップファイルを選択して取り込みます。<Strong>現在のすべてのデータが置き換えられます</Strong>（この操作は取り消せません）。実行前に確認ダイアログが表示されます。</Li>
         </Ul>
+        <H3>データの保存先</H3>
+        <P>データはすべてこのPC内に保存され、外部サーバーには一切送信されません。</P>
+        <Ul>
+          <Li><Strong>データベース</Strong>（ブックマーク・タグ・タグルール・設定） — <Strong>%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db</Strong></Li>
+          <Li><Strong>テーマ・検索履歴・一覧キャッシュ</Strong> — <Strong>%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\EBWebView\</Strong>（WebView2のプロファイル）</Li>
+          <Li><Strong>ログ</Strong> — <Strong>%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\</Strong></Li>
+        </Ul>
+        <P><Strong>Microsoft Store 版とインストーラー版（.exe / .msi）は同じフォルダを使います</Strong>ので、どちらに入れ替えてもブックマークはそのまま引き継がれます。アンインストールしてもこれらのフォルダは残るため、完全に消したい場合は手動で削除してください。別のPCへ移す場合は上の <Strong>Backup</Strong> でJSONを書き出し、移行先で <Strong>Restore</Strong> してください。</P>
         <H3>全件削除（Delete All）</H3>
         <P>同じ <Strong>Settings</Strong> ダイアログの <Strong>Danger Zone</Strong> から、すべてのブックマークとタグを完全に削除できます。誤操作を防ぐため、確認入力欄に <Strong>delete all</Strong> と入力した上で確認すると実行されます。この操作は取り消せません。</P>
       </section>
@@ -335,7 +369,8 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <Ul>
           <Li><Strong>←→</Strong> — Tabキーと同じ表示順で前後のカードに移動します。</Li>
           <Li><Strong>↑↓</Strong> — 列の位置がなるべく揃った直近の行のカードに移動します。列数の変更やピン留め／未ピン留めの区切りをまたいでも正しく動作します。</Li>
-          <Li>入力欄にフォーカスがある間やダイアログ表示中は無効です。</Li>
+          <Li><Strong>Home / End</Strong> — 一覧の先頭／最後尾のカードに直接移動します。</Li>
+          <Li>入力欄にフォーカスがある間やダイアログ表示中は無効です（入力欄では本来のカーソル移動として動作します）。</Li>
         </Ul>
         <H3>ブックマークごとのショートカット（アプリ内）</H3>
         <P>各ブックマークにキーを割り当てると、<Strong>アプリが表示されている間</Strong>にそのキーでページ／フォルダを開けます。割り当てたキーはカード右側に常時バッジ表示されます。</P>
@@ -374,14 +409,18 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>Chrome または Edge（Manifest V3 対応）。</Li>
           <Li>アプリが起動していること。</Li>
         </Ul>
-        <H3>インストール手順</H3>
+        <H3>インストール（推奨）— Edge アドオンストア</H3>
+        <P>Microsoft Edge をお使いの場合は、ストアからそのままインストールできます。デベロッパーモードは不要で、更新も自動です。下のボタンでストアのページを開き、<Strong>入手</Strong> をクリックしてください。</P>
+        <StoreButton href={EDGE_ADDON_URL}>Edge アドオンストアで開く</StoreButton>
+        <H3>インストール（Chrome など）— ZIPを読み込む</H3>
+        <P>ストアに未対応のブラウザでは、ZIPを手動で読み込みます。</P>
         <Ul>
-          <Li>下のボタンからZIPファイルをダウンロードして解凍する。</Li>
+          <Li>このセクション末尾のボタンからZIPファイルをダウンロードして解凍する。</Li>
           <Li>Chrome は <Strong>chrome://extensions</Strong>、Edge は <Strong>edge://extensions</Strong> をアドレスバーに入力して開く。</Li>
           <Li>右上の <Strong>デベロッパーモード</Strong> をオンにする。</Li>
           <Li><Strong>パッケージ化されていない拡張機能を読み込む</Strong> をクリックし、解凍したフォルダを選択する。</Li>
         </Ul>
-        <H3>起動時の案内について</H3>
+        <H3>起動時の案内について（ZIPで読み込んだ場合）</H3>
         <P>この拡張機能はデベロッパーモードで未パッケージのまま読み込まれているため、Chrome / Edge の起動時に確認メッセージが表示されることがあります。継続利用する場合は、この拡張機能を有効のまま使用してください。拡張機能が無効になった場合や反応しない場合は <Strong>chrome://extensions</Strong> または <Strong>edge://extensions</Strong> を開き、再度有効化して必要に応じて <Strong>再読み込み</Strong> してください。</P>
         <H3>使い方</H3>
         <Ul>
@@ -391,7 +430,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Shortcut</Strong> 欄でブックマークにショートカットキーを割り当てることができる（アプリ内での動作と同じ）。</Li>
           <Li><Strong>Add Bookmark</Strong> を押すと、そのまま拡張内から保存できる。</Li>
         </Ul>
-        <DownloadExtensionButton />
+        <DownloadExtensionButton label="ZIPをダウンロード（手動インストール用）" />
       </section>
     </>
   );
@@ -435,6 +474,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <Ul>
           <Li>Keywords are saved when you click a bookmark while searching.</Li>
           <Li>Click the search bar to see past searches; click any entry to reuse it.</Li>
+          <Li>While the history list is showing, use <Kbd>Alt</Kbd>+<Kbd>↓</Kbd> / <Kbd>Alt</Kbd>+<Kbd>↑</Kbd> to highlight an entry and <Kbd>Enter</Kbd> to select it (plain <Kbd>↓</Kbd> is reserved for card navigation, so it&apos;s not used for history selection).</Li>
           <Li>Delete entries individually or use &ldquo;Clear all&rdquo; to wipe history.</Li>
         </Ul>
       </section>
@@ -543,6 +583,14 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Backup</Strong> — writes bookmarks (including tags, memos, shortcuts, and order), tags, tag rules, and settings to a single JSON file.</Li>
           <Li><Strong>Restore</Strong> — pick a JSON backup file to import. This <Strong>replaces all current data</Strong> (cannot be undone). A confirmation dialog is shown first.</Li>
         </Ul>
+        <H3>Where Your Data Is Stored</H3>
+        <P>Everything is kept on this PC and is never sent to an external server.</P>
+        <Ul>
+          <Li><Strong>Database</Strong> (bookmarks, tags, tag rules, settings) — <Strong>%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db</Strong></Li>
+          <Li><Strong>Theme, search history, list cache</Strong> — <Strong>%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\EBWebView\</Strong> (WebView2 profile)</Li>
+          <Li><Strong>Logs</Strong> — <Strong>%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\</Strong></Li>
+        </Ul>
+        <P><Strong>The Microsoft Store build and the installer build (.exe / .msi) use these same folders</Strong>, so your bookmarks carry over when you switch between them. Uninstalling does not delete these folders — remove them manually to erase everything. To move to another PC, use <Strong>Backup</Strong> above to write a JSON file and <Strong>Restore</Strong> it there.</P>
         <H3>Delete All</H3>
         <P>The same <Strong>Settings</Strong> dialog has a <Strong>Danger Zone</Strong> that permanently deletes all bookmarks and tags. To prevent mistakes, you must type <Strong>delete all</Strong> in the confirmation field before confirming. This action cannot be undone.</P>
       </section>
@@ -601,7 +649,8 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <Ul>
           <Li><Strong>Left/Right</Strong> — move to the previous/next card in the same order as Tab.</Li>
           <Li><Strong>Up/Down</Strong> — jump to the closest card in the row above/below whose column lines up best. Works correctly across column-count changes and the pinned/unpinned section boundary.</Li>
-          <Li>Disabled while a text field is focused or a dialog is open.</Li>
+          <Li><Strong>Home / End</Strong> — jump straight to the first/last card in the list.</Li>
+          <Li>Disabled while a text field is focused or a dialog is open (text fields keep their native cursor movement instead).</Li>
         </Ul>
         <H3>Per-Bookmark Shortcuts (In-App)</H3>
         <P>Assign a key to a bookmark to open its page/folder <Strong>while the app is open</Strong>. Assigned keys are always shown as a badge on the right of the card.</P>
@@ -640,14 +689,18 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>Chrome or Edge (Manifest V3).</Li>
           <Li>The app must be running.</Li>
         </Ul>
-        <H3>Installation</H3>
+        <H3>Install (recommended) — Edge Add-ons Store</H3>
+        <P>On Microsoft Edge you can install it straight from the store: no Developer mode, and updates are automatic. Use the button below to open the store page, then click <Strong>Get</Strong>.</P>
+        <StoreButton href={EDGE_ADDON_URL}>Open in Edge Add-ons</StoreButton>
+        <H3>Install (Chrome and others) — Load the ZIP</H3>
+        <P>For browsers without a store listing, load the ZIP manually.</P>
         <Ul>
-          <Li>Download and unzip the ZIP file below.</Li>
+          <Li>Download and unzip the ZIP file at the end of this section.</Li>
           <Li>Open <Strong>chrome://extensions</Strong> in Chrome or <Strong>edge://extensions</Strong> in Edge.</Li>
           <Li>Enable <Strong>Developer mode</Strong> (top-right toggle).</Li>
           <Li>Click <Strong>Load unpacked</Strong> and select the unzipped folder.</Li>
         </Ul>
-        <H3>Startup Notice</H3>
+        <H3>Startup Notice (ZIP install only)</H3>
         <P>Because this extension is loaded unpacked with Developer mode enabled, Chrome or Edge may show a notice when the browser starts. To keep using the extension, leave it enabled. If it becomes disabled or stops responding, open <Strong>chrome://extensions</Strong> or <Strong>edge://extensions</Strong>, enable it again, and reload it if needed.</P>
         <H3>Usage</H3>
         <Ul>
@@ -657,20 +710,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>Use the <Strong>Shortcut</Strong> field to assign a key combo to the bookmark (works the same as in the main app).</Li>
           <Li>Click <Strong>Add Bookmark</Strong> to save directly from the extension.</Li>
         </Ul>
-        <div className="mt-4">
-          <a
-            href="/extension.zip"
-            download="bookmarks-extension.zip"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download Extension
-          </a>
-        </div>
+        <DownloadExtensionButton label="Download ZIP (manual install)" />
       </section>
     </>
   );

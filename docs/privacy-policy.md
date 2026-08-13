@@ -1,6 +1,6 @@
 # Privacy Policy — Bookmarks & Tags
 
-**Last updated: 2026-08-02**
+**Last updated: 2026-08-13**
 
 Bookmarks & Tags ("the app") is a bookmark manager developed by Yukihiro Sakuda. This policy explains what data the app handles and how.
 
@@ -18,7 +18,9 @@ The app stores the following information, all of which you enter yourself:
 
 ## Where data is stored
 
-All data is stored locally in a SQLite database on your own computer. It is never uploaded to any server operated by the developer or any third party.
+All data is stored locally in a SQLite database (`bookmarks.db`) on your own computer. It is never uploaded to any server operated by the developer or any third party.
+
+The database file is located at `%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db`, and display preferences such as theme and search history are kept in the app's local WebView2 profile under `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\`. The Microsoft Store version and the installer version use these same folders.
 
 ## Local network use
 
@@ -34,7 +36,7 @@ The companion browser extension only communicates with the local server describe
 
 ## Data retention and deletion
 
-Your data remains on your device until you delete it. You can delete individual bookmarks within the app, or remove all data by uninstalling the app and deleting its local data folder.
+Your data remains on your device until you delete it. You can delete individual bookmarks within the app, or remove all data by deleting the local data folders listed above. Note that uninstalling the app — including the Microsoft Store version — does not delete these folders, so delete them manually if you want to erase everything.
 
 ## Changes to this policy
 
