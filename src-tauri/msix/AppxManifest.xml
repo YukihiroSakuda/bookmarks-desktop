@@ -19,7 +19,7 @@
   <Identity
     Name="YukihiroSakuda.BookmarksTags"
     Publisher="CN=2B8E7D66-F9F9-4697-A28E-23DF034A4A87"
-    Version="0.1.6.0" />
+    Version="0.1.8.0" />
 
   <Properties>
     <DisplayName>Bookmarks &amp; Tags</DisplayName>
