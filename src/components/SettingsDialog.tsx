@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert, Keyboard, FileJson, RotateCcw } from "lucide-react";
+import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert, Keyboard, FileJson, RotateCcw, ExternalLink } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "./Button";
 import { useImportBookmarks } from "./ImportBookmarks";
 import { exportBookmarksToHtml, downloadHtml } from "@/utils/export";
@@ -12,6 +14,27 @@ import { toast } from "sonner";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const DELETE_CONFIRM_PHRASE = "delete all";
+
+const MS_STORE_URL = "https://apps.microsoft.com/detail/9MT8VDHDB2Z9";
+const RELEASES_URL = "https://github.com/YukihiroSakuda/bookmarks-desktop/releases";
+const PRIVACY_URL =
+  "https://github.com/YukihiroSakuda/bookmarks-desktop/blob/main/docs/privacy-policy.md";
+
+/** External links must go through the opener plugin — a plain <a> navigates the Tauri webview. */
+function ExtLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        openUrl(href).catch((e) => console.error(e));
+      }}
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+    >
+      {children}
+      <ExternalLink size={11} />
+    </button>
+  );
+}
 
 type Theme = "light" | "system" | "dark";
 
@@ -63,6 +86,7 @@ export function SettingsDialog({
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const deleteInputRef = useRef<HTMLInputElement>(null);
 
   function handleSummonKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -87,6 +111,14 @@ export function SettingsDialog({
       setTheme(saved);
     }
   }, [open]);
+
+  // Version comes from the Tauri backend, so it stays unresolved on the web dev server.
+  useEffect(() => {
+    if (!open || appVersion) return;
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => {});
+  }, [open, appVersion]);
 
   useEffect(() => {
     if (!open) return;
@@ -458,6 +490,24 @@ export function SettingsDialog({
                     Delete All
                   </Button>
                 </div>
+              </div>
+
+              {/* About */}
+              <div className="border-t pt-4">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-medium">Bookmarks &amp; Tags</span>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {appVersion ? `v${appVersion}` : ""}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-2">
+                  <ExtLink href={MS_STORE_URL}>Microsoft Store</ExtLink>
+                  <ExtLink href={RELEASES_URL}>GitHub Releases</ExtLink>
+                  <ExtLink href={PRIVACY_URL}>Privacy Policy</ExtLink>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Store and installer builds share the same data folder, so bookmarks carry over between them.
+                </p>
               </div>
             </div>
           </div>
