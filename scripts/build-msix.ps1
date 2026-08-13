@@ -104,17 +104,41 @@ Get-ChildItem (Join-Path $IconsDir "Square*.png"), (Join-Path $IconsDir "StoreLo
 # instead of the plated tile logo. Without them, Windows fills the icon's
 # transparent padding with BackgroundColor, which can make the icon
 # invisible against a same-colored background.
-$unplatedSources = @{
-  16  = "Square30x30Logo.png"
-  24  = "Square30x30Logo.png"
-  32  = "Square44x44Logo.png"
-  48  = "Square71x71Logo.png"
-  256 = "Square284x284Logo.png"
+#
+# Each variant has to be exactly its target size: WACK's "App resources" test
+# fails any qualifier-named image larger than the size it claims, which is what
+# copying the next-largest source icon used to do.
+Add-Type -AssemblyName System.Drawing
+
+function New-ResizedPng($SourcePath, $DestPath, $Size) {
+  $src = [System.Drawing.Image]::FromFile($SourcePath)
+  try {
+    $bmp = New-Object System.Drawing.Bitmap $Size, $Size
+    try {
+      $g = [System.Drawing.Graphics]::FromImage($bmp)
+      try {
+        $g.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceCopy
+        $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+        $g.DrawImage($src, 0, 0, $Size, $Size)
+      } finally {
+        $g.Dispose()
+      }
+      $bmp.Save($DestPath, [System.Drawing.Imaging.ImageFormat]::Png)
+    } finally {
+      $bmp.Dispose()
+    }
+  } finally {
+    $src.Dispose()
+  }
 }
-foreach ($size in $unplatedSources.Keys) {
-  $src = Join-Path $IconsDir $unplatedSources[$size]
+
+# icon.png is the 512x512 master, so every variant is a downscale.
+$unplatedSource = Join-Path $IconsDir "icon.png"
+foreach ($size in 16, 24, 32, 48, 256) {
   $dest = Join-Path $assetsDir "Square44x44Logo.targetsize-$size`_altform-unplated.png"
-  Copy-Item $src $dest
+  New-ResizedPng $unplatedSource $dest $size
 }
 
 # ---- Generate resource index (resources.pri) ----

@@ -1132,30 +1132,12 @@ pub fn open_path(path: String) -> Result<Value, String> {
         return Err(format!("パスが見つかりません: {path}"));
     }
 
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-        if p.is_dir() {
-            Command::new("explorer")
-                .raw_arg(format!("\"{path}\""))
-                .spawn()
-                .map_err(|e| e.to_string())?;
-        } else {
-            // Open the file with its default application.
-            // `cmd /C start "" "path"` is the standard Windows idiom for this.
-            Command::new("cmd")
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .args(["/C", "start", "", &path])
-                .spawn()
-                .map_err(|e| e.to_string())?;
-        }
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        return Err("open_path is only implemented on Windows".to_string());
-    }
+    // Hands the path to the shell, which opens a folder in Explorer and a file
+    // in its default application. The opener plugin enables the `open` crate's
+    // `shellexecute-on-windows` feature, so this goes through ShellExecuteW
+    // rather than spawning `cmd /C start` — the Windows App Certification Kit
+    // reports launching cmd.exe as a blocked executable reference.
+    tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| e.to_string())?;
 
     Ok(json!({ "ok": true }))
 }
