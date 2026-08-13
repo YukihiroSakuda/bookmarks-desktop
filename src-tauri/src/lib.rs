@@ -1,6 +1,8 @@
 mod commands;
 mod db;
 mod server;
+#[cfg(target_os = "windows")]
+mod winpkg;
 
 use db::AppState;
 use std::sync::{Arc, Mutex};
@@ -75,9 +77,18 @@ pub fn run() {
                 log::warn!("summon shortcut sync failed: {e}");
             }
 
-            // Auto-register right-click context menu entry and launch-at-login
-            #[cfg(target_os = "windows")]
-            {
+            // Auto-register right-click context menu entry and launch-at-login.
+            //
+            // Release + unpackaged builds only:
+            //   - A `tauri dev` run would otherwise point both registry entries at
+            //     `target/debug/app.exe`, which launches at login and fails with
+            //     ERR_CONNECTION_REFUSED because it loads devUrl (localhost:1420)
+            //     with no dev server running.
+            //   - In the MSIX (Store) build these HKCU writes are virtualized into
+            //     the package hive and never reach the real registry, so both
+            //     features are declared in msix/AppxManifest.xml instead.
+            #[cfg(all(target_os = "windows", not(debug_assertions)))]
+            if !winpkg::is_packaged() {
                 if let Err(e) = commands::register_context_menu() {
                     log::warn!("context menu registration failed: {e}");
                 }
@@ -86,9 +97,17 @@ pub fn run() {
                 }
             }
 
-            // Launched via the autostart entry (`--hidden`): stay in the tray
-            // instead of popping the window open right after login.
-            if args.iter().any(|a| a == "--hidden") {
+            // Launched at login: stay in the tray instead of popping the window
+            // open. Unpackaged builds get `--hidden` from the `Run` entry; the
+            // packaged build has no way to pass arguments through a startup task,
+            // so the activation kind is checked instead.
+            #[cfg(target_os = "windows")]
+            let launched_hidden =
+                args.iter().any(|a| a == "--hidden") || winpkg::launched_by_startup_task();
+            #[cfg(not(target_os = "windows"))]
+            let launched_hidden = args.iter().any(|a| a == "--hidden");
+
+            if launched_hidden {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
                 }

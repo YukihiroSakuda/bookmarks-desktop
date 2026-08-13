@@ -108,6 +108,7 @@ dependencies = [
  "tokio",
  "tower-http",
  "uuid",
+ "windows",
  "winreg 0.52.0",
 ]
 

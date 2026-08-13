@@ -28,6 +28,8 @@ $ManifestPath = Join-Path $MsixDir "AppxManifest.xml"
 $StagingDir = Join-Path $MsixDir "staging"
 $OutDir = Join-Path $MsixDir "output"
 $ReleaseDir = Join-Path $RepoRoot "src-tauri\target\release"
+$ContextMenuManifest = Join-Path $RepoRoot "src-tauri\context-menu\Cargo.toml"
+$ContextMenuDll = Join-Path $RepoRoot "src-tauri\context-menu\target\release\bookmarks_context_menu.dll"
 
 # ---- Sanity checks ----
 
@@ -61,11 +63,20 @@ if (-not $SkipBuild) {
   } finally {
     Pop-Location
   }
+
+  # Explorer context menu handler (IExplorerCommand). Packaged-only: the
+  # unpackaged build registers its verb through HKCU instead.
+  Write-Host "Building context menu handler (bookmarks_context_menu.dll)..."
+  cargo build --release --manifest-path $ContextMenuManifest
+  if ($LASTEXITCODE -ne 0) { Write-Error "context menu handler build failed" }
 }
 
 $exePath = Join-Path $ReleaseDir "app.exe"
 if (-not (Test-Path $exePath)) {
   Write-Error "app.exe not found at $exePath. Run without -SkipBuild first."
+}
+if (-not (Test-Path $ContextMenuDll)) {
+  Write-Error "bookmarks_context_menu.dll not found at $ContextMenuDll. Run without -SkipBuild first."
 }
 
 # ---- Stage package contents ----
@@ -77,6 +88,7 @@ New-Item -ItemType Directory -Path (Join-Path $StagingDir "Assets") | Out-Null
 
 Copy-Item $ManifestPath $StagingDir
 Copy-Item $exePath $StagingDir
+Copy-Item $ContextMenuDll $StagingDir
 
 $resourcesDir = Join-Path $ReleaseDir "resources"
 if (Test-Path $resourcesDir) {

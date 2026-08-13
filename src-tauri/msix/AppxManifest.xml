@@ -10,12 +10,21 @@
 
   Built with scripts/build-msix.ps1 from the repo root.
   Full release procedure: docs/msix-release.md
+
+  The context menu Clsid below must stay identical to CLSID_ADD_TO_BOOKMARKS in
+  src-tauri/context-menu/src/lib.rs.
 -->
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap uap3 uap5 desktop desktop4 desktop5 com rescap">
 
   <Identity
     Name="YukihiroSakuda.BookmarksTags"
@@ -50,6 +59,67 @@
         Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile Square71x71Logo="Assets\Square71x71Logo.png" />
       </uap:VisualElements>
+
+      <!--
+        Inside the MSIX container the app's own HKCU writes are virtualized and
+        never reach Windows, so launch-at-login and the Explorer context menu
+        (which the unpackaged build self-registers under HKCU) have to be
+        declared here instead. See src-tauri/src/winpkg.rs.
+      -->
+      <Extensions>
+        <!--
+          Launch at login. Startup tasks cannot pass arguments, so the app
+          detects ActivationKind::StartupTask instead of the "hidden" flag the
+          unpackaged build receives, and starts hidden in the tray.
+          Users can turn this off in Settings > Apps > Startup.
+        -->
+        <uap5:Extension
+          Category="windows.startupTask"
+          Executable="app.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask
+            TaskId="BookmarksStartup"
+            Enabled="true"
+            DisplayName="Bookmarks &amp; Tags" />
+        </uap5:Extension>
+
+        <!--
+          Stable launch path for the context menu handler: unlike
+          C:\Program Files\WindowsApps\...\app.exe it does not change on Store
+          updates, and launching through it preserves package identity.
+        -->
+        <uap3:Extension
+          Category="windows.appExecutionAlias"
+          Executable="app.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="bookmarks-tags.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+
+        <!-- "Add to Bookmarks" verb, implemented by src-tauri/context-menu. -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer DisplayName="Bookmarks context menu">
+              <com:Class
+                Id="F981B3C2-D892-4A14-A921-1FA9D161337E"
+                Path="bookmarks_context_menu.dll"
+                ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
+
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type="*">
+              <desktop5:Verb Id="AddToBookmarks" Clsid="F981B3C2-D892-4A14-A921-1FA9D161337E" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb Id="AddToBookmarks" Clsid="F981B3C2-D892-4A14-A921-1FA9D161337E" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
+      </Extensions>
     </Application>
   </Applications>
 </Package>

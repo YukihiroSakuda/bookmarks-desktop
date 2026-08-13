@@ -1103,6 +1103,9 @@ pub fn unregister_context_menu() -> Result<Value, String> {
 /// user logs in, via the standard per-user `Run` registry key. Idempotent —
 /// safe to call on every launch.
 #[cfg(target_os = "windows")]
+// Only called from release builds (see `lib.rs` setup), so debug builds would
+// otherwise flag it as dead code.
+#[cfg_attr(debug_assertions, allow(dead_code))]
 pub fn register_autostart() -> Result<(), String> {
     use winreg::enums::{HKEY_CURRENT_USER, KEY_WRITE};
     use winreg::RegKey;

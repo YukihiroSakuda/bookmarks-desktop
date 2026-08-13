@@ -26,7 +26,16 @@ powershell -File scripts/build-msix.ps1
 powershell -File scripts/build-msix.ps1 -SkipBuild
 ```
 
-出力は `src-tauri/msix/output/bookmarks.msix`。スクリプトは staging 作成 → アイコン（unplated 変種を含む）配置 → `makepri` で `resources.pri` 生成 → `makeappx pack` を行う。Windows SDK（`makeappx.exe` / `makepri.exe`）が必要。
+出力は `src-tauri/msix/output/bookmarks.msix`。スクリプトは Tauri release ビルド → **コンテキストメニュー DLL のビルド**（`src-tauri/context-menu`）→ staging 作成 → アイコン（unplated 変種を含む）配置 → `makepri` で `resources.pri` 生成 → `makeappx pack` を行う。Windows SDK（`makeappx.exe` / `makepri.exe`）が必要。
+
+`-SkipBuild` は `app.exe` と `bookmarks_context_menu.dll` の**両方**が既にビルド済みであることを前提にする。DLL だけ作り直したい場合は:
+
+```powershell
+cargo build --release --manifest-path src-tauri/context-menu/Cargo.toml
+powershell -File scripts/build-msix.ps1 -SkipBuild
+```
+
+> **AppxManifest.xml を編集するときの注意**: XML コメント内に `--` を含めるとコメントとして不正になり、`makepri` が `PRI191: Appx manifest not found or is invalid` で失敗する（コマンドライン引数の `--hidden` などを書きたくなるので踏みやすい）。
 
 ## 3. ローカル動作確認（推奨）
 
@@ -48,6 +57,21 @@ powershell -File scripts/build-msix.ps1 -SkipBuild
 > **注意**
 > - テスト版は Store 版と同じパッケージ識別子なので、インストールすると **Store 版が置き換わる**。確認後は Store から入れ直すこと。
 > - **提出用パッケージは未署名でなければならない。** テスト署名した `.msix` は提出に使えないので、確認後に `powershell -File scripts/build-msix.ps1 -SkipBuild` で必ずパックし直す。
+
+### 自動起動・右クリックメニューの確認項目
+
+MSIX コンテナは HKCU 書き込みを仮想化するため、この2機能は sideload 版とは**別の仕組み**（manifest 宣言）で動く。パッケージ版では毎回ここを確認する。
+
+| 確認 | 期待結果 |
+| ---- | -------- |
+| 設定 > アプリ > スタートアップ | 「Bookmarks & Tags」が並び、既定でオン |
+| サインインし直す | ウィンドウを出さずタスクトレイに常駐（`ActivationKind::StartupTask` を検出） |
+| ファイル/フォルダを右クリック | 「Add to Bookmarks」が表示され、クリックでアプリが起動しパスが入力済みになる |
+| `where.exe bookmarks-tags` | `%LOCALAPPDATA%\Microsoft\WindowsApps\bookmarks-tags.exe`（実行エイリアス）が出る |
+
+右クリックが出ない場合はハンドラの読み込み失敗が疑わしい。`taskkill /f /im explorer.exe` → 再起動で再読み込みされる。DLL は COM サロゲート（`dllhost.exe`）で動くので、デバッグ時はそのプロセスを見る。
+
+> レジストリ（`HKCU\Software\Classes\*\shell\AddToBookmarks` や `Run\Bookmarks`）は Store 版では**書かれないのが正常**。そこに値が入っている場合は sideload 版が書いたもの。
 
 ## 4. WACK（Windows アプリ認定キット）で検証
 
@@ -83,8 +107,8 @@ Get-AppxPackage -Name YukihiroSakuda.BookmarksTags | Select-Object Version, Sign
 ## チェックリスト
 
 - [ ] `AppxManifest.xml` のバージョンを `X.Y.Z.0` に更新した
-- [ ] `build-msix.ps1` でパッケージを生成した
-- [ ] テスト署名してローカル動作を確認した
+- [ ] `build-msix.ps1` でパッケージを生成した（`bookmarks_context_menu.dll` が staging に入っていること）
+- [ ] テスト署名してローカル動作を確認した（自動起動・右クリックメニューを含む）
 - [ ] WACK を通した
 - [ ] **未署名で再パックした**（テスト署名したまま提出しない）
 - [ ] Partner Center にアップロードし、更新内容・スクリーンショットを反映した

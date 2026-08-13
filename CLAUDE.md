@@ -67,7 +67,25 @@ Written in Rust. Key files:
 
 **SQLite schema** (5 tables): `bookmarks` (includes `kind`, `memo`), `tags`, `bookmarks_tags`, `user_settings`, `tag_rules`. Schema defined in `src-tauri/src/db.rs`.
 
-**Windows features**: On startup, automatically registers a Windows right-click context menu entry, and registers itself (idempotently) in the per-user `Run` registry key so it launches on login via `<exe> --hidden`. Accepts `--path <filepath>` CLI arg to pre-fill the bookmark form from Explorer. Single-instance plugin ensures a second launch focuses the existing window and forwards the path. Closing the main window hides it to a system tray icon instead of quitting (`CloseRequested` is intercepted); the tray's "Open Bookmarks"/left-click restores the window and "Quit" is the only way to actually exit. A `--hidden` launch (from autostart) starts with the window hidden in the tray.
+**Windows features**: On startup, **release + unpackaged builds only** automatically register a Windows right-click context menu entry and register the app (idempotently) in the per-user `Run` registry key so it launches on login via `<exe> --hidden`. Two cases are excluded (see `src-tauri/src/winpkg.rs`):
+- **Dev builds** (`debug_assertions`): otherwise a `tauri dev` run would repoint those registry entries at `target/debug/app.exe`, which then launches at login and fails with `ERR_CONNECTION_REFUSED` because it loads `devUrl` (localhost:1420) with no dev server running.
+- **MSIX (Store) builds** (`winpkg::is_packaged()`): inside the MSIX container HKCU writes are virtualized into the package's private hive (`%LOCALAPPDATA%\Packages\<PFN>\SystemAppData\Helium\User.dat`) and never reach Windows, so both features are declared in `src-tauri/msix/AppxManifest.xml` instead — see "MSIX / Store build" below.
+
+The app accepts a `--path <filepath>` CLI arg to pre-fill the bookmark form from Explorer. Single-instance plugin ensures a second launch focuses the existing window and forwards the path. Closing the main window hides it to a system tray icon instead of quitting (`CloseRequested` is intercepted); the tray's "Open Bookmarks"/left-click restores the window and "Quit" is the only way to actually exit. A `--hidden` launch (from autostart) starts with the window hidden in the tray.
+
+### MSIX / Store build
+
+The Microsoft Store version ships as an MSIX package built by `scripts/build-msix.ps1` from `src-tauri/msix/AppxManifest.xml`. Because the MSIX container virtualizes registry writes, the two Windows integrations are declared in the manifest rather than self-registered:
+
+| Feature | Unpackaged (NSIS/MSI) | MSIX (Store) |
+|---------|----------------------|--------------|
+| Launch at login | `Run` registry key → `<exe> --hidden` | `uap5:StartupTask` extension; the app detects `ActivationKind::StartupTask` (`winpkg::launched_by_startup_task()`) to start hidden |
+| Explorer right-click | `HKCU\Software\Classes\*\shell\AddToBookmarks` verb | `com:Extension` (surrogate COM server) + `desktop4:FileExplorerContextMenus` verbs for `*` and `Directory`, implemented by `src-tauri/context-menu` |
+| Launch path | the installed `app.exe` | `uap3:AppExecutionAlias` → `bookmarks-tags.exe` (version-independent, keeps package identity) |
+
+`src-tauri/context-menu/` is a standalone `cdylib` crate (own `[workspace]`, own `target/`) implementing `IExplorerCommand`. Its CLSID is duplicated in `src/lib.rs` and `AppxManifest.xml` — **keep the two in sync**. `Invoke` launches `bookmarks-tags.exe --path <selected item>`, so the existing single-instance path forwarding handles the rest. Store data (`bookmarks.db`) is *not* redirected: packaged and unpackaged builds share `%APPDATA%\com.yukihirosakuda.bookmarks\`.
+
+Release procedure: `docs/msix-release.md`.
 
 ### Local HTTP Server (port 37373)
 

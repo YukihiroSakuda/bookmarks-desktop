@@ -1,0 +1,33 @@
+[package]
+name = "bookmarks-context-menu"
+version = "0.1.8"
+description = "Explorer context menu handler (IExplorerCommand) for the Bookmarks MSIX package"
+authors = ["Yukihiro Sakuda"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.77.2"
+
+# Standalone package: it lives inside src-tauri/ but is built on its own, so
+# keep Cargo from treating it as part of any surrounding workspace.
+[workspace]
+
+[lib]
+name = "bookmarks_context_menu"
+crate-type = ["cdylib"]
+
+[dependencies]
+# The #[implement] macro lives in windows-core; the `windows` crate only
+# provides the generated bindings.
+windows-core = "0.61"
+windows = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_System_LibraryLoader",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
+] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
