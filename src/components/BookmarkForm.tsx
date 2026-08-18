@@ -1,6 +1,6 @@
 import { BookmarkUI, BookmarkKind } from "@/types/bookmark";
 import { Tag } from "@/types/tag";
-import { X, Clock, TrendingUp, Loader2, TriangleAlert, FolderOpen, Keyboard } from "lucide-react";
+import { X, Clock, TrendingUp, Loader2, TriangleAlert, FolderOpen, Keyboard, Minus } from "lucide-react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "./Button";
@@ -9,6 +9,7 @@ import { Input } from "./Input";
 import { fetchBookmarkPageTitle } from "@/shared/bookmarks/api";
 import { findDuplicateBookmark, detectKind, pathBasename } from "@/shared/bookmarks/form";
 import { eventToAccelerator, formatAcceleratorForDisplay } from "@/lib/shortcut";
+import { minimizeAppWindow } from "@/lib/appWindow";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface BookmarkFormProps {
@@ -186,6 +187,15 @@ export function BookmarkForm({
             {bookmark ? "Edit Your Bookmark" : "Add New Bookmark"}
           </h2>
           <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              onClick={minimizeAppWindow}
+              variant="ghost"
+              size="sm"
+              icon={Minus}
+              title="Minimize window"
+              aria-label="Minimize window"
+            />
             <Button type="button" onClick={onClose} variant="secondary" size="sm">
               Cancel
             </Button>
