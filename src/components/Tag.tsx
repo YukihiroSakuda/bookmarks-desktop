@@ -8,7 +8,7 @@ interface TagProps {
   onClick?: (ctrlKey: boolean) => void;
   isSelected?: boolean;
   isDisabled?: boolean;
-  /** Palette key set in Tag Manager. Without one the chip stays monochrome/blue. */
+  /** Palette key set in Tag Manager. Falls back to the default (blue). */
   color?: string | null;
 }
 
@@ -39,9 +39,7 @@ const Tag = memo(function Tag({
       className={`px-1.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${
         onClick && !isDisabled ? "cursor-pointer" : ""
       } ${
-        isSelected
-          ? colorStyles?.chipSelected ?? "bg-blue-500 text-white"
-          : colorStyles?.chip ?? "bg-secondary border border-input"
+        isSelected ? colorStyles.chipSelected : colorStyles.chip
       } ${
         isDisabled ? "opacity-50 cursor-not-allowed" : ""
       }`}

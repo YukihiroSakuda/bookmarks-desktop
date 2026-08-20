@@ -1,10 +1,11 @@
 /**
- * Optional per-tag accent colors.
+ * Per-tag accent colors.
  *
  * Only the palette key (`"red"`, `"teal"`, …) is stored in the database, so the
  * concrete classes — and therefore the light/dark rendering — stay defined here
- * in the frontend. Tags without a color keep the app's default monochrome chip
- * (and the blue accent when selected), so the color is strictly opt-in.
+ * in the frontend. Every tag has a color: tags that were never given one (and
+ * every tag created before the column existed) fall back to `DEFAULT_TAG_COLOR`,
+ * the app's blue accent.
  *
  * Tailwind needs the class names to appear literally in the source, hence the
  * fully written-out record instead of `bg-${color}-500` templates.
@@ -22,6 +23,9 @@ export const TAG_COLORS = [
 ] as const;
 
 export type TagColor = (typeof TAG_COLORS)[number];
+
+/** Used for tags with no color stored — keeps the app's blue accent as the default. */
+export const DEFAULT_TAG_COLOR: TagColor = "blue";
 
 interface TagColorStyles {
   /** Chip in its normal (unselected) state. */
@@ -83,7 +87,12 @@ export function isTagColor(value: string | null | undefined): value is TagColor 
   return !!value && (TAG_COLORS as readonly string[]).includes(value);
 }
 
-/** Styles for a stored color value, or `null` when the tag has no color set. */
-export function getTagColorStyles(color: string | null | undefined): TagColorStyles | null {
-  return isTagColor(color) ? TAG_COLOR_STYLES[color] : null;
+/** The stored color, or the default one when nothing (valid) is stored. */
+export function resolveTagColor(color: string | null | undefined): TagColor {
+  return isTagColor(color) ? color : DEFAULT_TAG_COLOR;
+}
+
+/** Styles for a stored color value, falling back to the default color. */
+export function getTagColorStyles(color: string | null | undefined): TagColorStyles {
+  return TAG_COLOR_STYLES[resolveTagColor(color)];
 }

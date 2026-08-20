@@ -39,7 +39,7 @@ interface BookmarkHeaderProps {
   onUpdateTagName: (oldName: string, newName: string) => Promise<void>;
   onAddTag: (name: string) => Promise<void>;
   onRemoveTag: (name: string) => Promise<void>;
-  onSetTagColor: (tagId: string, color: string | null) => Promise<void>;
+  onSetTagColor: (tagId: string, color: string) => Promise<void>;
   onReorderTags: (orderedIds: string[]) => Promise<void>;
   onSaveTagRule: (data: TagRuleFormData) => Promise<void>;
   onDeleteTagRule: (ruleId: string, removeTags: boolean) => Promise<void>;

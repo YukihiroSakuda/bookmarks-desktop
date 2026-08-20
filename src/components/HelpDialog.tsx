@@ -239,7 +239,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>タグの追加</Strong> — 新しいタグ名を入力して Enter または追加ボタンで作成。</Li>
           <Li><Strong>タグのリネーム</Strong> — タグ名をクリックして編集。変更は全ブックマークに即時反映されます。</Li>
           <Li><Strong>タグの削除</Strong> — タグを削除すると、そのタグが付いた全ブックマークから除去されます。タグに紐づくタグルールも合わせて削除するか選択できます。</Li>
-          <Li><Strong>タグの色</Strong> — タグ名の左の丸をクリックして8色から選択。色を付けたタグは、フィルターバーでもカードの上でもその色で表示されます。色なしのタグは従来どおりの表示です。</Li>
+          <Li><Strong>タグの色</Strong> — タグ名の左の丸をクリックして8色から選択。フィルターバーでもカードの上でもその色で表示されます。既定は青です。</Li>
           <Li><Strong>タグの並び替え</Strong> — 左のグリップをドラッグして並び順を変更。フィルターバーのタグもこの順序で並びます（並び替えていないタグは名前順）。</Li>
         </Ul>
       </section>
@@ -535,7 +535,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Add tag</Strong> — type a name and press Enter or click the Add button.</Li>
           <Li><Strong>Rename tag</Strong> — click the edit icon to rename. Changes apply to all bookmarks immediately.</Li>
           <Li><Strong>Delete tag</Strong> — removes the tag from all associated bookmarks. You can choose to also delete any related tag rules.</Li>
-          <Li><Strong>Tag color</Strong> — click the circle next to a tag to pick one of eight colors. Colored tags keep that color in the filter bar and on bookmark cards; tags without a color look exactly as before.</Li>
+          <Li><Strong>Tag color</Strong> — click the circle next to a tag to pick one of eight colors. The tag keeps that color in the filter bar and on bookmark cards. Blue is the default.</Li>
           <Li><Strong>Reorder tags</Strong> — drag the grip on the left to change the order. The filter bar follows the same order (tags never reordered stay alphabetical).</Li>
         </Ul>
       </section>

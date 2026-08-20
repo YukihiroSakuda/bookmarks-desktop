@@ -20,7 +20,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button } from "./Button";
 import { Input } from "./Input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { TAG_COLORS, TAG_COLOR_STYLES, getTagColorStyles } from "@/lib/tagColors";
+import { TAG_COLORS, TAG_COLOR_STYLES, resolveTagColor } from "@/lib/tagColors";
 import { Tag } from "@/types/tag";
 
 interface TagManagerProps {
@@ -29,20 +29,22 @@ interface TagManagerProps {
   onUpdateTagName: (oldName: string, newName: string) => Promise<void>;
   onAddTag: (tag: string) => Promise<void>;
   onRemoveTag: (tag: string) => Promise<void>;
-  onSetTagColor: (tagId: string, color: string | null) => Promise<void>;
+  onSetTagColor: (tagId: string, color: string) => Promise<void>;
   onReorderTags: (orderedIds: string[]) => Promise<void>;
 }
 
 interface TagColorPickerProps {
   color: string | null;
-  onSelect: (color: string | null) => void;
+  onSelect: (color: string) => void;
 }
 
 function TagColorPicker({ color, onSelect }: TagColorPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const styles = getTagColorStyles(color);
+  // Tags that never got a color (including every tag from before the feature)
+  // show as the default blue, so the picker always has one swatch marked.
+  const current = resolveTagColor(color);
 
-  const handleSelect = (next: string | null) => {
+  const handleSelect = (next: string) => {
     setIsOpen(false);
     onSelect(next);
   };
@@ -53,21 +55,11 @@ function TagColorPicker({ color, onSelect }: TagColorPickerProps) {
         <button
           type="button"
           title="Tag color"
-          className={`size-4 rounded-full border shrink-0 ${
-            styles ? styles.swatch : "bg-transparent border-dashed border-muted-foreground"
-          }`}
+          className={`size-4 rounded-full border shrink-0 ${TAG_COLOR_STYLES[current].swatch}`}
         />
       </PopoverTrigger>
       <PopoverContent className="w-auto p-2" align="start">
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            title="No color"
-            onClick={() => handleSelect(null)}
-            className={`size-5 rounded-full border border-dashed border-muted-foreground ${
-              color === null ? "ring-1 ring-ring ring-offset-1 ring-offset-popover" : ""
-            }`}
-          />
           {TAG_COLORS.map((name) => (
             <button
               key={name}
@@ -75,7 +67,7 @@ function TagColorPicker({ color, onSelect }: TagColorPickerProps) {
               title={name}
               onClick={() => handleSelect(name)}
               className={`size-5 rounded-full ${TAG_COLOR_STYLES[name].swatch} ${
-                color === name ? "ring-1 ring-ring ring-offset-1 ring-offset-popover" : ""
+                current === name ? "ring-1 ring-ring ring-offset-1 ring-offset-popover" : ""
               }`}
             />
           ))}
@@ -226,7 +218,7 @@ export function TagManager({
     setEditValue("");
   };
 
-  const handleSelectColor = async (tag: Tag, color: string | null) => {
+  const handleSelectColor = async (tag: Tag, color: string) => {
     // Optimistic: the chip recolors immediately, the reload from `availableTags`
     // confirms it a moment later.
     setTags((prev) => prev.map((t) => (t.id === tag.id ? { ...t, color } : t)));
