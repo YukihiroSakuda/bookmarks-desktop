@@ -180,6 +180,8 @@ pub fn run() {
             commands::list_tags,
             commands::create_tag,
             commands::update_tag,
+            commands::set_tag_color,
+            commands::reorder_tags,
             commands::delete_tag,
             commands::delete_all_tags,
             commands::list_tag_rules,

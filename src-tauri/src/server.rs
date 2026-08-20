@@ -51,6 +51,13 @@ fn new_id() -> String {
     Uuid::new_v4().to_string()
 }
 
+/// Order value for a newly created tag: the end of the manual order used by
+/// Tag Manager in the app.
+fn next_tag_order(conn: &Connection) -> Result<i64, String> {
+    conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tags", [], |r| r.get(0))
+        .map_err(|e| e.to_string())
+}
+
 fn link_tags(conn: &Connection, bookmark_id: &str, tags: &[String], ts: &str) -> Result<(), String> {
     for tag_name in tags {
         let existing: Option<String> = conn
@@ -62,8 +69,9 @@ fn link_tags(conn: &Connection, bookmark_id: &str, tags: &[String], ts: &str) ->
             None => {
                 let id = new_id();
                 conn.execute(
-                    "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-                    rusqlite::params![id, tag_name, ts, ts],
+                    "INSERT INTO tags (id, name, sort_order, created_at, updated_at) \
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![id, tag_name, next_tag_order(conn)?, ts, ts],
                 )
                 .map_err(|e| e.to_string())?;
                 id
@@ -238,15 +246,20 @@ async fn get_tags(State(state): State<ServerState>) -> ApiResult {
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let conn = db.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
-            .prepare("SELECT id, name, created_at, updated_at FROM tags ORDER BY name ASC")
+            .prepare(
+                "SELECT id, name, color, sort_order, created_at, updated_at \
+                 FROM tags ORDER BY sort_order ASC, name ASC",
+            )
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map([], |r| {
                 Ok(json!({
                     "id": r.get::<_, String>(0)?,
                     "name": r.get::<_, String>(1)?,
-                    "created_at": r.get::<_, String>(2)?,
-                    "updated_at": r.get::<_, String>(3)?,
+                    "color": r.get::<_, Option<String>>(2)?,
+                    "sort_order": r.get::<_, i64>(3)?,
+                    "created_at": r.get::<_, String>(4)?,
+                    "updated_at": r.get::<_, String>(5)?,
                 }))
             })
             .map_err(|e| e.to_string())?;
@@ -282,8 +295,9 @@ async fn post_tag(State(state): State<ServerState>, Json(body): Json<CreateTagBo
 
         let id = new_id();
         conn.execute(
-            "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![id, body.name, ts, ts],
+            "INSERT INTO tags (id, name, sort_order, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![id, body.name, next_tag_order(&conn)?, ts, ts],
         )
         .map_err(|e| e.to_string())?;
         Ok(json!({ "id": id }))

@@ -39,6 +39,8 @@ interface BookmarkHeaderProps {
   onUpdateTagName: (oldName: string, newName: string) => Promise<void>;
   onAddTag: (name: string) => Promise<void>;
   onRemoveTag: (name: string) => Promise<void>;
+  onSetTagColor: (tagId: string, color: string | null) => Promise<void>;
+  onReorderTags: (orderedIds: string[]) => Promise<void>;
   onSaveTagRule: (data: TagRuleFormData) => Promise<void>;
   onDeleteTagRule: (ruleId: string, removeTags: boolean) => Promise<void>;
   onDeleteAll: () => void;
@@ -74,6 +76,8 @@ export function BookmarkHeader({
   onUpdateTagName,
   onAddTag,
   onRemoveTag,
+  onSetTagColor,
+  onReorderTags,
   onSaveTagRule,
   onDeleteTagRule,
   onDeleteAll,
@@ -313,17 +317,16 @@ export function BookmarkHeader({
             </div>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {availableTags
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((tag) => (
-                <TagComponent
-                  key={tag.id}
-                  tag={tag.name}
-                  onClick={(ctrlKey) => onTagClick(tag.name, ctrlKey)}
-                  isSelected={selectedTags.includes(tag.name)}
-                  isDisabled={isOrderingMode}
-                />
-              ))}
+            {availableTags.map((tag) => (
+              <TagComponent
+                key={tag.id}
+                tag={tag.name}
+                color={tag.color}
+                onClick={(ctrlKey) => onTagClick(tag.name, ctrlKey)}
+                isSelected={selectedTags.includes(tag.name)}
+                isDisabled={isOrderingMode}
+              />
+            ))}
           </div>
         </div>
         <SortControls
@@ -350,6 +353,8 @@ export function BookmarkHeader({
           onRemoveTag={async (tag) => {
             await onRemoveTag(tag);
           }}
+          onSetTagColor={onSetTagColor}
+          onReorderTags={onReorderTags}
         />
       )}
 

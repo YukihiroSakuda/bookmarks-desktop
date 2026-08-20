@@ -61,6 +61,8 @@ interface BookmarkCardProps {
   onDelete: (id: string) => void | Promise<void>;
   onClick: () => void;
   isOrderingMode?: boolean;
+  /** Tag name -> color palette key, for the colors set in Tag Manager. */
+  tagColors?: Record<string, string>;
 }
 
 const BookmarkCard = memo(function BookmarkCard({
@@ -70,6 +72,7 @@ const BookmarkCard = memo(function BookmarkCard({
   onDelete,
   onClick,
   isOrderingMode = false,
+  tagColors,
 }: BookmarkCardProps) {
   const [showTags, setShowTags] = useState(true);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -90,7 +93,7 @@ const BookmarkCard = memo(function BookmarkCard({
   }, []);
 
   const sortedTags = useMemo(() =>
-    bookmark.tags.sort((a, b) => a.localeCompare(b)),
+    [...bookmark.tags].sort((a, b) => a.localeCompare(b)),
     [bookmark.tags]
   );
 
@@ -155,7 +158,7 @@ const BookmarkCard = memo(function BookmarkCard({
         {showTags && sortedTags.length > 0 && (
           <div className="flex items-center flex-wrap gap-1.5 overflow-hidden max-w-[50%] md:max-w-[60%]">
             {sortedTags.slice(0, Math.min(sortedTags.length, 3)).map((tag) => (
-              <Tag key={tag} tag={tag} isSelected={true} />
+              <Tag key={tag} tag={tag} color={tagColors?.[tag]} isSelected={true} />
             ))}
             {sortedTags.length > 3 && (
               <span className="text-xs text-muted-foreground">+{sortedTags.length - 3}</span>

@@ -114,6 +114,35 @@ export function useTagManagement() {
     [availableTags, fetchTags, fetchTagRules]
   );
 
+  const setTagColor = useCallback(
+    async (tagId: string, color: string | null) => {
+      const res = await fetch(`/api/tags/${tagId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ color }),
+      });
+      if (!res.ok) throw new Error("Failed to update tag color");
+      await fetchTags();
+    },
+    [fetchTags]
+  );
+
+  /** Persist the order produced by dragging rows in Tag Manager. */
+  const reorderTags = useCallback(
+    async (orderedIds: string[]) => {
+      const res = await fetch("/api/tags/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order: orderedIds.map((id, index) => ({ id, sort_order: index + 1 })),
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to reorder tags");
+      await fetchTags();
+    },
+    [fetchTags]
+  );
+
   const updateTagName = useCallback(async (oldName: string, newName: string) => {
     const tagObj = availableTags.find((t) => t.name === oldName);
     if (!tagObj) return;
@@ -214,6 +243,8 @@ export function useTagManagement() {
     addTag,
     removeTag,
     updateTagName,
+    setTagColor,
+    reorderTags,
     handleUpdateTags,
     saveTagRule,
     deleteTagRule,

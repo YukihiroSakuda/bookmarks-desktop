@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { memo, useCallback } from "react";
+import { getTagColorStyles } from "@/lib/tagColors";
 
 interface TagProps {
   tag: string;
@@ -7,9 +8,19 @@ interface TagProps {
   onClick?: (ctrlKey: boolean) => void;
   isSelected?: boolean;
   isDisabled?: boolean;
+  /** Palette key set in Tag Manager. Without one the chip stays monochrome/blue. */
+  color?: string | null;
 }
 
-const Tag = memo(function Tag({ tag, onDelete, onClick, isSelected, isDisabled = false }: TagProps) {
+const Tag = memo(function Tag({
+  tag,
+  onDelete,
+  onClick,
+  isSelected,
+  isDisabled = false,
+  color,
+}: TagProps) {
+  const colorStyles = getTagColorStyles(color);
   const handleDeleteClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (onDelete && !isDisabled) {
@@ -29,8 +40,8 @@ const Tag = memo(function Tag({ tag, onDelete, onClick, isSelected, isDisabled =
         onClick && !isDisabled ? "cursor-pointer" : ""
       } ${
         isSelected
-          ? "bg-blue-500 text-white"
-          : "bg-secondary border border-input"
+          ? colorStyles?.chipSelected ?? "bg-blue-500 text-white"
+          : colorStyles?.chip ?? "bg-secondary border border-input"
       } ${
         isDisabled ? "opacity-50 cursor-not-allowed" : ""
       }`}

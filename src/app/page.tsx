@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { BookmarkList } from "@/components/BookmarkList";
@@ -53,6 +53,8 @@ export default function BookmarksPage() {
     addTag,
     removeTag,
     updateTagName,
+    setTagColor,
+    reorderTags,
     handleUpdateTags: handleUpdateTagsBase,
     saveTagRule,
     deleteTagRule,
@@ -79,6 +81,16 @@ export default function BookmarksPage() {
   });
 
   const { history: searchHistory, addToHistory, removeFromHistory, clearHistory } = useSearchHistory();
+
+  // Bookmark cards only know their tag names, so the colors set in Tag Manager
+  // are looked up through this map.
+  const tagColors = useMemo(
+    () =>
+      Object.fromEntries(
+        availableTags.filter((tag) => tag.color).map((tag) => [tag.name, tag.color as string])
+      ),
+    [availableTags]
+  );
 
   const [isOrderingMode, setIsOrderingMode] = useState(false);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
@@ -350,6 +362,8 @@ export default function BookmarksPage() {
             onUpdateTagName={handleUpdateTagName}
             onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
+            onSetTagColor={setTagColor}
+            onReorderTags={reorderTags}
             onSaveTagRule={handleSaveTagRule}
             onDeleteTagRule={handleDeleteTagRule}
             onDeleteAll={handleDeleteAll}
@@ -390,6 +404,7 @@ export default function BookmarksPage() {
               }}
               isOrderingMode={isOrderingMode}
               onReorder={ordering.handleReorder}
+              tagColors={tagColors}
             />
 
             <FolderSearchResults

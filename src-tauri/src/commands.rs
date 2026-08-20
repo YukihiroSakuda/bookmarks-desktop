@@ -43,6 +43,12 @@ pub struct OrderItem {
 }
 
 #[derive(Deserialize)]
+pub struct TagOrderItem {
+    id: String,
+    sort_order: i64,
+}
+
+#[derive(Deserialize)]
 pub struct SettingsInput {
     list_columns: i64,
     sort_option: String,
@@ -59,6 +65,14 @@ pub struct TagRuleInput {
 }
 
 // ---------- Helpers ----------
+
+/// Order value for a newly created tag: the end of the manual order used by
+/// Tag Manager. Tags created before the manual order existed keep 0 and are
+/// listed first, alphabetically.
+fn next_tag_order(conn: &rusqlite::Connection) -> Result<i64, String> {
+    conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tags", [], |r| r.get(0))
+        .map_err(|e| e.to_string())
+}
 
 /// Insert tags (creating them if missing) and link them to a bookmark.
 fn link_tags(
@@ -82,8 +96,9 @@ fn link_tags(
             None => {
                 let id = new_id();
                 conn.execute(
-                    "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-                    rusqlite::params![id, tag_name, ts, ts],
+                    "INSERT INTO tags (id, name, sort_order, created_at, updated_at) \
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![id, tag_name, next_tag_order(conn)?, ts, ts],
                 )
                 .map_err(|e| e.to_string())?;
                 id
@@ -398,15 +413,20 @@ pub fn is_shortcut_available(app: AppHandle, accelerator: String) -> Result<bool
 pub fn list_tags(state: State<AppState>) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, name, created_at, updated_at FROM tags ORDER BY name ASC")
+        .prepare(
+            "SELECT id, name, color, sort_order, created_at, updated_at \
+             FROM tags ORDER BY sort_order ASC, name ASC",
+        )
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |r| {
             Ok(json!({
                 "id": r.get::<_, String>(0)?,
                 "name": r.get::<_, String>(1)?,
-                "created_at": r.get::<_, String>(2)?,
-                "updated_at": r.get::<_, String>(3)?,
+                "color": r.get::<_, Option<String>>(2)?,
+                "sort_order": r.get::<_, i64>(3)?,
+                "created_at": r.get::<_, String>(4)?,
+                "updated_at": r.get::<_, String>(5)?,
             }))
         })
         .map_err(|e| e.to_string())?;
@@ -418,7 +438,11 @@ pub fn list_tags(state: State<AppState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn create_tag(name: String, state: State<AppState>) -> Result<Value, String> {
+pub fn create_tag(
+    name: String,
+    color: Option<String>,
+    state: State<AppState>,
+) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let ts = now();
 
@@ -432,8 +456,9 @@ pub fn create_tag(name: String, state: State<AppState>) -> Result<Value, String>
 
     let id = new_id();
     conn.execute(
-        "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-        rusqlite::params![id, name, ts, ts],
+        "INSERT INTO tags (id, name, color, sort_order, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![id, name, color, next_tag_order(&conn)?, ts, ts],
     )
     .map_err(|e| e.to_string())?;
     Ok(json!({ "id": id }))
@@ -448,6 +473,44 @@ pub fn update_tag(id: String, name: String, state: State<AppState>) -> Result<Va
         rusqlite::params![name, ts, id],
     )
     .map_err(|e| e.to_string())?;
+    Ok(json!({ "ok": true }))
+}
+
+/// Set (or clear, with `None`) the accent color of a tag. The value is a
+/// palette key such as `"red"`, resolved to concrete classes in the frontend,
+/// so the stored data stays theme-independent.
+#[tauri::command]
+pub fn set_tag_color(
+    id: String,
+    color: Option<String>,
+    state: State<AppState>,
+) -> Result<Value, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let ts = now();
+    conn.execute(
+        "UPDATE tags SET color = ?1, updated_at = ?2 WHERE id = ?3",
+        rusqlite::params![color, ts, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(json!({ "ok": true }))
+}
+
+/// Persist the manual tag order produced by drag and drop in Tag Manager.
+/// Every tag is renumbered from 1, so tags created before this feature (which
+/// default to 0 and therefore fall back to alphabetical order) become explicit
+/// on the first reorder.
+#[tauri::command]
+pub fn reorder_tags(order: Vec<TagOrderItem>, state: State<AppState>) -> Result<Value, String> {
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    for item in &order {
+        tx.execute(
+            "UPDATE tags SET sort_order = ?1 WHERE id = ?2",
+            rusqlite::params![item.sort_order, item.id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(json!({ "ok": true }))
 }
 
@@ -601,6 +664,10 @@ struct ImportBookmark {
 struct ImportTag {
     id: String,
     name: String,
+    #[serde(default)]
+    color: Option<String>,
+    #[serde(default)]
+    sort_order: i64,
     created_at: String,
     updated_at: String,
 }
@@ -697,15 +764,20 @@ fn build_export_snapshot(conn: &rusqlite::Connection) -> Result<Value, String> {
     let mut tags = Vec::new();
     {
         let mut stmt = conn
-            .prepare("SELECT id, name, created_at, updated_at FROM tags ORDER BY name ASC")
+            .prepare(
+                "SELECT id, name, color, sort_order, created_at, updated_at \
+                 FROM tags ORDER BY sort_order ASC, name ASC",
+            )
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map([], |r| {
                 Ok(json!({
                     "id": r.get::<_, String>(0)?,
                     "name": r.get::<_, String>(1)?,
-                    "created_at": r.get::<_, String>(2)?,
-                    "updated_at": r.get::<_, String>(3)?,
+                    "color": r.get::<_, Option<String>>(2)?,
+                    "sort_order": r.get::<_, i64>(3)?,
+                    "created_at": r.get::<_, String>(4)?,
+                    "updated_at": r.get::<_, String>(5)?,
                 }))
             })
             .map_err(|e| e.to_string())?;
@@ -778,8 +850,9 @@ fn apply_import(conn: &mut rusqlite::Connection, data: &ImportData) -> Result<Va
 
     for t in &data.tags {
         tx.execute(
-            "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![t.id, t.name, t.created_at, t.updated_at],
+            "INSERT INTO tags (id, name, color, sort_order, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![t.id, t.name, t.color, t.sort_order, t.created_at, t.updated_at],
         )
         .map_err(|e| e.to_string())?;
     }

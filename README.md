@@ -65,6 +65,8 @@ Because the data folders sit outside the package, **uninstalling either build le
 
 - Add, edit, and delete tags
 - Filter by tag (single or multiple selection)
+- Optional per-tag color (8 presets) — colored tags stand out in the filter bar and on bookmark cards; tags without a color keep the default monochrome/blue look
+- Manual tag order via drag and drop in Tag Manager (the filter bar follows it)
 - Tag rules: automatic tagging based on URL/title patterns
 
 ### Search
