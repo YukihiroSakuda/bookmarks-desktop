@@ -52,10 +52,39 @@ export function isHttpUrl(url: string): boolean {
   }
 }
 
+/**
+ * Normalize a local/network path for comparison: strips a `file://` prefix
+ * (decoding percent-escapes), unifies separators to `\`, drops the trailing
+ * separator, and lowercases it because Windows paths are case-insensitive.
+ */
+export function normalizeLocalPath(path: string): string {
+  let p = path.trim();
+
+  if (/^file:\/\//i.test(p)) {
+    p = p.replace(/^file:\/\//i, "");
+    p = p.replace(/^\/(?=[a-zA-Z]:)/, ""); // file:///C:/dir -> C:/dir
+    try {
+      p = decodeURIComponent(p);
+    } catch { /* keep the raw value if it is not valid percent-encoding */ }
+  }
+
+  return p.replace(/\//g, "\\").replace(/\\+$/, "").toLowerCase();
+}
+
 export function findDuplicateBookmark<T extends BookmarkUrlLike>(
   bookmarks: T[],
   url: string
 ): T | undefined {
+  if (detectKind(url) === "path") {
+    const normalizedPath = normalizeLocalPath(url);
+    if (!normalizedPath) return undefined;
+
+    return bookmarks.find(
+      (bookmark) =>
+        detectKind(bookmark.url) === "path" && normalizeLocalPath(bookmark.url) === normalizedPath
+    );
+  }
+
   if (!isHttpUrl(url)) return undefined;
 
   const normalizedUrl = normalizeBookmarkUrl(url);
