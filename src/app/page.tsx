@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { BookmarkList } from "@/components/BookmarkList";
 import { BookmarkHeader } from "@/components/BookmarkHeader";
 import { BookmarkForm } from "@/components/BookmarkForm";
 import { SavingOrderOverlay } from "@/components/SavingOrderOverlay";
 import { DropOverlay } from "@/components/DropOverlay";
+import { FolderSearchResults } from "@/components/FolderSearchResults";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +34,7 @@ import {
   useBookmarkHotkeys,
   useTypeToSearch,
   useNewBookmarkFromUrl,
+  useFolderSearch,
 } from "@/hooks";
 import { toast } from "sonner";
 import { readAppCache, writeAppCache } from "@/lib/appCache";
@@ -212,6 +215,32 @@ export default function BookmarksPage() {
       filtering.setSearchQuery((prev) => prev + char),
   });
 
+  // The asynchronous half of search: file names inside bookmarked folders.
+  // Disabled while reordering, where the list is not a search result.
+  const {
+    folderSearch,
+    showProgress: isFolderSearchSlow,
+  } = useFolderSearch({
+    searchQuery: filtering.searchQuery,
+    enabled: !isOrderingMode,
+  });
+
+  const handleOpenFoundPath = useCallback(async (fullPath: string) => {
+    try {
+      await invoke("open_path", { path: fullPath });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  }, []);
+
+  const handleOpenContainingFolder = useCallback(
+    async (fullPath: string) => {
+      const cut = Math.max(fullPath.lastIndexOf("\\"), fullPath.lastIndexOf("/"));
+      await handleOpenFoundPath(cut > 0 ? fullPath.slice(0, cut) : fullPath);
+    },
+    [handleOpenFoundPath]
+  );
+
   useNewBookmarkFromUrl((values) => {
     setSelectedBookmark(undefined);
     setNewBookmarkInitialValues(values);
@@ -361,6 +390,14 @@ export default function BookmarksPage() {
               }}
               isOrderingMode={isOrderingMode}
               onReorder={ordering.handleReorder}
+            />
+
+            <FolderSearchResults
+              result={folderSearch}
+              showProgress={isFolderSearchSlow}
+              listColumns={settings.listColumns}
+              onOpen={handleOpenFoundPath}
+              onOpenContaining={handleOpenContainingFolder}
             />
           </div>
 

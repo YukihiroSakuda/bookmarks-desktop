@@ -72,6 +72,10 @@ Because the data folders sit outside the package, **uninstalling either build le
 - Real-time search across title, URL, and memo
 - Search history (up to 10 entries, stored in localStorage)
 - Just start typing to focus the search bar and begin typing (no need to press `/`; disabled while an input is focused or when modifier-key combos are used), `Esc` closes the modal
+- Search reaches **inside the folders you have bookmarked** — matching file and folder names appear under "In your folders", grouped by the bookmark they came from. Click to open, or open the containing folder
+  - Nothing is indexed or stored: each search walks the bookmarked folders and keeps only the matches, so results are never stale and no file names are written to disk, to a backup, or to a sync folder
+  - Bounded by design: 3 levels deep, 20,000 entries per folder, and build/dependency directories (`node_modules`, `.git`, `target`, …) are skipped. Folders too large to search fully say so instead of silently dropping results
+  - Network shares and removable drives are not searched by default, since walking them can block for seconds
 
 ### Import / export
 

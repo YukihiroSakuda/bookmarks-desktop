@@ -188,6 +188,20 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">検索</h2>
         <H3>キーワード検索</H3>
         <P>ヘッダーの検索バーにキーワードを入力すると、<Strong>タイトル・URL・メモ</Strong> を対象に絞り込まれます。</P>
+        <H3>フォルダの中も検索</H3>
+        <P><Strong>ブックマークしたフォルダの中にあるファイル名・フォルダ名</Strong> も検索対象になります。<Strong>2文字以上</Strong> 入力すると、一覧の下に「In your folders」として、どのブックマークの中で見つかったかごとにまとめて表示されます。</P>
+        <Ul>
+          <Li>クリックするとファイルは既定のアプリで、フォルダはエクスプローラで開きます。</Li>
+          <Li>行にマウスを乗せると出るアイコンから、そのファイルが入っているフォルダを開けます。</Li>
+          <Li>1つのフォルダで20件を超えて見つかったときは「Show N more」で残りを表示できます。</Li>
+        </Ul>
+        <P>検索するたびにフォルダを直接見に行くため、<Strong>結果は常に最新</Strong> です。ファイルの一覧を保存しておく仕組みではないので、バックアップにファイル名が含まれることもありません。</P>
+        <P>速く安全に終わらせるため、次の範囲に限って探します。</P>
+        <Ul>
+          <Li>フォルダの <Strong>3階層下まで</Strong>（1つのフォルダにつき最大2万件まで）。多すぎて全部を見られなかった場合はその旨が表示されます。</Li>
+          <Li><Strong>node_modules</Strong> や <Strong>.git</Strong> など、中身が膨大になりがちなフォルダは除外します。</Li>
+          <Li>ドライブ直下（<Strong>C:</Strong> など）、ネットワークドライブ、リムーバブルドライブは対象外です。</Li>
+        </Ul>
         <H3>キー入力で検索を開始</H3>
         <P>一覧のどこにフォーカスがあっても、文字キーを打ち始めるだけで検索バーにフォーカスが移り、その文字から入力が始まります。入力欄にフォーカスがあるときや、修飾キー（Ctrl / Alt / Shift / ⌘）付きの組み合わせを押したときは無効です（ブックマークのショートカットや編集キーを優先）。</P>
         <H3>検索履歴</H3>
@@ -468,6 +482,20 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Search</h2>
         <H3>Keyword Search</H3>
         <P>Type in the search bar to filter bookmarks by <Strong>title, URL, and memo</Strong>.</P>
+        <H3>Search Inside Folders</H3>
+        <P>Search also reaches <Strong>the file and folder names inside the folders you have bookmarked</Strong>. Type <Strong>two or more characters</Strong> and any matches appear below your bookmarks under &ldquo;In your folders&rdquo;, grouped by the bookmark they came from.</P>
+        <Ul>
+          <Li>Click a result to open the file in its default app, or the folder in File Explorer.</Li>
+          <Li>Hover a row to reveal an icon that opens the folder containing that file.</Li>
+          <Li>When one folder holds more than 20 matches, &ldquo;Show N more&rdquo; reveals the rest.</Li>
+        </Ul>
+        <P>Each search looks in the folders directly rather than consulting a stored list, so <Strong>results are never out of date</Strong> — and no file names are written to your backup.</P>
+        <P>To keep it quick, the search is limited to the following.</P>
+        <Ul>
+          <Li><Strong>Three levels deep</Strong>, and at most 20,000 entries per folder. If a folder was too large to search fully, the app says so.</Li>
+          <Li>Folders that tend to hold enormous numbers of files — <Strong>node_modules</Strong>, <Strong>.git</Strong> and the like — are skipped.</Li>
+          <Li>Whole drives (<Strong>C:</Strong> for example), network drives and removable drives are not searched.</Li>
+        </Ul>
         <H3>Type to Search</H3>
         <P>Wherever focus is in the list, just start typing — the search bar takes focus and your keystroke goes into it. This is disabled while a text field is focused, or when you press a modifier combo (Ctrl / Alt / Shift / ⌘), so bookmark shortcuts and editing keys keep working.</P>
         <H3>Search History</H3>

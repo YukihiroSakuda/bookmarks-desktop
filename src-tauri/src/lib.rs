@@ -1,5 +1,6 @@
 mod commands;
 mod db;
+mod folder_search;
 mod server;
 #[cfg(target_os = "windows")]
 mod winpkg;
@@ -194,6 +195,7 @@ pub fn run() {
             commands::register_context_menu,
             commands::unregister_context_menu,
             commands::save_extension_zip,
+            folder_search::search_in_folders,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

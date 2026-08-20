@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "0.1.9"
+version = "0.1.10"
 description = "Bookmark manager desktop app"
 authors = ["Yukihiro Sakuda"]
 license = "MIT"
@@ -35,6 +35,8 @@ windows = { version = "0.61", features = [
   "ApplicationModel_Activation",
   "Win32_Foundation",
   "Win32_Storage_Packaging_Appx",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Threading",
 ] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }

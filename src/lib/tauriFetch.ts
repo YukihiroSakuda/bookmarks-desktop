@@ -53,6 +53,10 @@ async function dispatch(
     }
   }
 
+  if (a === "folder-search") {
+    return invoke("search_in_folders", { query: query.get("q") ?? "" });
+  }
+
   if (a === "tags") {
     if (b === undefined) {
       if (method === "GET") return invoke("list_tags");
