@@ -2,11 +2,11 @@ import type { Config } from "tailwindcss";
 
 export default {
   darkMode: 'class',
-  content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
+  // Everything under src, not a list of specific directories: class name
+  // strings live in helpers and hooks too (e.g. src/lib/listLayout.ts), and a
+  // directory missing from this list fails silently — the classes are simply
+  // purged and the layout quietly stops responding.
+  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],
   theme: {
   	extend: {
   		colors: {

@@ -1,4 +1,5 @@
 import { BookmarkUI } from '@/types/bookmark';
+import { getListColumnClasses } from '@/lib/listLayout';
 import { BookmarkCard } from './BookmarkCard';
 import { Pin } from 'lucide-react';
 import {
@@ -100,13 +101,7 @@ export function BookmarkList({
     if (isOrderingMode) {
       return "grid grid-cols-1 gap-2";
     }
-    const columnClasses = {
-      1: "grid grid-cols-1 gap-2",
-      2: "grid grid-cols-1 sm:grid-cols-2 gap-2",
-      3: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2",
-      4: "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2"
-    };
-    return columnClasses[listColumns];
+    return getListColumnClasses(listColumns);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
