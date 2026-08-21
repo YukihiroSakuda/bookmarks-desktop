@@ -1,5 +1,6 @@
 use crate::db::AppState;
 use crate::favicon;
+use crate::page_title;
 use chrono::{SecondsFormat, Utc};
 use rusqlite::OptionalExtension;
 use serde::Deserialize;
@@ -1002,73 +1003,9 @@ pub async fn import_data(app: AppHandle, state: State<'_, AppState>) -> Result<V
 
 // ---------- Title fetch ----------
 
-fn fetch_title_blocking(url: &str) -> String {
-    let parsed = match reqwest::Url::parse(url) {
-        Ok(p) => p,
-        Err(_) => return String::new(),
-    };
-    let fallback = parsed
-        .host_str()
-        .map(|h| h.trim_start_matches("www.").to_string())
-        .unwrap_or_default();
-
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(8))
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return fallback,
-    };
-
-    let resp = match client
-        .get(url)
-        .header(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        )
-        .send()
-    {
-        Ok(r) => r,
-        Err(_) => return fallback,
-    };
-
-    let content_type = resp
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    if !content_type.contains("text/html") && !content_type.contains("xhtml") {
-        return fallback;
-    }
-
-    let body = match resp.text() {
-        Ok(b) => b,
-        Err(_) => return fallback,
-    };
-
-    extract_title(&body).unwrap_or(fallback)
-}
-
-/// Extract and normalize the contents of the first <title> element.
-fn extract_title(html: &str) -> Option<String> {
-    let lower = html.to_lowercase();
-    let start_tag = lower.find("<title")?;
-    let gt = lower[start_tag..].find('>')? + start_tag + 1;
-    let end = lower[gt..].find("</title>")? + gt;
-    let raw = &html[gt..end];
-    let normalized = raw.split_whitespace().collect::<Vec<_>>().join(" ");
-    let trimmed = normalized.trim().to_string();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed)
-    }
-}
-
 #[tauri::command]
 pub async fn fetch_title(url: String) -> Result<Value, String> {
-    let title = tauri::async_runtime::spawn_blocking(move || fetch_title_blocking(&url))
+    let title = tauri::async_runtime::spawn_blocking(move || page_title::fetch_title_blocking(&url))
         .await
         .map_err(|e| e.to_string())?;
     Ok(json!({ "title": title }))

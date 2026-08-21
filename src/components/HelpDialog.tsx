@@ -165,6 +165,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>右上の <Strong>Add Bookmark</Strong> ボタンで追加フォームを開きます。</P>
         <Ul>
           <Li>URLを入力するとページタイトルが自動取得されます。</Li>
+          <Li>SharePoint や Box のようにログインが必要なページでは、アプリからはサインイン画面しか見えないため、「サインイン」ではなく <Strong>URL から組み立てた名前</Strong>（ファイル名とサイト名など）が入ります。そのまま編集できます。</Li>
           <Li>タグとメモは任意で設定できます。</Li>
           <Li>保存後、タグルールが設定されている場合は自動的にタグが付与されます。</Li>
         </Ul>
@@ -464,6 +465,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>Click the <Strong>Add Bookmark</Strong> button in the top-right to open the form.</P>
         <Ul>
           <Li>The page title is automatically fetched when you enter a URL.</Li>
+          <Li>For pages behind a login (SharePoint, Box, an intranet portal) the app only ever sees the sign-in page, so it fills in a <Strong>name built from the URL</Strong> — usually the file name and the site — instead of &ldquo;Sign in&rdquo;. Edit it as you like.</Li>
           <Li>Tags and memos are optional.</Li>
           <Li>After saving, tag rules are automatically applied if configured.</Li>
         </Ul>

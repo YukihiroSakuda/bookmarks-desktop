@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod favicon;
+mod page_title;
 mod folder_search;
 mod server;
 #[cfg(target_os = "windows")]

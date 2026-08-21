@@ -35,7 +35,7 @@ Because the data folders sit outside the package, **uninstalling either build le
 ### Bookmark management
 
 - Add, edit, and delete bookmarks
-- Automatic title fetching when entering a URL
+- Automatic title fetching when entering a URL. Pages behind a login (SharePoint, Box, intranet portals) answer with a sign-in page, so the title is built from the URL instead — usually the file name and the site it lives in
 - Pin bookmarks (shown fixed at the top; pinning/unpinning auto-scrolls to the card's new position)
 - Automatic access-count tracking
 - Custom reordering via drag and drop
