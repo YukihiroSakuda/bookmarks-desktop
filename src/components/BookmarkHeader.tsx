@@ -25,6 +25,12 @@ interface BookmarkHeaderProps {
   onListColumnsChange: (columns: 1 | 2 | 3 | 4) => void;
   summonShortcut: string;
   onSummonShortcutChange: (accelerator: string) => void;
+  shortcutDirEnabled: boolean;
+  shortcutDirPath: string;
+  onShortcutDirChange: (patch: {
+    shortcutDirEnabled?: boolean;
+    shortcutDirPath?: string;
+  }) => void;
   selectedTags: string[];
   onAddBookmark: () => void;
   searchQuery: string;
@@ -62,6 +68,9 @@ export function BookmarkHeader({
   onListColumnsChange,
   summonShortcut,
   onSummonShortcutChange,
+  shortcutDirEnabled,
+  shortcutDirPath,
+  onShortcutDirChange,
   selectedTags,
   onAddBookmark,
   searchQuery,
@@ -256,6 +265,9 @@ export function BookmarkHeader({
               onListColumnsChange={onListColumnsChange}
               summonShortcut={summonShortcut}
               onSummonShortcutChange={onSummonShortcutChange}
+              shortcutDirEnabled={shortcutDirEnabled}
+              shortcutDirPath={shortcutDirPath}
+              onShortcutDirChange={onShortcutDirChange}
               bookmarks={bookmarks}
               onBookmarksUpdate={onBookmarksUpdate}
               onDeleteAll={onDeleteAll}

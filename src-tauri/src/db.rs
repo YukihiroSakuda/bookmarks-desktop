@@ -97,6 +97,16 @@ pub fn init_db(app: &AppHandle) -> Result<Connection, String> {
     add_column_if_missing(&conn, "user_settings", "api_token", "TEXT")?;
     add_column_if_missing(&conn, "tags", "color", "TEXT")?;
     add_column_if_missing(&conn, "tags", "sort_order", "INTEGER NOT NULL DEFAULT 0")?;
+    // Off by default: the shortcut folder writes into the user's profile, so it
+    // is never created until it is asked for. A NULL path means the default
+    // location (`%USERPROFILE%\Bookmarks`).
+    add_column_if_missing(
+        &conn,
+        "user_settings",
+        "shortcut_dir_enabled",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column_if_missing(&conn, "user_settings", "shortcut_dir_path", "TEXT")?;
     ensure_api_token(&conn)?;
 
     Ok(conn)

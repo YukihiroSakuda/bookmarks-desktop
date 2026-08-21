@@ -10,6 +10,8 @@ const DEFAULT_SETTINGS: UserSettingsUI = {
   sortOption: "accessCount",
   sortOrder: "desc",
   summonShortcut: DEFAULT_SUMMON_SHORTCUT,
+  shortcutDirEnabled: false,
+  shortcutDirPath: "",
 };
 
 export function useUserSettings() {
@@ -38,6 +40,8 @@ export function useUserSettings() {
           sort_option: settings.sortOption,
           sort_order: settings.sortOrder,
           summon_shortcut: settings.summonShortcut,
+          shortcut_dir_enabled: settings.shortcutDirEnabled,
+          shortcut_dir_path: settings.shortcutDirPath,
         }),
       });
       if (!res.ok) throw new Error("Failed to save settings");
@@ -74,6 +78,8 @@ export function useUserSettings() {
         sortOption: data.sort_option,
         sortOrder: data.sort_order,
         summonShortcut: data.summon_shortcut || DEFAULT_SUMMON_SHORTCUT,
+        shortcutDirEnabled: Boolean(data.shortcut_dir_enabled),
+        shortcutDirPath: data.shortcut_dir_path ?? "",
       };
 
       applySettings(uiSettings);

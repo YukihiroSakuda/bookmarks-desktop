@@ -64,6 +64,7 @@ Written in Rust. Key files:
 - `src/db.rs` — SQLite schema (auto-created on first run), `AppState` struct
 - `src/commands.rs` — Tauri `invoke()` handlers for all CRUD operations
 - `src/server.rs` — axum HTTP server on `127.0.0.1:37373` for the browser extension
+- `src/shortcutdir.rs` — mirrors `kind = 'path'` bookmarks into a flat Windows folder of `.lnk` shortcuts (off by default), so they can be picked from other apps' file dialogs. Deletes **only** files recorded in its own manifest (`.bookmarks-shortcuts.json`), never anything else in the directory. Also pins/unpins that folder to Quick Access via the `pintohome`/`unpinfromhome` shell verbs — note the shell's collections index on **VT_I4**, so a `VARIANT` built from `i64` silently matches nothing
 
 **SQLite schema** (5 tables): `bookmarks` (includes `kind`, `memo`), `tags`, `bookmarks_tags`, `user_settings`, `tag_rules`. Schema defined in `src-tauri/src/db.rs`.
 

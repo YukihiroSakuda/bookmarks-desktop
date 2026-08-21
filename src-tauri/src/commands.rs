@@ -57,6 +57,13 @@ pub struct SettingsInput {
     sort_option: String,
     sort_order: String,
     summon_shortcut: String,
+    // Optional so that callers which predate the shortcut folder — the
+    // extension's settings write, an older frontend bundle — leave the stored
+    // values alone instead of resetting them.
+    #[serde(default)]
+    shortcut_dir_enabled: Option<bool>,
+    #[serde(default)]
+    shortcut_dir_path: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -184,7 +191,11 @@ pub fn list_bookmarks(state: State<AppState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn create_bookmark(data: BookmarkInput, state: State<AppState>) -> Result<Value, String> {
+pub fn create_bookmark(
+    app: AppHandle,
+    data: BookmarkInput,
+    state: State<AppState>,
+) -> Result<Value, String> {
     let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
     let ts = now();
     let id = new_id();
@@ -217,11 +228,15 @@ pub fn create_bookmark(data: BookmarkInput, state: State<AppState>) -> Result<Va
     link_tags(&tx, &id, &data.tags, &ts)?;
     tx.commit().map_err(|e| e.to_string())?;
 
+    drop(conn);
+    crate::shortcutdir::request_sync(&app);
+
     Ok(json!({ "id": id }))
 }
 
 #[tauri::command]
 pub fn update_bookmark(
+    app: AppHandle,
     id: String,
     data: BookmarkInput,
     state: State<AppState>,
@@ -231,40 +246,27 @@ pub fn update_bookmark(
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
-    // Update core fields. kind is left unchanged when not provided.
-    match data.kind {
-        Some(kind) => {
-            tx.execute(
-                "UPDATE bookmarks SET kind = ?1, title = ?2, url = ?3, favicon = ?4, \
-                 is_pinned = ?5, memo = ?6, shortcut = ?7, updated_at = ?8 WHERE id = ?9",
-                rusqlite::params![
-                    kind,
-                    data.title,
-                    data.url,
-                    data.favicon,
-                    data.is_pinned as i64,
-                    data.memo,
-                    data.shortcut,
-                    ts,
-                    id
-                ],
-            )
-        }
-        None => tx.execute(
-            "UPDATE bookmarks SET title = ?1, url = ?2, favicon = ?3, \
-             is_pinned = ?4, memo = ?5, shortcut = ?6, updated_at = ?7 WHERE id = ?8",
-            rusqlite::params![
-                data.title,
-                data.url,
-                data.favicon,
-                data.is_pinned as i64,
-                data.memo,
-                data.shortcut,
-                ts,
-                id
-            ],
-        ),
-    }
+    // Update core fields. kind and favicon are left unchanged when the request
+    // omits them (COALESCE keeps the stored value): the edit form carries
+    // neither, and renaming a bookmark must not throw away the icon fetched for
+    // it. Nothing in the app clears a favicon through this path — the icon
+    // fetch writes the column directly.
+    tx.execute(
+        "UPDATE bookmarks SET kind = COALESCE(?1, kind), title = ?2, url = ?3, \
+         favicon = COALESCE(?4, favicon), is_pinned = ?5, memo = ?6, shortcut = ?7, \
+         updated_at = ?8 WHERE id = ?9",
+        rusqlite::params![
+            data.kind,
+            data.title,
+            data.url,
+            data.favicon,
+            data.is_pinned as i64,
+            data.memo,
+            data.shortcut,
+            ts,
+            id
+        ],
+    )
     .map_err(|e| e.to_string())?;
 
     // Replace tag links.
@@ -273,22 +275,36 @@ pub fn update_bookmark(
     link_tags(&tx, &id, &data.tags, &ts)?;
 
     tx.commit().map_err(|e| e.to_string())?;
+
+    drop(conn);
+    crate::shortcutdir::request_sync(&app);
+
     Ok(json!({ "ok": true }))
 }
 
 #[tauri::command]
-pub fn delete_bookmark(id: String, state: State<AppState>) -> Result<Value, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM bookmarks WHERE id = ?1", [&id])
-        .map_err(|e| e.to_string())?;
+pub fn delete_bookmark(
+    app: AppHandle,
+    id: String,
+    state: State<AppState>,
+) -> Result<Value, String> {
+    {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM bookmarks WHERE id = ?1", [&id])
+            .map_err(|e| e.to_string())?;
+    }
+    crate::shortcutdir::request_sync(&app);
     Ok(json!({ "ok": true }))
 }
 
 #[tauri::command]
-pub fn delete_all_bookmarks(state: State<AppState>) -> Result<Value, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    conn.execute("DELETE FROM bookmarks", [])
-        .map_err(|e| e.to_string())?;
+pub fn delete_all_bookmarks(app: AppHandle, state: State<AppState>) -> Result<Value, String> {
+    {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute("DELETE FROM bookmarks", [])
+            .map_err(|e| e.to_string())?;
+    }
+    crate::shortcutdir::request_sync(&app);
     Ok(json!({ "ok": true }))
 }
 
@@ -308,14 +324,25 @@ pub fn toggle_pin(id: String, state: State<AppState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn increment_access(id: String, state: State<AppState>) -> Result<Value, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    let ts = now();
-    conn.execute(
-        "UPDATE bookmarks SET access_count = access_count + 1, last_accessed_at = ?1 WHERE id = ?2",
-        rusqlite::params![ts, id],
-    )
-    .map_err(|e| e.to_string())?;
+pub fn increment_access(
+    app: AppHandle,
+    id: String,
+    state: State<AppState>,
+) -> Result<Value, String> {
+    {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        let ts = now();
+        conn.execute(
+            "UPDATE bookmarks SET access_count = access_count + 1, last_accessed_at = ?1 WHERE id = ?2",
+            rusqlite::params![ts, id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    // Only the shortcut's timestamp can have moved, so this skips the full
+    // reconcile that every other mutation asks for.
+    crate::shortcutdir::touch(&app, &id);
+
     Ok(json!({ "ok": true }))
 }
 
@@ -593,7 +620,8 @@ pub fn get_settings(state: State<AppState>) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let value = conn
         .query_row(
-            "SELECT list_columns, sort_option, sort_order, summon_shortcut \
+            "SELECT list_columns, sort_option, sort_order, summon_shortcut, \
+             shortcut_dir_enabled, shortcut_dir_path \
              FROM user_settings WHERE id = 1",
             [],
             |r| {
@@ -602,6 +630,8 @@ pub fn get_settings(state: State<AppState>) -> Result<Value, String> {
                     "sort_option": r.get::<_, String>(1)?,
                     "sort_order": r.get::<_, String>(2)?,
                     "summon_shortcut": r.get::<_, String>(3)?,
+                    "shortcut_dir_enabled": r.get::<_, i64>(4)? != 0,
+                    "shortcut_dir_path": r.get::<_, Option<String>>(5)?,
                 }))
             },
         )
@@ -619,16 +649,25 @@ pub fn update_settings(
         let conn = state.conn.lock().map_err(|e| e.to_string())?;
         conn.execute(
             "UPDATE user_settings SET list_columns = ?1, sort_option = ?2, sort_order = ?3, \
-             summon_shortcut = ?4 WHERE id = 1",
+             summon_shortcut = ?4, \
+             shortcut_dir_enabled = COALESCE(?5, shortcut_dir_enabled), \
+             shortcut_dir_path = COALESCE(?6, shortcut_dir_path) WHERE id = 1",
             rusqlite::params![
                 data.list_columns,
                 data.sort_option,
                 data.sort_order,
-                data.summon_shortcut
+                data.summon_shortcut,
+                data.shortcut_dir_enabled.map(|v| v as i64),
+                data.shortcut_dir_path
             ],
         )
         .map_err(|e| e.to_string())?;
     }
+
+    // Switching the shortcut folder on, or pointing it somewhere else, should
+    // take effect without waiting for the next bookmark edit.
+    crate::shortcutdir::request_sync(&app);
+
     // Re-register the summon hotkey so changes take effect immediately. Returns
     // `failed` if the new combo is already taken, letting the caller warn.
     sync_summon_inner(&app)
@@ -997,6 +1036,10 @@ pub async fn import_data(app: AppHandle, state: State<'_, AppState>) -> Result<V
 
     // Settings (incl. the summon hotkey) may have changed — re-register it.
     sync_summon_inner(&app)?;
+
+    // The whole bookmark set was replaced, so the shortcut folder has to be
+    // rebuilt from scratch.
+    crate::shortcutdir::request_sync(&app);
 
     Ok(summary)
 }

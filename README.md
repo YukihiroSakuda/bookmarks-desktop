@@ -20,6 +20,7 @@ All data lives on your own PC — nothing is sent to a server operated by the de
 | Database (bookmarks, tags, tag rules, settings) | `%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db`<br>(= `C:\Users\<user>\AppData\Roaming\com.yukihirosakuda.bookmarks\`) |
 | WebView2 profile — theme, search history, list cache (localStorage) | `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\EBWebView\` |
 | Logs | `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\` |
+| File shortcuts (only when switched on) | `%USERPROFILE%\Bookmarks\` — changeable in Settings |
 
 **The Microsoft Store build and the GitHub Releases build share these same folders**, so your bookmarks carry over when you switch between them. (The Store build is a plain MSIX package with only the `runFullTrust` capability and no Package Support Framework, so Windows does not redirect its `%APPDATA%` writes into the package container.) Only the executable differs:
 
@@ -48,6 +49,23 @@ Because the data folders sit outside the package, **uninstalling either build le
 - Files open with the default app; folders open in Explorer
 - Add files/folders by dragging them from Windows Explorer
 - Add directly from Explorer's right-click menu ("Add to Bookmarks")
+
+### File shortcuts (use your bookmarks inside other apps' file dialogs)
+
+Off by default; switch it on in **Settings → File shortcuts**.
+
+Every app's Open/Attach dialog is Explorer, and Windows Quick Access can only pin *folders* — never a set of files scattered across the disk. So when you are attaching a file in Outlook, uploading one in Chrome, or placing one in Photoshop, a bookmark manager is no help at all: clicking a bookmark opens the file in its own app instead of handing the path to the dialog.
+
+Turning this on keeps one Windows folder (`%USERPROFILE%\Bookmarks` by default, changeable) filled with `.lnk` shortcuts to every bookmarked file and folder. Pin it to Quick Access — there is a button for it — and your bookmarks are one click away in the left pane of every file dialog.
+
+- Flat: one bookmark, one shortcut. Shortcuts are named after the **real file name**, extension included, so dialog filters still match them
+- Two bookmarks with the same file name are told apart by their folder: `見積書 (案件A).xlsx`
+- Each shortcut's modified time is the time you last opened that bookmark, so sorting a dialog by "Date modified" puts what you actually use on top
+- **URLs are not included** — a `.url` file cannot be picked in a file dialog, and it would only crowd out the files that can
+- The folder follows the app: add, rename, or delete a bookmark and the shortcuts follow. Deleting a shortcut by hand just brings it back on the next sync
+- Switching the feature off removes the shortcuts it created, the folder (if you left nothing else in it), and the Quick Access pin
+
+Only files this app created are ever deleted — they are tracked in a manifest inside the folder. Point the setting at a folder full of your own documents and it can add shortcuts there, but it can never take anything away.
 
 ### Memo
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert, Keyboard, FileJson, RotateCcw, ExternalLink, Image as ImageIcon } from "lucide-react";
+import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert, Keyboard, FileJson, RotateCcw, ExternalLink, Image as ImageIcon, FolderOpen, RefreshCw, Pin, PinOff } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
@@ -16,6 +16,9 @@ import { tauriFetch } from "@/lib/tauriFetch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const DELETE_CONFIRM_PHRASE = "delete all";
+
+/** Shown until the user picks a location; the backend resolves it for real. */
+const DEFAULT_SHORTCUT_DIR = "%USERPROFILE%\\Bookmarks";
 
 const MS_STORE_URL = "https://apps.microsoft.com/detail/9MT8VDHDB2Z9";
 const RELEASES_URL = "https://github.com/YukihiroSakuda/bookmarks-desktop/releases";
@@ -62,6 +65,12 @@ interface SettingsDialogProps {
   onListColumnsChange: (cols: 1 | 2 | 3 | 4) => void;
   summonShortcut: string;
   onSummonShortcutChange: (accelerator: string) => void;
+  shortcutDirEnabled: boolean;
+  shortcutDirPath: string;
+  onShortcutDirChange: (patch: {
+    shortcutDirEnabled?: boolean;
+    shortcutDirPath?: string;
+  }) => void;
   bookmarks: BookmarkUI[];
   onBookmarksUpdate: (bookmarks: BookmarkUI[]) => void;
   onDeleteAll: () => void;
@@ -74,6 +83,9 @@ export function SettingsDialog({
   onListColumnsChange,
   summonShortcut,
   onSummonShortcutChange,
+  shortcutDirEnabled,
+  shortcutDirPath,
+  onShortcutDirChange,
   bookmarks,
   onBookmarksUpdate,
   onDeleteAll,
@@ -186,6 +198,110 @@ export function SettingsDialog({
 
   function handleCancelFetchIcons() {
     tauriFetch("/api/favicons/cancel", { method: "POST" }).catch(() => {});
+  }
+
+  // Shortcut folder. Switching it on or picking a new location is saved like
+  // any other setting; the backend reconciles the folder right after.
+  const [isSyncingShortcuts, setIsSyncingShortcuts] = useState(false);
+  const [isPinning, setIsPinning] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+
+  async function handlePickShortcutDir() {
+    try {
+      const res = await tauriFetch("/api/shortcut-dir/pick", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(`フォルダを選択できませんでした: ${data?.error ?? "unknown error"}`);
+        return;
+      }
+      if (data?.cancelled) return;
+      onShortcutDirChange({ shortcutDirPath: data.path });
+    } catch (error) {
+      console.error("Error picking shortcut folder:", error);
+      toast.error("フォルダを選択できませんでした。");
+    }
+  }
+
+  async function handleOpenShortcutDir() {
+    const res = await tauriFetch("/api/shortcut-dir/open", { method: "POST" });
+    if (!res.ok) {
+      const data = await res.json();
+      toast.error(`フォルダを開けませんでした: ${data?.error ?? "unknown error"}`);
+    }
+  }
+
+  // Quick Access can also be changed from Explorer, so the toggle reads the
+  // real state when the dialog opens rather than tracking it locally.
+  useEffect(() => {
+    if (!open || !shortcutDirEnabled) return;
+    let cancelled = false;
+    tauriFetch("/api/shortcut-dir/pinned")
+      .then((res) => (res.ok ? res.json() : { pinned: false }))
+      .then((data) => {
+        if (!cancelled) setIsPinned(Boolean(data?.pinned));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open, shortcutDirEnabled, shortcutDirPath]);
+
+  async function handleTogglePin() {
+    const pinning = !isPinned;
+    setIsPinning(true);
+    try {
+      const res = await tauriFetch(`/api/shortcut-dir/${pinning ? "pin" : "unpin"}`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // tauriFetch turns a backend error into `ok: false` rather than
+        // throwing, so this branch has to report it — swallowing it here is
+        // what made a real failure look like a silent refusal.
+        toast.error(`クイックアクセスを変更できませんでした: ${data?.error ?? "unknown error"}`);
+        return;
+      }
+
+      // The backend reports the state it observed afterwards, so the button
+      // never claims an outcome the shell did not actually produce.
+      setIsPinned(Boolean(data?.pinned));
+      if (data?.pinned === pinning) {
+        toast.success(pinning ? "Pinned to Quick Access." : "Unpinned from Quick Access.");
+      } else {
+        toast.warning(
+          "クイックアクセスを変更できませんでした。フォルダを右クリックして操作してください。"
+        );
+      }
+    } catch (error) {
+      console.error("Error changing Quick Access pin:", error);
+      toast.error("クイックアクセスを変更できませんでした。");
+    } finally {
+      setIsPinning(false);
+    }
+  }
+
+  async function handleSyncShortcuts() {
+    setIsSyncingShortcuts(true);
+    try {
+      const res = await tauriFetch("/api/shortcut-dir/sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(`同期できませんでした: ${data?.error ?? "unknown error"}`);
+        return;
+      }
+      if (data?.enabled === false) return;
+      const skipped = data.skipped?.length ?? 0;
+      toast.success(
+        skipped > 0
+          ? `Shortcut folder updated. ${skipped} skipped.`
+          : "Shortcut folder updated."
+      );
+    } catch (error) {
+      console.error("Error syncing shortcut folder:", error);
+      toast.error("ショートカットを同期できませんでした。");
+    } finally {
+      setIsSyncingShortcuts(false);
+    }
   }
 
   const { isImporting, handleFileUpload } = useImportBookmarks({
@@ -552,6 +668,89 @@ export function SettingsDialog({
                   Site icons are fetched from each site once and stored locally. Bookmarks added
                   one at a time get theirs right away; imported ones are collected here.
                 </p>
+              </div>
+
+              {/* File shortcuts */}
+              <div>
+                <label className="block text-sm font-medium mb-2">File shortcuts</label>
+                <div className="flex gap-1.5">
+                  {([
+                    ["Off", false],
+                    ["On", true],
+                  ] as const).map(([label, value]) => (
+                    <button
+                      key={label}
+                      onClick={() => onShortcutDirChange({ shortcutDirEnabled: value })}
+                      className={`flex-1 py-1.5 text-sm rounded-md border transition-colors ${
+                        shortcutDirEnabled === value
+                          ? "bg-foreground text-background border-foreground"
+                          : "bg-secondary text-muted-foreground border-border hover:bg-accent"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Puts a shortcut to every bookmarked file and folder in one Windows folder, so
+                  they can be picked from any app&apos;s file dialog. Pin it to Quick Access to
+                  reach it there. URLs are not included.
+                </p>
+
+                {shortcutDirEnabled && (
+                  <>
+                    <div
+                      className="mt-2 rounded-md border border-input bg-transparent px-3 py-2 text-xs text-muted-foreground truncate"
+                      title={shortcutDirPath || DEFAULT_SHORTCUT_DIR}
+                    >
+                      {shortcutDirPath || DEFAULT_SHORTCUT_DIR}
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={FolderOpen}
+                        onClick={handlePickShortcutDir}
+                        className="flex-1"
+                      >
+                        Change
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={ExternalLink}
+                        onClick={handleOpenShortcutDir}
+                        className="flex-1"
+                      >
+                        Open
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={RefreshCw}
+                        onClick={handleSyncShortcuts}
+                        disabled={isSyncingShortcuts}
+                        className="flex-1"
+                      >
+                        {isSyncingShortcuts ? "Syncing..." : "Sync now"}
+                      </Button>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={isPinned ? PinOff : Pin}
+                      onClick={handleTogglePin}
+                      disabled={isPinning}
+                      className="w-full mt-2"
+                    >
+                      {isPinning
+                        ? "Working..."
+                        : isPinned
+                          ? "Unpin from Quick Access"
+                          : "Pin to Quick Access"}
+                    </Button>
+                  </>
+                )}
               </div>
 
               {/* Danger Zone */}

@@ -99,6 +99,15 @@ async function dispatch(
     if (method === "PUT") return invoke("update_settings", { data: body });
   }
 
+  if (a === "shortcut-dir") {
+    if (b === "sync") return invoke("sync_shortcut_dir");
+    if (b === "pick") return invoke("pick_shortcut_dir");
+    if (b === "open") return invoke("open_shortcut_dir");
+    if (b === "pin") return invoke("pin_shortcut_dir");
+    if (b === "unpin") return invoke("unpin_shortcut_dir");
+    if (b === "pinned") return invoke("shortcut_dir_pinned");
+  }
+
   throw new Error(`Unhandled API route: ${method} /${seg.join("/")}`);
 }
 
