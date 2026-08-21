@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   display_mode TEXT NOT NULL DEFAULT 'list',
   list_columns INTEGER NOT NULL DEFAULT 4,
-  sort_option TEXT NOT NULL DEFAULT 'accessCount',
-  sort_order TEXT NOT NULL DEFAULT 'desc'
+  sort_option TEXT NOT NULL DEFAULT 'title',
+  sort_order TEXT NOT NULL DEFAULT 'asc'
 );
 
 CREATE TABLE IF NOT EXISTS tag_rules (
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS tag_rules (
 );
 
 INSERT INTO user_settings (id, display_mode, list_columns, sort_option, sort_order)
-VALUES (1, 'list', 4, 'accessCount', 'desc')
+VALUES (1, 'list', 4, 'title', 'asc')
 ON CONFLICT(id) DO NOTHING;
 "#;
 

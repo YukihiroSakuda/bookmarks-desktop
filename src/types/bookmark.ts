@@ -33,7 +33,7 @@ export interface BookmarkUI {
   shortcut?: string;
 }
 
-export type SortOption = 'accessCount' | 'title' | 'createdAt' | 'custom';
+export type SortOption = 'recency' | 'title' | 'createdAt' | 'custom';
 export type SortOrder = 'asc' | 'desc';
 
 export const convertToUI = (bookmark: Bookmark & { tags: string[] }): BookmarkUI => ({

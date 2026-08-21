@@ -185,9 +185,17 @@ export function useBookmarks(options: UseBookmarksOptions) {
         await openUrl(bookmark.url);
       }
 
+      // The timestamp matters as much as the count: the recency sort decays a
+      // bookmark by how long ago it was last opened, so without it one you just
+      // opened would not move until the next full fetch.
       const newCount = (bookmark.accessCount || 0) + 1;
+      const openedAt = new Date().toISOString();
       setBookmarks((prev) =>
-        prev.map((b) => b.id === bookmark.id ? { ...b, accessCount: newCount } : b)
+        prev.map((b) =>
+          b.id === bookmark.id
+            ? { ...b, accessCount: newCount, lastAccessedAt: openedAt }
+            : b
+        )
       );
       await fetch(`/api/bookmarks/${bookmark.id}/access`, { method: "PATCH" });
     } catch (error) {

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { BookmarkUI, SortOption, SortOrder, convertToUI } from "@/types/bookmark";
 import { tauriFetch as fetch } from "@/lib/tauriFetch";
+import { createBookmarkComparator } from "@/lib/bookmarkScore";
 
 function bookmarkMatchesFilter(
   bookmark: BookmarkUI,
@@ -106,24 +107,7 @@ export function useBookmarkOrdering(options: UseBookmarkOrderingOptions) {
 
         const sortedVisible = visibleSlots
           .map((index) => bookmarks[index])
-          .sort((a, b) => {
-            let comparison = 0;
-            switch (currentSort) {
-              case "accessCount":
-                comparison = (a.accessCount || 0) - (b.accessCount || 0);
-                break;
-              case "title":
-                comparison = a.title.localeCompare(b.title);
-                break;
-              case "createdAt":
-                comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-                break;
-              case "custom":
-                comparison = (a.customOrder || 0) - (b.customOrder || 0);
-                break;
-            }
-            return currentSort === "custom" ? comparison : currentOrder === "asc" ? comparison : -comparison;
-          });
+          .sort(createBookmarkComparator(currentSort, currentOrder));
 
         const newBookmarks = [...bookmarks];
         visibleSlots.forEach((slot, i) => {
