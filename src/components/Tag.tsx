@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { memo, useCallback } from "react";
-import { getTagColorStyles } from "@/lib/tagColors";
+import { getTagColorStyles, TAG_CHIP_OFF } from "@/lib/tagColors";
 
 interface TagProps {
   tag: string;
@@ -39,7 +39,7 @@ const Tag = memo(function Tag({
       className={`px-1.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 ${
         onClick && !isDisabled ? "cursor-pointer" : ""
       } ${
-        isSelected ? colorStyles.chipSelected : colorStyles.chip
+        isSelected ? colorStyles.chipOn : TAG_CHIP_OFF
       } ${
         isDisabled ? "opacity-50 cursor-not-allowed" : ""
       }`}

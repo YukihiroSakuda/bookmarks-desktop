@@ -44,12 +44,10 @@
 - アイコンは Lucide React から統一的に使用
 
 ### タグ
-- 非選択: `bg-secondary` + テキスト色
-- 選択: `bg-blue-500 text-white`
 - 形状: `rounded-full px-2 py-1 text-xs font-medium`
+- **OFF（非選択）: 無色**（`TAG_CHIP_OFF` = `bg-secondary border border-input`）。色に関わらず全タグ共通。フィルタバー全体が色で埋まると、実際に ON にしている数個が埋もれるため、色は ON の印としてだけ使う
+- **ON（選択・カード上のタグ）: その色の淡いトーン**（`bg-<color>-500/10` + `text-<color>-700 dark:text-<color>-300` + `border-<color>-500/30`）。塗りつぶしにはしない。カードにタグが3つ並んでもタイトルが読める静けさを保つ
 - **タグの色（唯一の多色の例外）**: タグは Tag Manager で色を変更できる。パレットと具体的なクラスは `src/lib/tagColors.ts` に集約する（8色固定、任意の色は不可）
-  - 非選択: `bg-<color>-500/10` + `text-<color>-700 dark:text-<color>-300` + `border-<color>-500/30`（淡いトーンでモノクロ基調を壊さない）
-  - 選択: 塗り + その色の上で読める文字色（濃い色は白、明るい色は `text-neutral-900`）
   - **既定色は青**（`DEFAULT_TAG_COLOR`）。色を設定していないタグ・機能導入前からのタグはすべて青として描画する。「色なし」という状態は UI 上には存在しない
 
 ### モーダル / ポップオーバー
