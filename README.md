@@ -115,7 +115,7 @@ Only files this app created are ever deleted — they are tracked in a manifest 
 ### UI / UX
 
 - Modern design based on shadcn/ui (monochrome + a single blue accent)
-- **Japanese / English** for Settings and Help, switched in **Settings → Appearance → Language** and remembered. The rest of the app stays in English — these are the two screens that are mostly prose
+- **English / Japanese** for Settings and Help, switched in **Settings → Appearance → Language** and remembered. English by default; the rest of the app is English-only — these are the two screens that are mostly prose
 - Dark mode support (Light / System / Dark)
 - Responsive layout
 - Site icons fetched once from the site itself when a bookmark is added, then stored locally (no third-party icon service, and no network access to display them). Icons for imported bookmarks can be collected from **Settings → Data → Fetch missing icons**

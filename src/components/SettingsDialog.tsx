@@ -63,8 +63,8 @@ type Theme = "light" | "system" | "dark";
 
 /** Labelled in their own language, the way a language picker always is. */
 const LANG_CHOICES: { key: UiLang; label: string }[] = [
-  { key: "ja", label: "日本語" },
   { key: "en", label: "English" },
+  { key: "ja", label: "日本語" },
 ];
 
 const THEMES: { key: Theme; icon: typeof Sun }[] = [

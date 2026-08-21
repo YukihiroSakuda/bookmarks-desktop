@@ -10,7 +10,7 @@ export type UiLang = "ja" | "en";
 
 const STORAGE_KEY = "ui_lang";
 
-export const DEFAULT_UI_LANG: UiLang = "ja";
+export const DEFAULT_UI_LANG: UiLang = "en";
 
 /** Read the stored choice. Call from an effect — localStorage is client-only. */
 export function readStoredUiLang(): UiLang {
