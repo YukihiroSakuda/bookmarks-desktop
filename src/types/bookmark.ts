@@ -45,6 +45,7 @@ export const convertToUI = (bookmark: Bookmark & { tags: string[] }): BookmarkUI
   isPinned: bookmark.is_pinned,
   createdAt: bookmark.created_at,
   updatedAt: bookmark.updated_at,
+  favicon: bookmark.favicon || undefined,
   accessCount: bookmark.access_count,
   lastAccessedAt: bookmark.last_accessed_at || undefined,
   customOrder: bookmark.custom_order,
