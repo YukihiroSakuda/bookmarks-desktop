@@ -271,7 +271,7 @@ export function BookmarkHeader({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <HelpDialog lang={uiLang} />
+            <HelpDialog lang={uiLang} onLangChange={handleUiLangChange} />
             <SettingsDialog
               lang={uiLang}
               onLangChange={handleUiLangChange}

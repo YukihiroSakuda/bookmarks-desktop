@@ -14,6 +14,12 @@ import { Button } from "./Button";
 import { cn } from "@/lib/utils";
 import { UiLang } from "@/lib/uiLanguage";
 
+/** Abbreviated here: the header is tight, and Settings carries the full names. */
+const LANG_TABS: { key: UiLang; label: string }[] = [
+  { key: "en", label: "EN" },
+  { key: "ja", label: "JA" },
+];
+
 // ---- helpers ----------------------------------------------------------------
 
 function H3({ children }: { children: React.ReactNode }) {
@@ -814,7 +820,13 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
 
 // ---- main component ---------------------------------------------------------
 
-export function HelpDialog({ lang }: { lang: UiLang }) {
+export function HelpDialog({
+  lang,
+  onLangChange,
+}: {
+  lang: UiLang;
+  onLangChange: (lang: UiLang) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState("basic");
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -901,6 +913,26 @@ export function HelpDialog({ lang }: { lang: UiLang }) {
               <DialogTitle className="text-xl">
                 Book<span className="text-blue-500">marks</span>{lang === "ja" ? " — 使い方ガイド" : " — Help"}
               </DialogTitle>
+              {/* Settings owns this preference, but the longest prose in the
+                  app is right here: opening the guide in a language you cannot
+                  read should not mean closing it, going to Settings and coming
+                  back. Both controls write the same stored value. */}
+              <div className="flex items-center border rounded-md overflow-hidden text-sm mr-6">
+                {LANG_TABS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => onLangChange(key)}
+                    className={cn(
+                      "px-3 py-1 transition-colors",
+                      lang === key
+                        ? "bg-blue-500 text-white"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </DialogHeader>
 
