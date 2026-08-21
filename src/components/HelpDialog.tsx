@@ -12,7 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
-import { UI_LANG_TABS, UiLang } from "@/lib/uiLanguage";
+import { UiLang } from "@/lib/uiLanguage";
+import { LanguageToggle } from "./LanguageToggle";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -907,26 +908,7 @@ export function HelpDialog({
               <DialogTitle className="text-xl">
                 Book<span className="text-blue-500">marks</span>{lang === "ja" ? " — 使い方ガイド" : " — Help"}
               </DialogTitle>
-              {/* Settings owns this preference, but the longest prose in the
-                  app is right here: opening the guide in a language you cannot
-                  read should not mean closing it, going to Settings and coming
-                  back. Both controls write the same stored value. */}
-              <div className="flex items-center border rounded-md overflow-hidden text-sm mr-6">
-                {UI_LANG_TABS.map(({ key, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => onLangChange(key)}
-                    className={cn(
-                      "px-3 py-1 transition-colors",
-                      lang === key
-                        ? "bg-blue-500 text-white"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <LanguageToggle lang={lang} onChange={onLangChange} className="mr-6" />
             </div>
           </DialogHeader>
 

@@ -15,7 +15,8 @@ import { toast } from "sonner";
 import { tauriFetch } from "@/lib/tauriFetch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { UI_LANG_TABS, UiLang } from "@/lib/uiLanguage";
+import { UiLang } from "@/lib/uiLanguage";
+import { LanguageToggle } from "./LanguageToggle";
 import { SETTINGS_TEXT } from "@/lib/settingsText";
 
 const DELETE_CONFIRM_PHRASE = "delete all";
@@ -573,7 +574,10 @@ export function SettingsDialog({
                 <span className="text-blue-500">#</span>
                 {t.title}
               </h2>
-              <Button onClick={() => setOpen(false)} variant="ghost" size="sm" icon={X} />
+              <div className="flex items-center gap-2">
+                <LanguageToggle lang={lang} onChange={onLangChange} />
+                <Button onClick={() => setOpen(false)} variant="ghost" size="sm" icon={X} />
+              </div>
             </div>
 
             {/* Eight sections stacked in one narrow column had made the dialog
@@ -606,28 +610,6 @@ export function SettingsDialog({
                 <section ref={registerRef("appearance")}>
                   <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">{t.sections.appearance}</h2>
                   <div className="flex flex-col gap-5">
-                    {/* Language — drawn exactly as the help dialog draws it, since
-                        it is the same control on the same value. */}
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-medium">{t.language}</label>
-                      <div className="flex items-center border rounded-md overflow-hidden text-sm">
-                        {UI_LANG_TABS.map(({ key, label }) => (
-                          <button
-                            key={key}
-                            onClick={() => onLangChange(key)}
-                            className={cn(
-                              "px-3 py-1 transition-colors",
-                              lang === key
-                                ? "bg-blue-500 text-white"
-                                : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                            )}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
                     {/* Display Columns */}
                     <div>
                       <label className="block text-sm font-medium mb-2">{t.displayColumns}</label>
