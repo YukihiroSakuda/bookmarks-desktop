@@ -14,6 +14,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 No test framework is configured.
 
+**Do not run `npm run build` while `npm run tauri:dev` is running.** Both write to
+`.next`, so a build overwrites the chunks the live dev server is serving and the
+app window dies with `Cannot find module './<n>.js'`. Touching a source file does
+not recover it — the dev server has to be stopped, `.next` deleted, and
+`tauri:dev` restarted. Use `npx tsc --noEmit` and `npm run lint` to check a change
+while the app is up, and save `npm run build` for when it is not.
+
+The app cannot be opened in a plain browser, even though `next dev` serves it on
+1420: `useExplorerImport` calls `getCurrentWebviewWindow()` at mount, which throws
+outside the Tauri webview and takes the whole page down. Driving the real window
+programmatically needs `tauri-driver` + `msedgedriver`, which is not set up here.
+
 ## Tech Stack
 
 Next.js 15 (App Router, **frontend only — no API routes**) / React 19 / TypeScript / Tailwind CSS 3 / shadcn/ui (New York style, neutral base) / Tauri 2 (Rust backend, SQLite via rusqlite) / dnd-kit / Lucide React
