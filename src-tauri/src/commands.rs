@@ -1,9 +1,12 @@
 use crate::db::AppState;
+use crate::favicon;
+use crate::page_title;
 use chrono::{SecondsFormat, Utc};
 use rusqlite::OptionalExtension;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use uuid::Uuid;
@@ -43,6 +46,12 @@ pub struct OrderItem {
 }
 
 #[derive(Deserialize)]
+pub struct TagOrderItem {
+    id: String,
+    sort_order: i64,
+}
+
+#[derive(Deserialize)]
 pub struct SettingsInput {
     list_columns: i64,
     sort_option: String,
@@ -59,6 +68,14 @@ pub struct TagRuleInput {
 }
 
 // ---------- Helpers ----------
+
+/// Order value for a newly created tag: the end of the manual order used by
+/// Tag Manager. Tags created before the manual order existed keep 0 and are
+/// listed first, alphabetically.
+fn next_tag_order(conn: &rusqlite::Connection) -> Result<i64, String> {
+    conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tags", [], |r| r.get(0))
+        .map_err(|e| e.to_string())
+}
 
 /// Insert tags (creating them if missing) and link them to a bookmark.
 fn link_tags(
@@ -82,8 +99,9 @@ fn link_tags(
             None => {
                 let id = new_id();
                 conn.execute(
-                    "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-                    rusqlite::params![id, tag_name, ts, ts],
+                    "INSERT INTO tags (id, name, sort_order, created_at, updated_at) \
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![id, tag_name, next_tag_order(conn)?, ts, ts],
                 )
                 .map_err(|e| e.to_string())?;
                 id
@@ -398,15 +416,20 @@ pub fn is_shortcut_available(app: AppHandle, accelerator: String) -> Result<bool
 pub fn list_tags(state: State<AppState>) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT id, name, created_at, updated_at FROM tags ORDER BY name ASC")
+        .prepare(
+            "SELECT id, name, color, sort_order, created_at, updated_at \
+             FROM tags ORDER BY sort_order ASC, name ASC",
+        )
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], |r| {
             Ok(json!({
                 "id": r.get::<_, String>(0)?,
                 "name": r.get::<_, String>(1)?,
-                "created_at": r.get::<_, String>(2)?,
-                "updated_at": r.get::<_, String>(3)?,
+                "color": r.get::<_, Option<String>>(2)?,
+                "sort_order": r.get::<_, i64>(3)?,
+                "created_at": r.get::<_, String>(4)?,
+                "updated_at": r.get::<_, String>(5)?,
             }))
         })
         .map_err(|e| e.to_string())?;
@@ -418,7 +441,11 @@ pub fn list_tags(state: State<AppState>) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn create_tag(name: String, state: State<AppState>) -> Result<Value, String> {
+pub fn create_tag(
+    name: String,
+    color: Option<String>,
+    state: State<AppState>,
+) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
     let ts = now();
 
@@ -432,8 +459,9 @@ pub fn create_tag(name: String, state: State<AppState>) -> Result<Value, String>
 
     let id = new_id();
     conn.execute(
-        "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-        rusqlite::params![id, name, ts, ts],
+        "INSERT INTO tags (id, name, color, sort_order, created_at, updated_at) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        rusqlite::params![id, name, color, next_tag_order(&conn)?, ts, ts],
     )
     .map_err(|e| e.to_string())?;
     Ok(json!({ "id": id }))
@@ -448,6 +476,44 @@ pub fn update_tag(id: String, name: String, state: State<AppState>) -> Result<Va
         rusqlite::params![name, ts, id],
     )
     .map_err(|e| e.to_string())?;
+    Ok(json!({ "ok": true }))
+}
+
+/// Set (or clear, with `None`) the accent color of a tag. The value is a
+/// palette key such as `"red"`, resolved to concrete classes in the frontend,
+/// so the stored data stays theme-independent.
+#[tauri::command]
+pub fn set_tag_color(
+    id: String,
+    color: Option<String>,
+    state: State<AppState>,
+) -> Result<Value, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let ts = now();
+    conn.execute(
+        "UPDATE tags SET color = ?1, updated_at = ?2 WHERE id = ?3",
+        rusqlite::params![color, ts, id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(json!({ "ok": true }))
+}
+
+/// Persist the manual tag order produced by drag and drop in Tag Manager.
+/// Every tag is renumbered from 1, so tags created before this feature (which
+/// default to 0 and therefore fall back to alphabetical order) become explicit
+/// on the first reorder.
+#[tauri::command]
+pub fn reorder_tags(order: Vec<TagOrderItem>, state: State<AppState>) -> Result<Value, String> {
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    for item in &order {
+        tx.execute(
+            "UPDATE tags SET sort_order = ?1 WHERE id = ?2",
+            rusqlite::params![item.sort_order, item.id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(json!({ "ok": true }))
 }
 
@@ -601,6 +667,10 @@ struct ImportBookmark {
 struct ImportTag {
     id: String,
     name: String,
+    #[serde(default)]
+    color: Option<String>,
+    #[serde(default)]
+    sort_order: i64,
     created_at: String,
     updated_at: String,
 }
@@ -697,15 +767,20 @@ fn build_export_snapshot(conn: &rusqlite::Connection) -> Result<Value, String> {
     let mut tags = Vec::new();
     {
         let mut stmt = conn
-            .prepare("SELECT id, name, created_at, updated_at FROM tags ORDER BY name ASC")
+            .prepare(
+                "SELECT id, name, color, sort_order, created_at, updated_at \
+                 FROM tags ORDER BY sort_order ASC, name ASC",
+            )
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map([], |r| {
                 Ok(json!({
                     "id": r.get::<_, String>(0)?,
                     "name": r.get::<_, String>(1)?,
-                    "created_at": r.get::<_, String>(2)?,
-                    "updated_at": r.get::<_, String>(3)?,
+                    "color": r.get::<_, Option<String>>(2)?,
+                    "sort_order": r.get::<_, i64>(3)?,
+                    "created_at": r.get::<_, String>(4)?,
+                    "updated_at": r.get::<_, String>(5)?,
                 }))
             })
             .map_err(|e| e.to_string())?;
@@ -778,8 +853,9 @@ fn apply_import(conn: &mut rusqlite::Connection, data: &ImportData) -> Result<Va
 
     for t in &data.tags {
         tx.execute(
-            "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![t.id, t.name, t.created_at, t.updated_at],
+            "INSERT INTO tags (id, name, color, sort_order, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            rusqlite::params![t.id, t.name, t.color, t.sort_order, t.created_at, t.updated_at],
         )
         .map_err(|e| e.to_string())?;
     }
@@ -927,76 +1003,147 @@ pub async fn import_data(app: AppHandle, state: State<'_, AppState>) -> Result<V
 
 // ---------- Title fetch ----------
 
-fn fetch_title_blocking(url: &str) -> String {
-    let parsed = match reqwest::Url::parse(url) {
-        Ok(p) => p,
-        Err(_) => return String::new(),
-    };
-    let fallback = parsed
-        .host_str()
-        .map(|h| h.trim_start_matches("www.").to_string())
-        .unwrap_or_default();
-
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(8))
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return fallback,
-    };
-
-    let resp = match client
-        .get(url)
-        .header(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        )
-        .send()
-    {
-        Ok(r) => r,
-        Err(_) => return fallback,
-    };
-
-    let content_type = resp
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    if !content_type.contains("text/html") && !content_type.contains("xhtml") {
-        return fallback;
-    }
-
-    let body = match resp.text() {
-        Ok(b) => b,
-        Err(_) => return fallback,
-    };
-
-    extract_title(&body).unwrap_or(fallback)
-}
-
-/// Extract and normalize the contents of the first <title> element.
-fn extract_title(html: &str) -> Option<String> {
-    let lower = html.to_lowercase();
-    let start_tag = lower.find("<title")?;
-    let gt = lower[start_tag..].find('>')? + start_tag + 1;
-    let end = lower[gt..].find("</title>")? + gt;
-    let raw = &html[gt..end];
-    let normalized = raw.split_whitespace().collect::<Vec<_>>().join(" ");
-    let trimmed = normalized.trim().to_string();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed)
-    }
-}
-
 #[tauri::command]
 pub async fn fetch_title(url: String) -> Result<Value, String> {
-    let title = tauri::async_runtime::spawn_blocking(move || fetch_title_blocking(&url))
+    let title = tauri::async_runtime::spawn_blocking(move || page_title::fetch_title_blocking(&url))
         .await
         .map_err(|e| e.to_string())?;
     Ok(json!({ "title": title }))
+}
+
+// ---------- Favicon fetch ----------
+
+/// How many sites the bulk fetch talks to at once. Small enough to stay polite
+/// on a shared/corporate network, large enough that dead links (which each cost
+/// a full timeout) do not dominate the run.
+const FAVICON_BATCH: usize = 6;
+
+/// Fetch the icon for one bookmark and store it. Called right after a bookmark
+/// is added, so the icon is already local by the time the card is drawn again.
+#[tauri::command]
+pub async fn fetch_favicon(
+    id: String,
+    url: String,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let icon = tauri::async_runtime::spawn_blocking(move || favicon::fetch_favicon_blocking(&url))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(icon) = &icon {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE bookmarks SET favicon = ?1 WHERE id = ?2",
+            rusqlite::params![icon, id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok(json!({ "favicon": icon }))
+}
+
+/// Web bookmarks still without an icon — the count behind the Settings button.
+#[tauri::command]
+pub fn count_missing_favicons(state: State<AppState>) -> Result<Value, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM bookmarks \
+             WHERE kind = 'url' AND (favicon IS NULL OR favicon = '')",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(json!({ "count": count }))
+}
+
+/// Fetch every missing icon, a batch at a time, emitting `favicon-progress`
+/// after each batch. This is the only place the app contacts many sites at
+/// once, so it never runs on its own — the user presses the button — and it
+/// stops at the next batch boundary when `cancel_fetch_favicons` is called.
+#[tauri::command]
+pub async fn fetch_missing_favicons(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let targets: Vec<(String, String)> = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, url FROM bookmarks \
+                 WHERE kind = 'url' AND (favicon IS NULL OR favicon = '') \
+                 ORDER BY custom_order ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(|e| e.to_string())?);
+        }
+        out
+    };
+
+    let total = targets.len();
+    state.favicon_cancel.store(false, Ordering::Relaxed);
+    let _ = app.emit("favicon-progress", json!({ "done": 0, "total": total, "updated": 0 }));
+
+    let mut done = 0usize;
+    let mut updated = 0usize;
+    let mut cancelled = false;
+
+    for batch in targets.chunks(FAVICON_BATCH) {
+        if state.favicon_cancel.load(Ordering::Relaxed) {
+            cancelled = true;
+            break;
+        }
+
+        // Spawn the whole batch first so the requests overlap, then collect.
+        let handles: Vec<_> = batch
+            .iter()
+            .map(|(id, url)| {
+                let id = id.clone();
+                let url = url.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    (id, favicon::fetch_favicon_blocking(&url))
+                })
+            })
+            .collect();
+
+        let mut fetched = Vec::new();
+        for handle in handles {
+            done += 1;
+            if let Ok((id, Some(icon))) = handle.await {
+                fetched.push((id, icon));
+            }
+        }
+
+        if !fetched.is_empty() {
+            let conn = state.conn.lock().map_err(|e| e.to_string())?;
+            for (id, icon) in &fetched {
+                conn.execute(
+                    "UPDATE bookmarks SET favicon = ?1 WHERE id = ?2",
+                    rusqlite::params![icon, id],
+                )
+                .map_err(|e| e.to_string())?;
+            }
+            updated += fetched.len();
+        }
+
+        let _ = app.emit(
+            "favicon-progress",
+            json!({ "done": done, "total": total, "updated": updated }),
+        );
+    }
+
+    Ok(json!({ "total": total, "updated": updated, "cancelled": cancelled }))
+}
+
+#[tauri::command]
+pub fn cancel_fetch_favicons(state: State<AppState>) -> Result<Value, String> {
+    state.favicon_cancel.store(true, Ordering::Relaxed);
+    Ok(json!({ "ok": true }))
 }
 
 // ---------- Extension download ----------

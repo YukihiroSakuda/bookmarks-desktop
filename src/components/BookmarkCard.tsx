@@ -17,33 +17,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-function getFaviconUrl(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    const h = urlObj.hostname;
-    if (!h || h === 'localhost' || !h.includes('.') ||
-        h.includes('.kmt.') || h.includes('.komatsu.') ||
-        h.includes('.local') || h.includes('.internal') ||
-        h.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-      return '';
-    }
-    return `https://www.google.com/s2/favicons?domain=${h}&sz=32`;
-  } catch {
-    return '';
-  }
-}
-
-const FaviconDisplay = memo(function FaviconDisplay({ url }: { url: string }) {
+/**
+ * The icon stored on the bookmark (a `data:` URI fetched once when it was
+ * added), or the generic globe. Nothing here touches the network.
+ */
+const FaviconDisplay = memo(function FaviconDisplay({ favicon }: { favicon?: string }) {
   const [showFallback, setShowFallback] = useState(false);
   const handleError = useCallback(() => setShowFallback(true), []);
 
-  if (!url || showFallback) {
+  if (!favicon || showFallback) {
     return <Globe className="size-4 text-foreground" />;
   }
 
   return (
     <Image
-      src={url}
+      src={favicon}
       alt=""
       width={16}
       height={16}
@@ -61,6 +49,8 @@ interface BookmarkCardProps {
   onDelete: (id: string) => void | Promise<void>;
   onClick: () => void;
   isOrderingMode?: boolean;
+  /** Tag name -> color palette key, for the colors set in Tag Manager. */
+  tagColors?: Record<string, string>;
 }
 
 const BookmarkCard = memo(function BookmarkCard({
@@ -70,6 +60,7 @@ const BookmarkCard = memo(function BookmarkCard({
   onDelete,
   onClick,
   isOrderingMode = false,
+  tagColors,
 }: BookmarkCardProps) {
   const [showTags, setShowTags] = useState(true);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -90,12 +81,11 @@ const BookmarkCard = memo(function BookmarkCard({
   }, []);
 
   const sortedTags = useMemo(() =>
-    bookmark.tags.sort((a, b) => a.localeCompare(b)),
+    [...bookmark.tags].sort((a, b) => a.localeCompare(b)),
     [bookmark.tags]
   );
 
   const isPath = bookmark.kind === 'path';
-  const faviconUrl = useMemo(() => getFaviconUrl(bookmark.url), [bookmark.url]);
   const domain = useMemo(() => {
     if (isPath) return bookmark.url;
     try {
@@ -122,7 +112,7 @@ const BookmarkCard = memo(function BookmarkCard({
         {isPath ? (
           <Folder className="size-4 text-foreground shrink-0" />
         ) : (
-          <FaviconDisplay url={faviconUrl} />
+          <FaviconDisplay favicon={bookmark.favicon} />
         )}
         {isOrderingMode ? (
           <div className="flex-1 min-w-0 overflow-hidden">
@@ -155,7 +145,7 @@ const BookmarkCard = memo(function BookmarkCard({
         {showTags && sortedTags.length > 0 && (
           <div className="flex items-center flex-wrap gap-1.5 overflow-hidden max-w-[50%] md:max-w-[60%]">
             {sortedTags.slice(0, Math.min(sortedTags.length, 3)).map((tag) => (
-              <Tag key={tag} tag={tag} isSelected={true} />
+              <Tag key={tag} tag={tag} color={tagColors?.[tag]} isSelected={true} />
             ))}
             {sortedTags.length > 3 && (
               <span className="text-xs text-muted-foreground">+{sortedTags.length - 3}</span>

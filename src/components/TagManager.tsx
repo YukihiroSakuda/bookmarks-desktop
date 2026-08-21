@@ -1,7 +1,26 @@
-import { SquarePen, Trash2, X } from "lucide-react";
+import { GripVertical, SquarePen, Trash2, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "./Button";
 import { Input } from "./Input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TAG_COLORS, TAG_COLOR_STYLES, resolveTagColor } from "@/lib/tagColors";
 import { Tag } from "@/types/tag";
 
 interface TagManagerProps {
@@ -10,6 +29,86 @@ interface TagManagerProps {
   onUpdateTagName: (oldName: string, newName: string) => Promise<void>;
   onAddTag: (tag: string) => Promise<void>;
   onRemoveTag: (tag: string) => Promise<void>;
+  onSetTagColor: (tagId: string, color: string) => Promise<void>;
+  onReorderTags: (orderedIds: string[]) => Promise<void>;
+}
+
+interface TagColorPickerProps {
+  color: string | null;
+  onSelect: (color: string) => void;
+}
+
+function TagColorPicker({ color, onSelect }: TagColorPickerProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  // Tags that never got a color (including every tag from before the feature)
+  // show as the default blue, so the picker always has one swatch marked.
+  const current = resolveTagColor(color);
+
+  const handleSelect = (next: string) => {
+    setIsOpen(false);
+    onSelect(next);
+  };
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title="Tag color"
+          className={`size-4 rounded-full border shrink-0 ${TAG_COLOR_STYLES[current].swatch}`}
+        />
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-2" align="start">
+        <div className="flex items-center gap-1.5">
+          {TAG_COLORS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              title={name}
+              onClick={() => handleSelect(name)}
+              className={`size-5 rounded-full ${TAG_COLOR_STYLES[name].swatch} ${
+                current === name ? "ring-1 ring-ring ring-offset-1 ring-offset-popover" : ""
+              }`}
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface SortableTagRowProps {
+  tag: Tag;
+  children: React.ReactNode;
+}
+
+function SortableTagRow({ tag, children }: SortableTagRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tag.id,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+      className="flex items-center gap-2 p-2 bg-secondary rounded-lg border"
+    >
+      <button
+        type="button"
+        title="Drag to reorder"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground shrink-0"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="size-4" />
+      </button>
+      {children}
+    </div>
+  );
 }
 
 export function TagManager({
@@ -18,6 +117,8 @@ export function TagManager({
   onUpdateTagName,
   onAddTag,
   onRemoveTag,
+  onSetTagColor,
+  onReorderTags,
 }: TagManagerProps) {
   const [tags, setTags] = useState<Tag[]>([]);
   const [newTag, setNewTag] = useState("");
@@ -26,6 +127,11 @@ export function TagManager({
   const [isAdding, setIsAdding] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [removingTagId, setRemovingTagId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   useEffect(() => {
     setTags([...availableTags]);
@@ -112,6 +218,38 @@ export function TagManager({
     setEditValue("");
   };
 
+  const handleSelectColor = async (tag: Tag, color: string) => {
+    // Optimistic: the chip recolors immediately, the reload from `availableTags`
+    // confirms it a moment later.
+    setTags((prev) => prev.map((t) => (t.id === tag.id ? { ...t, color } : t)));
+    try {
+      await onSetTagColor(tag.id, color);
+    } catch (error) {
+      console.error("Error updating tag color:", error);
+      setTags([...availableTags]);
+      alert("タグの色の変更中にエラーが発生しました。");
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = tags.findIndex((t) => t.id === active.id);
+    const newIndex = tags.findIndex((t) => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(tags, oldIndex, newIndex);
+    setTags(reordered);
+    try {
+      await onReorderTags(reordered.map((t) => t.id));
+    } catch (error) {
+      console.error("Error reordering tags:", error);
+      setTags([...availableTags]);
+      alert("タグの並び替え中にエラーが発生しました。");
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-popover rounded-2xl border shadow-lg p-6 w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -151,58 +289,70 @@ export function TagManager({
                   No tags yet. Add your first tag above!
                 </p>
               )}
-              {tags
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((tag) => (
-                  <div
-                    key={tag.id}
-                    className="flex items-center justify-between p-2 bg-secondary rounded-lg border"
-                  >
-                    {editingTag && editingTag.id === tag.id ? (
-                      <div className="flex-1 flex gap-2">
-                        <Input
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          className="flex-1"
-                        />
-                        <Button
-                          onClick={handleSaveEdit}
-                          variant="secondary"
-                          size="sm"
-                          isLoading={isSavingEdit}
-                        >
-                          OK
-                        </Button>
-                        <Button
-                          onClick={handleCancelEdit}
-                          variant="secondary"
-                          size="sm"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="text-sm">{tag.name}</span>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            onClick={() => handleStartEdit(tag)}
-                            variant="ghost"
-                            size="sm"
-                            icon={SquarePen}
-                          />
-                          <Button
-                            onClick={() => handleRemoveTag(tag)}
-                            variant="ghost"
-                            size="sm"
-                            icon={Trash2}
-                            isLoading={removingTagId === tag.id}
-                          />
-                        </div>
-                      </>
-                    )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={tags.map((t) => t.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="flex flex-col gap-2">
+                    {tags.map((tag) => (
+                      <SortableTagRow key={tag.id} tag={tag}>
+                        {editingTag && editingTag.id === tag.id ? (
+                          <div className="flex-1 flex gap-2">
+                            <Input
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              className="flex-1"
+                            />
+                            <Button
+                              onClick={handleSaveEdit}
+                              variant="secondary"
+                              size="sm"
+                              isLoading={isSavingEdit}
+                            >
+                              OK
+                            </Button>
+                            <Button
+                              onClick={handleCancelEdit}
+                              variant="secondary"
+                              size="sm"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        ) : (
+                          <>
+                            <TagColorPicker
+                              color={tag.color ?? null}
+                              onSelect={(color) => handleSelectColor(tag, color)}
+                            />
+                            <span className="text-sm flex-1 truncate">{tag.name}</span>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                onClick={() => handleStartEdit(tag)}
+                                variant="ghost"
+                                size="sm"
+                                icon={SquarePen}
+                              />
+                              <Button
+                                onClick={() => handleRemoveTag(tag)}
+                                variant="ghost"
+                                size="sm"
+                                icon={Trash2}
+                                isLoading={removingTagId === tag.id}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </SortableTagRow>
+                    ))}
                   </div>
-                ))}
+                </SortableContext>
+              </DndContext>
             </div>
           </div>
         </div>

@@ -51,6 +51,13 @@ fn new_id() -> String {
     Uuid::new_v4().to_string()
 }
 
+/// Order value for a newly created tag: the end of the manual order used by
+/// Tag Manager in the app.
+fn next_tag_order(conn: &Connection) -> Result<i64, String> {
+    conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tags", [], |r| r.get(0))
+        .map_err(|e| e.to_string())
+}
+
 fn link_tags(conn: &Connection, bookmark_id: &str, tags: &[String], ts: &str) -> Result<(), String> {
     for tag_name in tags {
         let existing: Option<String> = conn
@@ -62,8 +69,9 @@ fn link_tags(conn: &Connection, bookmark_id: &str, tags: &[String], ts: &str) ->
             None => {
                 let id = new_id();
                 conn.execute(
-                    "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-                    rusqlite::params![id, tag_name, ts, ts],
+                    "INSERT INTO tags (id, name, sort_order, created_at, updated_at) \
+                     VALUES (?1, ?2, ?3, ?4, ?5)",
+                    rusqlite::params![id, tag_name, next_tag_order(conn)?, ts, ts],
                 )
                 .map_err(|e| e.to_string())?;
                 id
@@ -187,6 +195,9 @@ async fn post_bookmark(
 ) -> ApiResult {
     let db = state.db;
     let app = state.app.clone();
+    let icon_app = app.clone();
+    let icon_target = (body.kind.as_deref().unwrap_or("url") == "url" && body.favicon.is_none())
+        .then(|| body.url.clone());
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let mut conn = db.lock().map_err(|e| e.to_string())?;
         let ts = now();
@@ -224,6 +235,24 @@ async fn post_bookmark(
 
         link_tags(&tx, &id, &body.tags, &ts)?;
         tx.commit().map_err(|e| e.to_string())?;
+
+        // Fetch the icon after the bookmark is saved, so the extension's popup
+        // closes immediately instead of waiting on the site.
+        if let Some(url) = icon_target {
+            let db = Arc::clone(&db);
+            let app = icon_app;
+            let id = id.clone();
+            std::thread::spawn(move || {
+                let Some(icon) = crate::favicon::fetch_favicon_blocking(&url) else { return };
+                let Ok(conn) = db.lock() else { return };
+                let _ = conn.execute(
+                    "UPDATE bookmarks SET favicon = ?1 WHERE id = ?2",
+                    rusqlite::params![icon, id],
+                );
+                let _ = app.emit("bookmark-added", ());
+            });
+        }
+
         Ok(json!({ "id": id }))
     })
     .await
@@ -238,15 +267,20 @@ async fn get_tags(State(state): State<ServerState>) -> ApiResult {
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let conn = db.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
-            .prepare("SELECT id, name, created_at, updated_at FROM tags ORDER BY name ASC")
+            .prepare(
+                "SELECT id, name, color, sort_order, created_at, updated_at \
+                 FROM tags ORDER BY sort_order ASC, name ASC",
+            )
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map([], |r| {
                 Ok(json!({
                     "id": r.get::<_, String>(0)?,
                     "name": r.get::<_, String>(1)?,
-                    "created_at": r.get::<_, String>(2)?,
-                    "updated_at": r.get::<_, String>(3)?,
+                    "color": r.get::<_, Option<String>>(2)?,
+                    "sort_order": r.get::<_, i64>(3)?,
+                    "created_at": r.get::<_, String>(4)?,
+                    "updated_at": r.get::<_, String>(5)?,
                 }))
             })
             .map_err(|e| e.to_string())?;
@@ -282,8 +316,9 @@ async fn post_tag(State(state): State<ServerState>, Json(body): Json<CreateTagBo
 
         let id = new_id();
         conn.execute(
-            "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4)",
-            rusqlite::params![id, body.name, ts, ts],
+            "INSERT INTO tags (id, name, sort_order, created_at, updated_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![id, body.name, next_tag_order(&conn)?, ts, ts],
         )
         .map_err(|e| e.to_string())?;
         Ok(json!({ "id": id }))
@@ -329,68 +364,9 @@ async fn get_tag_rules(State(state): State<ServerState>) -> ApiResult {
     .map(Json)
 }
 
-fn fetch_title_blocking(url: &str) -> String {
-    let parsed = match reqwest::Url::parse(url) {
-        Ok(p) => p,
-        Err(_) => return String::new(),
-    };
-    let fallback = parsed
-        .host_str()
-        .map(|h| h.trim_start_matches("www.").to_string())
-        .unwrap_or_default();
-
-    let client = match reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(8))
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return fallback,
-    };
-
-    let resp = match client
-        .get(url)
-        .header(
-            "User-Agent",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        )
-        .send()
-    {
-        Ok(r) => r,
-        Err(_) => return fallback,
-    };
-
-    let content_type = resp
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or("")
-        .to_string();
-    if !content_type.contains("text/html") && !content_type.contains("xhtml") {
-        return fallback;
-    }
-
-    let body = match resp.text() {
-        Ok(b) => b,
-        Err(_) => return fallback,
-    };
-
-    extract_title(&body).unwrap_or(fallback)
-}
-
-fn extract_title(html: &str) -> Option<String> {
-    let lower = html.to_lowercase();
-    let start_tag = lower.find("<title")?;
-    let gt = lower[start_tag..].find('>')? + start_tag + 1;
-    let end = lower[gt..].find("</title>")? + gt;
-    let raw = &html[gt..end];
-    let normalized = raw.split_whitespace().collect::<Vec<_>>().join(" ");
-    let trimmed = normalized.trim().to_string();
-    if trimmed.is_empty() { None } else { Some(trimmed) }
-}
-
 async fn get_title(Query(q): Query<TitleQuery>) -> ApiResult {
     let url = q.url;
-    let title = tokio::task::spawn_blocking(move || fetch_title_blocking(&url))
+    let title = tokio::task::spawn_blocking(move || crate::page_title::fetch_title_blocking(&url))
         .await
         .unwrap_or_default();
     Ok(Json(json!({ "title": title })))

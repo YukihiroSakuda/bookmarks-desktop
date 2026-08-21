@@ -45,12 +45,19 @@ async function dispatch(
       const id = b;
       if (c === "pin") return invoke("toggle_pin", { id });
       if (c === "access") return invoke("increment_access", { id });
+      if (c === "favicon") return invoke("fetch_favicon", { id, url: body?.url });
       if (c === undefined) {
         if (method === "PUT" || method === "PATCH")
           return invoke("update_bookmark", { id, data: body });
         if (method === "DELETE") return invoke("delete_bookmark", { id });
       }
     }
+  }
+
+  if (a === "favicons") {
+    if (b === "missing") return invoke("count_missing_favicons");
+    if (b === "fetch-missing") return invoke("fetch_missing_favicons");
+    if (b === "cancel") return invoke("cancel_fetch_favicons");
   }
 
   if (a === "folder-search") {
@@ -60,12 +67,19 @@ async function dispatch(
   if (a === "tags") {
     if (b === undefined) {
       if (method === "GET") return invoke("list_tags");
-      if (method === "POST") return invoke("create_tag", { name: body?.name });
+      if (method === "POST")
+        return invoke("create_tag", { name: body?.name, color: body?.color ?? null });
       if (method === "DELETE") return invoke("delete_all_tags");
+    } else if (b === "reorder") {
+      return invoke("reorder_tags", { order: body?.order });
     } else {
       const id = b;
-      if (method === "PUT" || method === "PATCH")
+      if (method === "PUT" || method === "PATCH") {
+        // A tag update carries either a rename or a color change, never both.
+        if (body && "color" in body)
+          return invoke("set_tag_color", { id, color: body.color ?? null });
         return invoke("update_tag", { id, name: body?.name });
+      }
       if (method === "DELETE") return invoke("delete_tag", { id });
     }
   }

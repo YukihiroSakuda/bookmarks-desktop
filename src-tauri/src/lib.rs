@@ -1,5 +1,7 @@
 mod commands;
 mod db;
+mod favicon;
+mod page_title;
 mod folder_search;
 mod server;
 #[cfg(target_os = "windows")]
@@ -70,6 +72,7 @@ pub fn run() {
                 conn: conn.clone(),
                 pending_path: Mutex::new(pending),
                 summon_shortcut: Mutex::new(None),
+                favicon_cancel: std::sync::atomic::AtomicBool::new(false),
             });
 
             // Register the global "summon" hotkey from settings so it is live
@@ -180,6 +183,8 @@ pub fn run() {
             commands::list_tags,
             commands::create_tag,
             commands::update_tag,
+            commands::set_tag_color,
+            commands::reorder_tags,
             commands::delete_tag,
             commands::delete_all_tags,
             commands::list_tag_rules,
@@ -190,6 +195,10 @@ pub fn run() {
             commands::export_data,
             commands::import_data,
             commands::fetch_title,
+            commands::fetch_favicon,
+            commands::count_missing_favicons,
+            commands::fetch_missing_favicons,
+            commands::cancel_fetch_favicons,
             commands::open_path,
             commands::get_pending_path,
             commands::register_context_menu,

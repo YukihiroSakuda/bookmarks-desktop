@@ -6,7 +6,7 @@ Bookmarks & Tags ("the app") is a bookmark manager developed by Yukihiro Sakuda.
 
 ## Summary
 
-The app does not collect, transmit, or store any of your data outside your own device. There are no accounts, no analytics, no ads, and no third-party data sharing.
+The app does not collect, transmit, or store any of your data outside your own device. There are no accounts, no analytics, no ads, and no third-party data sharing. The only outbound connections the app makes are to the websites you bookmark, as described in "Connecting to the sites you bookmark" below.
 
 ## What data the app handles
 
@@ -21,6 +21,15 @@ The app stores the following information, all of which you enter yourself:
 All data is stored locally in a SQLite database (`bookmarks.db`) on your own computer. It is never uploaded to any server operated by the developer or any third party.
 
 The database file is located at `%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db`, and display preferences such as theme and search history are kept in the app's local WebView2 profile under `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\`. The Microsoft Store version and the installer version use these same folders.
+
+## Connecting to the sites you bookmark
+
+When you add a bookmark for a web page, the app requests that page from the site itself — the same request your browser makes when you open it — in order to read its title and its icon (favicon). The icon is then stored in the local database, so displaying your bookmarks afterwards requires no network access at all.
+
+- Only the site you are bookmarking is contacted. No third-party service is involved, and no icon or lookup service ever receives the list of sites you bookmark
+- Bookmarks for local files and folders never cause any network request
+- Importing bookmarks (HTML or JSON backup) does not contact any site. If you want icons for imported bookmarks, **Settings → Data → Fetch missing icons** requests them from those sites, and only when you press it
+- Nothing about these requests is reported back to the developer
 
 ## Local network use
 

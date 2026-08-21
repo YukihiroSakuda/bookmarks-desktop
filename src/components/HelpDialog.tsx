@@ -165,6 +165,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>右上の <Strong>Add Bookmark</Strong> ボタンで追加フォームを開きます。</P>
         <Ul>
           <Li>URLを入力するとページタイトルが自動取得されます。</Li>
+          <Li>SharePoint や Box のようにログインが必要なページでは、アプリからはサインイン画面しか見えないため、「サインイン」ではなく <Strong>URL から組み立てた名前</Strong>（ファイル名とサイト名など）が入ります。そのまま編集できます。</Li>
           <Li>タグとメモは任意で設定できます。</Li>
           <Li>保存後、タグルールが設定されている場合は自動的にタグが付与されます。</Li>
         </Ul>
@@ -239,6 +240,8 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>タグの追加</Strong> — 新しいタグ名を入力して Enter または追加ボタンで作成。</Li>
           <Li><Strong>タグのリネーム</Strong> — タグ名をクリックして編集。変更は全ブックマークに即時反映されます。</Li>
           <Li><Strong>タグの削除</Strong> — タグを削除すると、そのタグが付いた全ブックマークから除去されます。タグに紐づくタグルールも合わせて削除するか選択できます。</Li>
+          <Li><Strong>タグの色</Strong> — タグ名の左の丸をクリックして8色から選択。フィルターバーでもカードの上でもその色で表示されます。既定は青です。</Li>
+          <Li><Strong>タグの並び替え</Strong> — 左のグリップをドラッグして並び順を変更。フィルターバーのタグもこの順序で並びます（並び替えていないタグは名前順）。</Li>
         </Ul>
       </section>
 
@@ -317,6 +320,9 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Backup</Strong> — ブックマーク（タグ・メモ・ショートカット・並び順を含む）、タグ、タグルール、設定をまとめてJSONファイルに書き出します。</Li>
           <Li><Strong>Restore</Strong> — JSONバックアップファイルを選択して取り込みます。<Strong>現在のすべてのデータが置き換えられます</Strong>（この操作は取り消せません）。実行前に確認ダイアログが表示されます。</Li>
         </Ul>
+        <H3>サイトアイコン（ファビコン）</H3>
+        <P>Web ブックマークを追加すると、そのサイト自身からアイコンを1回だけ取得してアプリ内に保存します。以降の表示は完全にローカルなので、オフラインでもアイコンが出ます。アイコン取得のために外部のサービスを経由することはありません。</P>
+        <P>インポートしたブックマークではアイコンを自動取得しません（大量のサイトへ一斉に接続しないため）。<Strong>Fetch missing icons</Strong> ボタンを押した時だけまとめて取得します。実行中は進捗が表示され、<Strong>Stop</Strong> で中断できます。</P>
         <H3>データの保存先</H3>
         <P>データはすべてこのPC内に保存され、外部サーバーには一切送信されません。</P>
         <Ul>
@@ -459,6 +465,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>Click the <Strong>Add Bookmark</Strong> button in the top-right to open the form.</P>
         <Ul>
           <Li>The page title is automatically fetched when you enter a URL.</Li>
+          <Li>For pages behind a login (SharePoint, Box, an intranet portal) the app only ever sees the sign-in page, so it fills in a <Strong>name built from the URL</Strong> — usually the file name and the site — instead of &ldquo;Sign in&rdquo;. Edit it as you like.</Li>
           <Li>Tags and memos are optional.</Li>
           <Li>After saving, tag rules are automatically applied if configured.</Li>
         </Ul>
@@ -533,6 +540,8 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Add tag</Strong> — type a name and press Enter or click the Add button.</Li>
           <Li><Strong>Rename tag</Strong> — click the edit icon to rename. Changes apply to all bookmarks immediately.</Li>
           <Li><Strong>Delete tag</Strong> — removes the tag from all associated bookmarks. You can choose to also delete any related tag rules.</Li>
+          <Li><Strong>Tag color</Strong> — click the circle next to a tag to pick one of eight colors. The tag keeps that color in the filter bar and on bookmark cards. Blue is the default.</Li>
+          <Li><Strong>Reorder tags</Strong> — drag the grip on the left to change the order. The filter bar follows the same order (tags never reordered stay alphabetical).</Li>
         </Ul>
       </section>
 
@@ -611,6 +620,9 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Backup</Strong> — writes bookmarks (including tags, memos, shortcuts, and order), tags, tag rules, and settings to a single JSON file.</Li>
           <Li><Strong>Restore</Strong> — pick a JSON backup file to import. This <Strong>replaces all current data</Strong> (cannot be undone). A confirmation dialog is shown first.</Li>
         </Ul>
+        <H3>Site Icons (Favicons)</H3>
+        <P>When you add a web bookmark, its icon is fetched once from the site itself and stored in the app. Everything after that is local, so icons show up even offline. No third-party icon service is involved.</P>
+        <P>Imported bookmarks do not fetch icons automatically, to avoid contacting hundreds of sites at once. Press <Strong>Fetch missing icons</Strong> to collect them; progress is shown while it runs and <Strong>Stop</Strong> cancels it.</P>
         <H3>Where Your Data Is Stored</H3>
         <P>Everything is kept on this PC and is never sent to an external server.</P>
         <Ul>

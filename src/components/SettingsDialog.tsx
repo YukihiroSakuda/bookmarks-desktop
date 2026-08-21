@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert, Keyboard, FileJson, RotateCcw, ExternalLink } from "lucide-react";
+import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert, Keyboard, FileJson, RotateCcw, ExternalLink, Image as ImageIcon } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -11,6 +12,7 @@ import { exportBookmarksToHtml, downloadHtml } from "@/utils/export";
 import { BookmarkUI } from "@/types/bookmark";
 import { eventToAccelerator, formatAcceleratorForDisplay } from "@/lib/shortcut";
 import { toast } from "sonner";
+import { tauriFetch } from "@/lib/tauriFetch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const DELETE_CONFIRM_PHRASE = "delete all";
@@ -135,9 +137,60 @@ export function SettingsDialog({
     applyTheme(selected);
   }
 
+  // "Fetch missing icons" is the only action that contacts many sites at once,
+  // so it is always user-initiated, shows its progress, and can be stopped.
+  const [missingIcons, setMissingIcons] = useState(0);
+  const [iconProgress, setIconProgress] = useState<{ done: number; total: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    tauriFetch("/api/favicons/missing")
+      .then((res) => (res.ok ? res.json() : { count: 0 }))
+      .then((data) => {
+        if (!cancelled) setMissingIcons(data?.count ?? 0);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open, iconProgress]);
+
+  useEffect(() => {
+    const promise = listen<{ done: number; total: number }>("favicon-progress", (event) => {
+      setIconProgress({ done: event.payload.done, total: event.payload.total });
+    });
+    return () => {
+      promise.then((unlisten) => unlisten());
+    };
+  }, []);
+
+  async function handleFetchIconsClick() {
+    setIconProgress({ done: 0, total: missingIcons });
+    try {
+      const res = await tauriFetch("/api/favicons/fetch-missing", { method: "POST" });
+      const data = res.ok ? await res.json() : null;
+      if (data?.cancelled) {
+        toast.success(`Stopped. ${data.updated} icons fetched.`);
+      } else {
+        toast.success(`${data?.updated ?? 0} of ${data?.total ?? 0} icons fetched.`);
+      }
+      onRestoreComplete();
+    } catch (error) {
+      console.error("Error fetching icons:", error);
+      toast.error("Failed to fetch icons.");
+    } finally {
+      setIconProgress(null);
+    }
+  }
+
+  function handleCancelFetchIcons() {
+    tauriFetch("/api/favicons/cancel", { method: "POST" }).catch(() => {});
+  }
+
   const { isImporting, handleFileUpload } = useImportBookmarks({
     onImportComplete: (count) => {
-      toast.success(`${count} bookmarks imported successfully!`);
+      toast.success(`${count} bookmarks imported. Use "Fetch missing icons" for their icons.`);
       setOpen(false);
     },
     onBookmarksUpdate,
@@ -472,6 +525,32 @@ export function SettingsDialog({
                 </div>
                 <p className="text-xs text-muted-foreground mt-1.5">
                   JSON backup includes everything (tags, memos, shortcuts, settings). Restore replaces all current data.
+                </p>
+
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    icon={ImageIcon}
+                    onClick={handleFetchIconsClick}
+                    disabled={iconProgress !== null || missingIcons === 0}
+                    className="flex-1"
+                  >
+                    {iconProgress
+                      ? `Fetching ${iconProgress.done} / ${iconProgress.total}...`
+                      : missingIcons === 0
+                        ? "All icons fetched"
+                        : `Fetch missing icons (${missingIcons})`}
+                  </Button>
+                  {iconProgress && (
+                    <Button variant="secondary" size="sm" onClick={handleCancelFetchIcons}>
+                      Stop
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  Site icons are fetched from each site once and stored locally. Bookmarks added
+                  one at a time get theirs right away; imported ones are collected here.
                 </p>
               </div>
 

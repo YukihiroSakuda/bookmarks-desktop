@@ -13,7 +13,7 @@ Data is stored in SQLite, so it works fully offline with no external server requ
 
 ## Where data is stored
 
-All data lives on your own PC — nothing is sent to an external server. The database is a single SQLite file (`bookmarks.db`):
+All data lives on your own PC — nothing is sent to a server operated by the developer or any third party. The only outbound requests are to the sites you bookmark, to read their title and icon when you add them (see [Privacy Policy](docs/privacy-policy.md)). The database is a single SQLite file (`bookmarks.db`):
 
 | What | Location |
 | ---- | -------- |
@@ -35,7 +35,7 @@ Because the data folders sit outside the package, **uninstalling either build le
 ### Bookmark management
 
 - Add, edit, and delete bookmarks
-- Automatic title fetching when entering a URL
+- Automatic title fetching when entering a URL. Pages behind a login (SharePoint, Box, intranet portals) answer with a sign-in page, so the title is built from the URL instead — usually the file name and the site it lives in
 - Pin bookmarks (shown fixed at the top; pinning/unpinning auto-scrolls to the card's new position)
 - Automatic access-count tracking
 - Custom reordering via drag and drop
@@ -65,6 +65,8 @@ Because the data folders sit outside the package, **uninstalling either build le
 
 - Add, edit, and delete tags
 - Filter by tag (single or multiple selection)
+- Per-tag color (8 presets, blue by default) — applied in the filter bar and on bookmark cards
+- Manual tag order via drag and drop in Tag Manager (the filter bar follows it)
 - Tag rules: automatic tagging based on URL/title patterns
 
 ### Search
@@ -96,7 +98,7 @@ Because the data folders sit outside the package, **uninstalling either build le
 - Modern design based on shadcn/ui (monochrome + a single blue accent)
 - Dark mode support (Light / System / Dark)
 - Responsive layout
-- Automatic favicon fetching and display
+- Site icons fetched once from the site itself when a bookmark is added, then stored locally (no third-party icon service, and no network access to display them). Icons for imported bookmarks can be collected from **Settings → Data → Fetch missing icons**
 
 ## Tech stack
 

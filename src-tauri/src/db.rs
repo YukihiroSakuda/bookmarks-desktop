@@ -1,4 +1,5 @@
 use rusqlite::{Connection, OptionalExtension};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
@@ -12,6 +13,8 @@ pub struct AppState {
     /// the DB on each key press. Per-bookmark shortcuts are handled in-app
     /// (only while the window is focused), not via global registration.
     pub summon_shortcut: Mutex<Option<String>>,
+    /// Set while the user cancels the bulk "fetch missing icons" run.
+    pub favicon_cancel: AtomicBool,
 }
 
 const SCHEMA: &str = r#"
@@ -92,6 +95,8 @@ pub fn init_db(app: &AppHandle) -> Result<Connection, String> {
         "TEXT NOT NULL DEFAULT 'CmdOrCtrl+Alt+Space'",
     )?;
     add_column_if_missing(&conn, "user_settings", "api_token", "TEXT")?;
+    add_column_if_missing(&conn, "tags", "color", "TEXT")?;
+    add_column_if_missing(&conn, "tags", "sort_order", "INTEGER NOT NULL DEFAULT 0")?;
     ensure_api_token(&conn)?;
 
     Ok(conn)

@@ -8,6 +8,30 @@ import { tauriFetch as fetch } from "@/lib/tauriFetch";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
+/**
+ * Ask the backend to fetch the site's favicon and store it on the bookmark,
+ * then refresh so the card picks it up. Failures are silent — the card just
+ * keeps the generic globe.
+ */
+async function fetchFaviconInBackground(
+  id: string,
+  url: string,
+  refresh: () => Promise<void>
+): Promise<void> {
+  try {
+    const res = await fetch(`/api/bookmarks/${id}/favicon`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) return;
+    const { favicon } = await res.json();
+    if (favicon) await refresh();
+  } catch {
+    /* offline, unreachable site, no icon — nothing to do */
+  }
+}
+
 interface UseBookmarksOptions {
   tagRules: TagRule[];
   availableTags: Tag[];
@@ -64,10 +88,15 @@ export function useBookmarks(options: UseBookmarksOptions) {
             tagRules,
           });
         } else {
-          await createBookmark(bookmarkData, {
+          const created = await createBookmark(bookmarkData, {
             availableTags,
             tagRules,
           });
+          // Fetch the site's icon once, in the background: the card appears
+          // right away and gains its icon a moment later.
+          if ((bookmarkData.kind ?? "url") === "url") {
+            void fetchFaviconInBackground(created.id, bookmarkData.url, refreshAfterMutation);
+          }
         }
 
         setIsModalOpen(false);

@@ -25,6 +25,11 @@ export function readAppCache(): AppCache | null {
 export function writeAppCache(data: AppCache): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    // Favicons are data URIs of a few KB each — thousands of them would blow
+    // the localStorage quota and take the whole cache down with them. They are
+    // read from SQLite on the first real load instead.
+    // (`undefined` values are dropped by JSON.stringify)
+    const bookmarks = data.bookmarks.map((bookmark) => ({ ...bookmark, favicon: undefined }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, bookmarks }));
   } catch {}
 }

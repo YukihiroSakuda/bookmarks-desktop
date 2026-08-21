@@ -31,6 +31,8 @@ interface BookmarkListProps {
   onBookmarkClick: (bookmark: BookmarkUI) => void;
   isOrderingMode?: boolean;
   onReorder?: (oldIndex: number, newIndex: number, isPinned: boolean) => void;
+  /** Tag name -> color palette key, for the colors set in Tag Manager. */
+  tagColors?: Record<string, string>;
 }
 
 interface SortableBookmarkCardProps {
@@ -40,6 +42,7 @@ interface SortableBookmarkCardProps {
   onDelete: (id: string) => void;
   onClick: () => void;
   isOrderingMode: boolean;
+  tagColors?: Record<string, string>;
 }
 
 function SortableBookmarkCard({
@@ -49,6 +52,7 @@ function SortableBookmarkCard({
   onDelete,
   onClick,
   isOrderingMode,
+  tagColors,
 }: SortableBookmarkCardProps) {
   const {
     attributes,
@@ -74,6 +78,7 @@ function SortableBookmarkCard({
         onDelete={onDelete}
         onClick={isOrderingMode ? () => {} : onClick}
         isOrderingMode={isOrderingMode}
+        tagColors={tagColors}
       />
     </div>
   );
@@ -89,6 +94,7 @@ export function BookmarkList({
   onBookmarkClick,
   isOrderingMode = false,
   onReorder,
+  tagColors,
 }: BookmarkListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -139,6 +145,7 @@ export function BookmarkList({
           onDelete={onDelete}
           onClick={() => onBookmarkClick(bookmark)}
           isOrderingMode={isOrderingMode}
+          tagColors={tagColors}
         />
       ));
     }
@@ -152,6 +159,7 @@ export function BookmarkList({
         onDelete={onDelete}
         onClick={() => onBookmarkClick(bookmark)}
         isOrderingMode={isOrderingMode}
+        tagColors={tagColors}
       />
     ));
   };

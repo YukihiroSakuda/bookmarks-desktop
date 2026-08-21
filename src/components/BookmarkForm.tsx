@@ -363,6 +363,7 @@ export function BookmarkForm({
                   <TagComponent
                     key={tag.id}
                     tag={tag.name}
+                    color={tag.color}
                     isSelected={tags.includes(tag.name)}
                     onClick={() => handleTagClick(tag.name)}
                   />

@@ -92,8 +92,10 @@ name = "app"
 version = "0.1.10"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "chrono",
  "log",
+ "percent-encoding",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
