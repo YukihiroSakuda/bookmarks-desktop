@@ -53,6 +53,9 @@
 ### モーダル / ポップオーバー
 - 背景オーバーレイ: `bg-background/50 backdrop-blur-sm`
 - パネル: `bg-popover rounded-2xl border shadow-lg p-6`
+- **項目が多いダイアログは左ナビ + 本文の2ペイン**にする（`HelpDialog` / `SettingsDialog`）。ナビは `w-44`〜`w-56 shrink-0 border-r`、選択中は `text-blue-500 font-medium bg-blue-500/5`。縦に積み続けて下端が画面外に出るくらいなら、カテゴリで割る
+  - ナビは**スクロール移動**で、全セクションは常に描画しておく（`HelpDialog` / `SettingsDialog` とも同じ）。クリックで飛べて、かつ読み流しても全部に行き当たる。クリックしないと存在しない、という作りにはしない（「トグルによる情報の出し入れ」を避けるのと同じ理由）
+  - 本文側に見出し（`border-l-2 border-blue-500 pl-2.5`）とセクション間の `border-t` を置き、スクロール中でも今どのカテゴリにいるか分かるようにする。ダイアログ自体は `h-[80vh]` 程度で高さを固定し、中身だけがスクロールする
 
 ### 入力フィールド
 - `rounded-md border border-input bg-transparent`

@@ -39,6 +39,7 @@ Because the data folders sit outside the package, **uninstalling either build le
 - Automatic title fetching when entering a URL. Pages behind a login (SharePoint, Box, intranet portals) answer with a sign-in page, so the title is built from the URL instead — usually the file name and the site it lives in
 - Pin bookmarks (shown fixed at the top; pinning/unpinning auto-scrolls to the card's new position)
 - Automatic access-count tracking
+- Sort by **Name**, **Most Used**, **Date Added**, or **My Order** (your own drag-and-drop arrangement). "Most Used" is the access count divided down by how long ago you last opened the bookmark (halving every 30 days), so five visits this week outrank two hundred from six months ago and the list keeps pace with what you are actually working on. Nothing extra is stored — it is computed from the count and timestamp already kept. A new install starts on Name, ascending
 - Custom reordering via drag and drop
 - List view (1–4 columns)
 - Bulk delete all bookmarks and tags (with a `delete all` confirmation prompt)
@@ -114,6 +115,7 @@ Only files this app created are ever deleted — they are tracked in a manifest 
 ### UI / UX
 
 - Modern design based on shadcn/ui (monochrome + a single blue accent)
+- **Japanese / English** for Settings and Help, switched in **Settings → Appearance → Language** and remembered. The rest of the app stays in English — these are the two screens that are mostly prose
 - Dark mode support (Light / System / Dark)
 - Responsive layout
 - Site icons fetched once from the site itself when a bookmark is added, then stored locally (no third-party icon service, and no network access to display them). Icons for imported bookmarks can be collected from **Settings → Data → Fetch missing icons**
