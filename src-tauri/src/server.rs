@@ -195,6 +195,9 @@ async fn post_bookmark(
 ) -> ApiResult {
     let db = state.db;
     let app = state.app.clone();
+    let icon_app = app.clone();
+    let icon_target = (body.kind.as_deref().unwrap_or("url") == "url" && body.favicon.is_none())
+        .then(|| body.url.clone());
     tokio::task::spawn_blocking(move || -> Result<Value, String> {
         let mut conn = db.lock().map_err(|e| e.to_string())?;
         let ts = now();
@@ -232,6 +235,24 @@ async fn post_bookmark(
 
         link_tags(&tx, &id, &body.tags, &ts)?;
         tx.commit().map_err(|e| e.to_string())?;
+
+        // Fetch the icon after the bookmark is saved, so the extension's popup
+        // closes immediately instead of waiting on the site.
+        if let Some(url) = icon_target {
+            let db = Arc::clone(&db);
+            let app = icon_app;
+            let id = id.clone();
+            std::thread::spawn(move || {
+                let Some(icon) = crate::favicon::fetch_favicon_blocking(&url) else { return };
+                let Ok(conn) = db.lock() else { return };
+                let _ = conn.execute(
+                    "UPDATE bookmarks SET favicon = ?1 WHERE id = ?2",
+                    rusqlite::params![icon, id],
+                );
+                let _ = app.emit("bookmark-added", ());
+            });
+        }
+
         Ok(json!({ "id": id }))
     })
     .await

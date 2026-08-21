@@ -319,6 +319,9 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Backup</Strong> — ブックマーク（タグ・メモ・ショートカット・並び順を含む）、タグ、タグルール、設定をまとめてJSONファイルに書き出します。</Li>
           <Li><Strong>Restore</Strong> — JSONバックアップファイルを選択して取り込みます。<Strong>現在のすべてのデータが置き換えられます</Strong>（この操作は取り消せません）。実行前に確認ダイアログが表示されます。</Li>
         </Ul>
+        <H3>サイトアイコン（ファビコン）</H3>
+        <P>Web ブックマークを追加すると、そのサイト自身からアイコンを1回だけ取得してアプリ内に保存します。以降の表示は完全にローカルなので、オフラインでもアイコンが出ます。アイコン取得のために外部のサービスを経由することはありません。</P>
+        <P>インポートしたブックマークではアイコンを自動取得しません（大量のサイトへ一斉に接続しないため）。<Strong>Fetch missing icons</Strong> ボタンを押した時だけまとめて取得します。実行中は進捗が表示され、<Strong>Stop</Strong> で中断できます。</P>
         <H3>データの保存先</H3>
         <P>データはすべてこのPC内に保存され、外部サーバーには一切送信されません。</P>
         <Ul>
@@ -615,6 +618,9 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li><Strong>Backup</Strong> — writes bookmarks (including tags, memos, shortcuts, and order), tags, tag rules, and settings to a single JSON file.</Li>
           <Li><Strong>Restore</Strong> — pick a JSON backup file to import. This <Strong>replaces all current data</Strong> (cannot be undone). A confirmation dialog is shown first.</Li>
         </Ul>
+        <H3>Site Icons (Favicons)</H3>
+        <P>When you add a web bookmark, its icon is fetched once from the site itself and stored in the app. Everything after that is local, so icons show up even offline. No third-party icon service is involved.</P>
+        <P>Imported bookmarks do not fetch icons automatically, to avoid contacting hundreds of sites at once. Press <Strong>Fetch missing icons</Strong> to collect them; progress is shown while it runs and <Strong>Stop</Strong> cancels it.</P>
         <H3>Where Your Data Is Stored</H3>
         <P>Everything is kept on this PC and is never sent to an external server.</P>
         <Ul>

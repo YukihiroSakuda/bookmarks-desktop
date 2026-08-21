@@ -1,9 +1,11 @@
 use crate::db::AppState;
+use crate::favicon;
 use chrono::{SecondsFormat, Utc};
 use rusqlite::OptionalExtension;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
 use uuid::Uuid;
@@ -1070,6 +1072,141 @@ pub async fn fetch_title(url: String) -> Result<Value, String> {
         .await
         .map_err(|e| e.to_string())?;
     Ok(json!({ "title": title }))
+}
+
+// ---------- Favicon fetch ----------
+
+/// How many sites the bulk fetch talks to at once. Small enough to stay polite
+/// on a shared/corporate network, large enough that dead links (which each cost
+/// a full timeout) do not dominate the run.
+const FAVICON_BATCH: usize = 6;
+
+/// Fetch the icon for one bookmark and store it. Called right after a bookmark
+/// is added, so the icon is already local by the time the card is drawn again.
+#[tauri::command]
+pub async fn fetch_favicon(
+    id: String,
+    url: String,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let icon = tauri::async_runtime::spawn_blocking(move || favicon::fetch_favicon_blocking(&url))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(icon) = &icon {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        conn.execute(
+            "UPDATE bookmarks SET favicon = ?1 WHERE id = ?2",
+            rusqlite::params![icon, id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+
+    Ok(json!({ "favicon": icon }))
+}
+
+/// Web bookmarks still without an icon — the count behind the Settings button.
+#[tauri::command]
+pub fn count_missing_favicons(state: State<AppState>) -> Result<Value, String> {
+    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM bookmarks \
+             WHERE kind = 'url' AND (favicon IS NULL OR favicon = '')",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(json!({ "count": count }))
+}
+
+/// Fetch every missing icon, a batch at a time, emitting `favicon-progress`
+/// after each batch. This is the only place the app contacts many sites at
+/// once, so it never runs on its own — the user presses the button — and it
+/// stops at the next batch boundary when `cancel_fetch_favicons` is called.
+#[tauri::command]
+pub async fn fetch_missing_favicons(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    let targets: Vec<(String, String)> = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, url FROM bookmarks \
+                 WHERE kind = 'url' AND (favicon IS NULL OR favicon = '') \
+                 ORDER BY custom_order ASC",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row.map_err(|e| e.to_string())?);
+        }
+        out
+    };
+
+    let total = targets.len();
+    state.favicon_cancel.store(false, Ordering::Relaxed);
+    let _ = app.emit("favicon-progress", json!({ "done": 0, "total": total, "updated": 0 }));
+
+    let mut done = 0usize;
+    let mut updated = 0usize;
+    let mut cancelled = false;
+
+    for batch in targets.chunks(FAVICON_BATCH) {
+        if state.favicon_cancel.load(Ordering::Relaxed) {
+            cancelled = true;
+            break;
+        }
+
+        // Spawn the whole batch first so the requests overlap, then collect.
+        let handles: Vec<_> = batch
+            .iter()
+            .map(|(id, url)| {
+                let id = id.clone();
+                let url = url.clone();
+                tauri::async_runtime::spawn_blocking(move || {
+                    (id, favicon::fetch_favicon_blocking(&url))
+                })
+            })
+            .collect();
+
+        let mut fetched = Vec::new();
+        for handle in handles {
+            done += 1;
+            if let Ok((id, Some(icon))) = handle.await {
+                fetched.push((id, icon));
+            }
+        }
+
+        if !fetched.is_empty() {
+            let conn = state.conn.lock().map_err(|e| e.to_string())?;
+            for (id, icon) in &fetched {
+                conn.execute(
+                    "UPDATE bookmarks SET favicon = ?1 WHERE id = ?2",
+                    rusqlite::params![icon, id],
+                )
+                .map_err(|e| e.to_string())?;
+            }
+            updated += fetched.len();
+        }
+
+        let _ = app.emit(
+            "favicon-progress",
+            json!({ "done": done, "total": total, "updated": updated }),
+        );
+    }
+
+    Ok(json!({ "total": total, "updated": updated, "cancelled": cancelled }))
+}
+
+#[tauri::command]
+pub fn cancel_fetch_favicons(state: State<AppState>) -> Result<Value, String> {
+    state.favicon_cancel.store(true, Ordering::Relaxed);
+    Ok(json!({ "ok": true }))
 }
 
 // ---------- Extension download ----------

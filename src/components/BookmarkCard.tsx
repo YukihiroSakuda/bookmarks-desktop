@@ -17,33 +17,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 
-function getFaviconUrl(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    const h = urlObj.hostname;
-    if (!h || h === 'localhost' || !h.includes('.') ||
-        h.includes('.kmt.') || h.includes('.komatsu.') ||
-        h.includes('.local') || h.includes('.internal') ||
-        h.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-      return '';
-    }
-    return `https://www.google.com/s2/favicons?domain=${h}&sz=32`;
-  } catch {
-    return '';
-  }
-}
-
-const FaviconDisplay = memo(function FaviconDisplay({ url }: { url: string }) {
+/**
+ * The icon stored on the bookmark (a `data:` URI fetched once when it was
+ * added), or the generic globe. Nothing here touches the network.
+ */
+const FaviconDisplay = memo(function FaviconDisplay({ favicon }: { favicon?: string }) {
   const [showFallback, setShowFallback] = useState(false);
   const handleError = useCallback(() => setShowFallback(true), []);
 
-  if (!url || showFallback) {
+  if (!favicon || showFallback) {
     return <Globe className="size-4 text-foreground" />;
   }
 
   return (
     <Image
-      src={url}
+      src={favicon}
       alt=""
       width={16}
       height={16}
@@ -98,7 +86,6 @@ const BookmarkCard = memo(function BookmarkCard({
   );
 
   const isPath = bookmark.kind === 'path';
-  const faviconUrl = useMemo(() => getFaviconUrl(bookmark.url), [bookmark.url]);
   const domain = useMemo(() => {
     if (isPath) return bookmark.url;
     try {
@@ -125,7 +112,7 @@ const BookmarkCard = memo(function BookmarkCard({
         {isPath ? (
           <Folder className="size-4 text-foreground shrink-0" />
         ) : (
-          <FaviconDisplay url={faviconUrl} />
+          <FaviconDisplay favicon={bookmark.favicon} />
         )}
         {isOrderingMode ? (
           <div className="flex-1 min-w-0 overflow-hidden">

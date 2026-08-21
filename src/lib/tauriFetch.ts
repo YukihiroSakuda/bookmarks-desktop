@@ -45,12 +45,19 @@ async function dispatch(
       const id = b;
       if (c === "pin") return invoke("toggle_pin", { id });
       if (c === "access") return invoke("increment_access", { id });
+      if (c === "favicon") return invoke("fetch_favicon", { id, url: body?.url });
       if (c === undefined) {
         if (method === "PUT" || method === "PATCH")
           return invoke("update_bookmark", { id, data: body });
         if (method === "DELETE") return invoke("delete_bookmark", { id });
       }
     }
+  }
+
+  if (a === "favicons") {
+    if (b === "missing") return invoke("count_missing_favicons");
+    if (b === "fetch-missing") return invoke("fetch_missing_favicons");
+    if (b === "cancel") return invoke("cancel_fetch_favicons");
   }
 
   if (a === "folder-search") {

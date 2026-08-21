@@ -13,7 +13,7 @@ Data is stored in SQLite, so it works fully offline with no external server requ
 
 ## Where data is stored
 
-All data lives on your own PC — nothing is sent to an external server. The database is a single SQLite file (`bookmarks.db`):
+All data lives on your own PC — nothing is sent to a server operated by the developer or any third party. The only outbound requests are to the sites you bookmark, to read their title and icon when you add them (see [Privacy Policy](docs/privacy-policy.md)). The database is a single SQLite file (`bookmarks.db`):
 
 | What | Location |
 | ---- | -------- |
@@ -98,7 +98,7 @@ Because the data folders sit outside the package, **uninstalling either build le
 - Modern design based on shadcn/ui (monochrome + a single blue accent)
 - Dark mode support (Light / System / Dark)
 - Responsive layout
-- Automatic favicon fetching and display
+- Site icons fetched once from the site itself when a bookmark is added, then stored locally (no third-party icon service, and no network access to display them). Icons for imported bookmarks can be collected from **Settings → Data → Fetch missing icons**
 
 ## Tech stack
 
