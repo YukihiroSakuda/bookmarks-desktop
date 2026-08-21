@@ -1,6 +1,6 @@
 [package]
 name = "bookmarks-context-menu"
-version = "0.1.10"
+version = "0.2.0"
 description = "Explorer context menu handler (IExplorerCommand) for the Bookmarks MSIX package"
 authors = ["Yukihiro Sakuda"]
 license = "MIT"
