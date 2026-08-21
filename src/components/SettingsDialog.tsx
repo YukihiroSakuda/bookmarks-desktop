@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { tauriFetch } from "@/lib/tauriFetch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { UiLang } from "@/lib/uiLanguage";
+import { UI_LANG_TABS, UiLang } from "@/lib/uiLanguage";
 import { SETTINGS_TEXT } from "@/lib/settingsText";
 
 const DELETE_CONFIRM_PHRASE = "delete all";
@@ -60,12 +60,6 @@ function ExtLink({ href, children }: { href: string; children: React.ReactNode }
 }
 
 type Theme = "light" | "system" | "dark";
-
-/** Labelled in their own language, the way a language picker always is. */
-const LANG_CHOICES: { key: UiLang; label: string }[] = [
-  { key: "en", label: "English" },
-  { key: "ja", label: "日本語" },
-];
 
 const THEMES: { key: Theme; icon: typeof Sun }[] = [
   { key: "light", icon: Sun },
@@ -612,25 +606,26 @@ export function SettingsDialog({
                 <section ref={registerRef("appearance")}>
                   <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">{t.sections.appearance}</h2>
                   <div className="flex flex-col gap-5">
-                    {/* Language */}
-                    <div>
-                      <label className="block text-sm font-medium mb-2">{t.language}</label>
-                      <div className="flex gap-1.5">
-                        {LANG_CHOICES.map(({ key, label }) => (
+                    {/* Language — drawn exactly as the help dialog draws it, since
+                        it is the same control on the same value. */}
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">{t.language}</label>
+                      <div className="flex items-center border rounded-md overflow-hidden text-sm">
+                        {UI_LANG_TABS.map(({ key, label }) => (
                           <button
                             key={key}
                             onClick={() => onLangChange(key)}
-                            className={`flex-1 py-1.5 text-sm rounded-md border transition-colors ${
+                            className={cn(
+                              "px-3 py-1 transition-colors",
                               lang === key
-                                ? "bg-foreground text-background border-foreground"
-                                : "bg-secondary text-muted-foreground border-border hover:bg-accent"
-                            }`}
+                                ? "bg-blue-500 text-white"
+                                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                            )}
                           >
                             {label}
                           </button>
                         ))}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1.5">{t.languageNote}</p>
                     </div>
 
                     {/* Display Columns */}

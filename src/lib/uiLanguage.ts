@@ -12,6 +12,16 @@ const STORAGE_KEY = "ui_lang";
 
 export const DEFAULT_UI_LANG: UiLang = "en";
 
+/**
+ * The switch, as both dialogs draw it. Two-letter codes rather than the full
+ * names: they read the same in either language, so the control does not change
+ * width or meaning when you use it.
+ */
+export const UI_LANG_TABS: { key: UiLang; label: string }[] = [
+  { key: "en", label: "EN" },
+  { key: "ja", label: "JA" },
+];
+
 /** Read the stored choice. Call from an effect — localStorage is client-only. */
 export function readStoredUiLang(): UiLang {
   try {

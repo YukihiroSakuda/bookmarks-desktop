@@ -12,13 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
-import { UiLang } from "@/lib/uiLanguage";
-
-/** Abbreviated here: the header is tight, and Settings carries the full names. */
-const LANG_TABS: { key: UiLang; label: string }[] = [
-  { key: "en", label: "EN" },
-  { key: "ja", label: "JA" },
-];
+import { UI_LANG_TABS, UiLang } from "@/lib/uiLanguage";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -918,7 +912,7 @@ export function HelpDialog({
                   read should not mean closing it, going to Settings and coming
                   back. Both controls write the same stored value. */}
               <div className="flex items-center border rounded-md overflow-hidden text-sm mr-6">
-                {LANG_TABS.map(({ key, label }) => (
+                {UI_LANG_TABS.map(({ key, label }) => (
                   <button
                     key={key}
                     onClick={() => onLangChange(key)}
