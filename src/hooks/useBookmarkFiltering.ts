@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { BookmarkUI, SortOption, SortOrder } from "@/types/bookmark";
+import { createBookmarkComparator } from "@/lib/bookmarkScore";
 
 interface UseBookmarkFilteringOptions {
   bookmarks: BookmarkUI[];
@@ -53,30 +54,9 @@ export function useBookmarkFiltering({
     if (isOrderingMode && currentSort === "custom") {
       sorted = filtered;
     } else {
-      sorted = [...filtered].sort((a, b) => {
-        let comparison = 0;
-        switch (currentSort) {
-          case "accessCount":
-            comparison = (a.accessCount || 0) - (b.accessCount || 0);
-            break;
-          case "title":
-            comparison = a.title.localeCompare(b.title);
-            break;
-          case "createdAt":
-            comparison =
-              new Date(a.createdAt).getTime() -
-              new Date(b.createdAt).getTime();
-            break;
-          case "custom":
-            comparison = (a.customOrder || 0) - (b.customOrder || 0);
-            break;
-        }
-        return currentSort === "custom"
-          ? comparison
-          : currentOrder === "asc"
-          ? comparison
-          : -comparison;
-      });
+      sorted = [...filtered].sort(
+        createBookmarkComparator(currentSort, currentOrder)
+      );
     }
 
     return {

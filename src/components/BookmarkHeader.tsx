@@ -19,12 +19,19 @@ import { TagRule as TagRuleComponent } from "./TagRule";
 import { SortControls } from "./SortControls";
 import { SettingsDialog } from "./SettingsDialog";
 import { HelpDialog } from "./HelpDialog";
+import { DEFAULT_UI_LANG, readStoredUiLang, storeUiLang, UiLang } from "@/lib/uiLanguage";
 
 interface BookmarkHeaderProps {
   listColumns: 1 | 2 | 3 | 4;
   onListColumnsChange: (columns: 1 | 2 | 3 | 4) => void;
   summonShortcut: string;
   onSummonShortcutChange: (accelerator: string) => void;
+  shortcutDirEnabled: boolean;
+  shortcutDirPath: string;
+  onShortcutDirChange: (patch: {
+    shortcutDirEnabled?: boolean;
+    shortcutDirPath?: string;
+  }) => void;
   selectedTags: string[];
   onAddBookmark: () => void;
   searchQuery: string;
@@ -62,6 +69,9 @@ export function BookmarkHeader({
   onListColumnsChange,
   summonShortcut,
   onSummonShortcutChange,
+  shortcutDirEnabled,
+  shortcutDirPath,
+  onShortcutDirChange,
   selectedTags,
   onAddBookmark,
   searchQuery,
@@ -94,6 +104,17 @@ export function BookmarkHeader({
   isSavingOrder = false,
 }: BookmarkHeaderProps) {
   const [isTagManagerOpen, setIsTagManagerOpen] = useState(false);
+  // Held here because Help and Settings are siblings that have to agree on it:
+  // the switch lives in Settings, the longest prose is in Help. Hydrated in an
+  // effect since localStorage does not exist while the page is prerendered.
+  const [uiLang, setUiLang] = useState<UiLang>(DEFAULT_UI_LANG);
+  useEffect(() => {
+    setUiLang(readStoredUiLang());
+  }, []);
+  const handleUiLangChange = (next: UiLang) => {
+    setUiLang(next);
+    storeUiLang(next);
+  };
   const [isTagRuleOpen, setIsTagRuleOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [activeHistoryIndex, setActiveHistoryIndex] = useState(-1);
@@ -250,12 +271,17 @@ export function BookmarkHeader({
             )}
           </div>
           <div className="flex items-center gap-2">
-            <HelpDialog />
+            <HelpDialog lang={uiLang} onLangChange={handleUiLangChange} />
             <SettingsDialog
+              lang={uiLang}
+              onLangChange={handleUiLangChange}
               listColumns={listColumns}
               onListColumnsChange={onListColumnsChange}
               summonShortcut={summonShortcut}
               onSummonShortcutChange={onSummonShortcutChange}
+              shortcutDirEnabled={shortcutDirEnabled}
+              shortcutDirPath={shortcutDirPath}
+              onShortcutDirChange={onShortcutDirChange}
               bookmarks={bookmarks}
               onBookmarksUpdate={onBookmarksUpdate}
               onDeleteAll={onDeleteAll}

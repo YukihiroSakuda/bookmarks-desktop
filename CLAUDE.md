@@ -14,6 +14,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 No test framework is configured.
 
+**Do not run `npm run build` while `npm run tauri:dev` is running.** Both write to
+`.next`, so a build overwrites the chunks the live dev server is serving and the
+app window dies with `Cannot find module './<n>.js'`. Touching a source file does
+not recover it — the dev server has to be stopped, `.next` deleted, and
+`tauri:dev` restarted. Use `npx tsc --noEmit` and `npm run lint` to check a change
+while the app is up, and save `npm run build` for when it is not.
+
+The app cannot be opened in a plain browser, even though `next dev` serves it on
+1420: `useExplorerImport` calls `getCurrentWebviewWindow()` at mount, which throws
+outside the Tauri webview and takes the whole page down. Driving the real window
+programmatically needs `tauri-driver` + `msedgedriver`, which is not set up here.
+
 ## Tech Stack
 
 Next.js 15 (App Router, **frontend only — no API routes**) / React 19 / TypeScript / Tailwind CSS 3 / shadcn/ui (New York style, neutral base) / Tauri 2 (Rust backend, SQLite via rusqlite) / dnd-kit / Lucide React
@@ -40,7 +52,7 @@ In practice the app is deployed as a **Tauri desktop app** only. There are no Ne
 State is managed via custom hooks in `src/hooks/` (barrel-exported from `src/hooks/index.ts`):
 - `useUserSettings` — sort, columns (persisted via Tauri `get_settings`/`update_settings`)
 - `useBookmarks` — CRUD, fetch, pin toggle, bulk operations, memo
-- `useBookmarkFiltering` — search (title + URL + memo), tag filter, sort
+- `useBookmarkFiltering` — search (title + URL + memo), tag filter, sort (comparator from `src/lib/bookmarkScore.ts`)
 - `useBookmarkOrdering` — drag-and-drop reorder
 - `useTagManagement` — tags/rules CRUD
 - `useKeyboardShortcuts` — Escape (close/deselect). Focus-the-search-box-and-start-typing is handled separately, inline in `page.tsx`, on the first plain keystroke
@@ -64,6 +76,7 @@ Written in Rust. Key files:
 - `src/db.rs` — SQLite schema (auto-created on first run), `AppState` struct
 - `src/commands.rs` — Tauri `invoke()` handlers for all CRUD operations
 - `src/server.rs` — axum HTTP server on `127.0.0.1:37373` for the browser extension
+- `src/shortcutdir.rs` — mirrors `kind = 'path'` bookmarks into a flat Windows folder of `.lnk` shortcuts (off by default), so they can be picked from other apps' file dialogs. Deletes **only** files recorded in its own manifest (`.bookmarks-shortcuts.json`), never anything else in the directory. Also pins/unpins that folder to Quick Access via the `pintohome`/`unpinfromhome` shell verbs — note the shell's collections index on **VT_I4**, so a `VARIANT` built from `i64` silently matches nothing
 
 **SQLite schema** (5 tables): `bookmarks` (includes `kind`, `memo`), `tags`, `bookmarks_tags`, `user_settings`, `tag_rules`. Schema defined in `src-tauri/src/db.rs`.
 
@@ -103,6 +116,9 @@ Chrome/Edge Manifest V3 extension (separate Vite + React project). Build output 
 
 - `src/lib/tauriFetch.ts` — Fetch-compatible adapter routing `/api/*` calls to Tauri `invoke()` commands
 - `src/lib/appCache.ts` — localStorage cache for all app data (`bm_app_cache` key), used for instant startup render
+- `src/lib/uiLanguage.ts` — the en/ja choice for the Help and Settings dialogs (localStorage `ui_lang`, like the theme; `en` by default). Owned by `BookmarkHeader`, which renders both dialogs and passes it down. Both dialogs carry the same `LanguageToggle` (EN/JA) in their header — one control on one stored value, so a reader who opened either in the wrong language fixes it where they are. The rest of the app stays English per the conventions below
+- `src/lib/settingsText.ts` — every string the Settings dialog shows, in both languages. Sentences needing mid-sentence emphasis are split into before/strong/after keys, since the emphasis does not fall in the same place in both languages
+- `src/lib/bookmarkScore.ts` — the single sort comparator, shared by `useBookmarkFiltering` and `useBookmarkOrdering` so a sort key cannot be added to one and forgotten in the other. Also holds `recencyScore`: `(access_count + 1) × 0.5^(days since last access / 30)`, computed at read time from columns that already exist — no schema, no stored score. Elapsed time scales every score by the same factor, so the order never drifts on its own and needs no timer
 - `src/lib/utils.ts` — `cn()` helper (clsx + tailwind-merge)
 - `src/utils/export.ts` — Bookmark HTML export utility
 
@@ -148,5 +164,5 @@ UIデザインのコンセプトとルールは `.claude/skills/ui-design-guidel
 - Components: PascalCase filenames
 - Functions/variables: camelCase
 - Constants: UPPER_SNAKE_CASE
-- UI messages: English
+- UI messages: English, **except** the Help and Settings dialogs, which follow `src/lib/uiLanguage.ts` (en default). Anything user-visible added to Settings needs an entry in both halves of `src/lib/settingsText.ts` — the table is `satisfies Record<UiLang, unknown>`, so a missing one is a type error
 - Commit prefixes: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `test:`, `chore:`

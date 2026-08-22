@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(agent-browser open *)",
+      "Bash(agent-browser scroll *)",
+      "Bash(agent-browser pdf *)",
+      "PowerShell($f = \"d:\\\\my-app\\\\bookmarks-desktop\\\\promo\\\\tools\\\\build.ps1\"; $t = [System.IO.File]::ReadAllText\\($f, [System.Text.Encoding]::UTF8\\); [System.IO.File]::WriteAllText\\($f, $t, \\(New-Object System.Text.UTF8Encoding $true\\)\\); powershell -ExecutionPolicy Bypass -File $f)",
+      "PowerShell(Get-ChildItem \"d:\\\\my-app\\\\bookmarks-desktop\\\\promo\\\\dist\" | ForEach-Object { \"$\\($_.Name\\) \\($\\([math]::Round\\($_.Length/1KB\\)\\) KB\\)\" })",
+      "PowerShell($b = \"$env:APPDATA\\\\com.yukihirosakuda.bookmarks\\\\promo-backup\\\\bookmarks.db\"; if \\(Test-Path $b\\) { $i = Get-Item $b; \"あり: $b`nサイズ: $\\($i.Length\\) bytes / 更新: $\\($i.LastWriteTime\\)\" } else { \"見つかりません: $b\" }; \"`n現在のライブDB\\(デモ\\): \"; $live = \"$env:APPDATA\\\\com.yukihirosakuda.bookmarks\\\\bookmarks.db\"; if \\(Test-Path $live\\) { \"$live \\($\\(\\(Get-Item $live\\).Length\\) bytes\\)\" })",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"d:\\\\my-app\\\\bookmarks-desktop\\\\promo\\\\tools\\\\restore-db.ps1\")",
+      "PowerShell($dir = \"$env:APPDATA\\\\com.yukihirosakuda.bookmarks\"; \"App running: $\\(if \\(Get-Process -Name app,bookmarks -ErrorAction SilentlyContinue\\) { 'YES' } else { 'no' }\\)\"; \"--- $dir ---\"; Get-ChildItem $dir -Force | ForEach-Object { \"$\\($_.Name\\) $\\(if\\($_.PSIsContainer\\){'[dir]'}else{\"$\\($_.Length\\)b\"}\\)\" }; $bdir = Join-Path $dir 'promo-backup'; if \\(Test-Path $bdir\\) { \"--- promo-backup ---\"; Get-ChildItem $bdir -Force | ForEach-Object { \"$\\($_.Name\\) $\\($_.Length\\)b\" } })",
+      "Bash(powershell -Command \"Stop-Process -Name explorer -Force\")",
+      "Bash(Start-Sleep -Seconds 1)",
+      "Bash(powershell -Command \"Start-Process explorer\")",
+      "Bash(powershell -Command \"Get-Process -Name app -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, StartTime\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('sharp'\\)\\)\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('png-to-ico'\\)\\)\")",
+      "Bash(node scripts/gen-favicon.js)",
+      "Bash(ls scripts *)",
+      "Bash(rmdir scripts *)",
+      "Bash(powershell -Command \"Get-Process -Name app -ErrorAction SilentlyContinue | Stop-Process -Force\")",
+      "Bash(powershell -Command 'Add-Type -AssemblyName System.Drawing; $icon = [System.Drawing.Icon]::ExtractAssociatedIcon\\('\\\\''C:\\\\Users\\\\Yukihiro\\\\AppData\\\\Local\\\\bookmarks\\\\app.exe'\\\\''\\); $bmp = $icon.ToBitmap\\(\\); $bmp.Save\\('\\\\''C:\\\\Users\\\\Yukihiro\\\\AppData\\\\Local\\\\Temp\\\\extracted_app_icon3.png'\\\\''\\)')"
+    ]
+  }
+}

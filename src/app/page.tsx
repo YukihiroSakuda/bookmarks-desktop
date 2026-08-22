@@ -339,6 +339,11 @@ export default function BookmarksPage() {
                 );
               }
             }}
+            shortcutDirEnabled={settings.userSettings?.shortcutDirEnabled ?? false}
+            shortcutDirPath={settings.userSettings?.shortcutDirPath ?? ""}
+            onShortcutDirChange={async (patch) => {
+              await settings.updateUserSettings(patch);
+            }}
             onListColumnsChange={async (columns) => {
               await settings.updateUserSettings({
                 listColumns: columns,

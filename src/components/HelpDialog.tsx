@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
+import { UiLang } from "@/lib/uiLanguage";
+import { LanguageToggle } from "./LanguageToggle";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -66,6 +68,27 @@ function ShortcutRow({ keys, label }: { keys: string[]; label: string }) {
 
 function Strong({ children }: { children: React.ReactNode }) {
   return <span className="font-medium text-foreground">{children}</span>;
+}
+
+/** A formula shown as written, not as prose. Scrolls rather than wrapping. */
+function Formula({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-xs font-mono text-foreground bg-muted border border-border rounded-md px-3 py-2 mb-2 overflow-x-auto whitespace-pre">
+      {children}
+    </div>
+  );
+}
+
+/** One worked example: the case on the left, the number it produces on the right. */
+function StatRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-sm font-medium text-foreground tabular-nums shrink-0 ml-3">
+        {value}
+      </span>
+    </div>
+  );
 }
 
 const EDGE_ADDON_URL =
@@ -276,12 +299,29 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <H3>ソート</H3>
         <P>ソートコントロールから並び順を変更できます。</P>
         <Ul>
-          <Li><Strong>Created Date</Strong> — ブックマークを追加した順。</Li>
-          <Li><Strong>Title</Strong> — タイトルのアルファベット・あいうえお順。</Li>
-          <Li><Strong>Access Count</Strong> — よく開くブックマークを上位に表示。</Li>
-          <Li><Strong>Custom</Strong> — 手動並び替えで設定した順序（後述）。</Li>
+          <Li><Strong>Name</Strong> — タイトルのアルファベット・あいうえお順。</Li>
+          <Li><Strong>Most Used</Strong> — 最近使っているものを上位に表示（計算方法は下記）。</Li>
+          <Li><Strong>Date Added</Strong> — ブックマークを追加した順。</Li>
+          <Li><Strong>My Order</Strong> — 手動並び替えで設定した順序（後述）。</Li>
         </Ul>
-        <P>各ソートキーに対して <Strong>昇順 / 降順</Strong> を切り替えられます。設定は保存されます。</P>
+        <P>各ソートキーに対して <Strong>昇順 / 降順</Strong> を切り替えられます。設定は保存されます。初期状態は <Strong>Name</Strong> の昇順です。</P>
+
+        <H3>Most Used の計算</H3>
+        <P>開いた回数を、最後に開いてからの経過日数で割り引いた値です。この値が大きい順に並びます。</P>
+        <Formula>スコア =（開いた回数 + 1）× 0.5 ^（経過日数 ÷ 30）</Formula>
+        <Ul>
+          <Li><Strong>30日で半分</Strong> — 触らなくなって1か月経つと価値が半分になります。過去にどれだけ開いていても、放置すれば下がっていきます。</Li>
+          <Li><Strong>経過日数</Strong>は最後に開いた日から数えます。一度も開いていないものは、追加した日から数えます。</Li>
+          <Li><Strong>+ 1</Strong> があるのは、まだ一度も開いていないブックマークを 0 にしないためです。今日追加したものが、半年前に使わなくなったものより下に沈むことはありません。</Li>
+        </Ul>
+        <P>同じ時点で比べた例:</P>
+        <div className="mb-3">
+          <StatRow label="5回・2日前に使用" value="5.7" />
+          <StatRow label="200回・半年前に使用" value="3.1" />
+          <StatRow label="今日追加・未使用" value="1.0" />
+          <StatRow label="1回・90日前に使用" value="0.25" />
+        </div>
+        <P>スコアは保存されません。並べ替えるたびに、記録済みの回数と日時から計算しています。時間が経つと全部のスコアが同じ割合で下がるだけなので、放っておいて順番が入れ替わることはありません。順番が動くのは実際にブックマークを開いたときだけです。</P>
       </section>
 
       <div className="border-t" />
@@ -289,11 +329,11 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("reorder")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">手動並び替え</h2>
         <H3>並び替えモードの切替</H3>
-        <P>ソートコントロールの <Strong>Custom</Strong> を選択し、<Strong>Edit</Strong> スイッチをオンにするとモードに切り替わります。モード中は検索バーとフィルターが無効になります。</P>
+        <P>ソートコントロールの <Strong>My Order</Strong> を選択し、<Strong>Edit</Strong> スイッチをオンにするとモードに切り替わります。モード中は検索バーとフィルターが無効になります。</P>
         <H3>順序の変更</H3>
         <P>各行をドラッグ＆ドロップして自由に並び替えます。ピン留めブックマークとそれ以外は別々のグループとして並び替えできます。</P>
         <H3>保存</H3>
-        <P><Strong>Edit</Strong> スイッチをオフにすると順序が自動保存されます。保存中はオーバーレイが表示されます。並び替えた順序を表示するにはソートを <Strong>Custom</Strong> に設定してください。</P>
+        <P><Strong>Edit</Strong> スイッチをオフにすると順序が自動保存されます。保存中はオーバーレイが表示されます。並び替えた順序を表示するにはソートを <Strong>My Order</Strong> に設定してください。</P>
       </section>
 
       <div className="border-t" />
@@ -576,12 +616,29 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <H3>Sort</H3>
         <P>Change the sort order from the sort controls.</P>
         <Ul>
-          <Li><Strong>Created Date</Strong> — sorted by when the bookmark was added.</Li>
-          <Li><Strong>Title</Strong> — alphabetical order.</Li>
-          <Li><Strong>Access Count</Strong> — most visited bookmarks first.</Li>
-          <Li><Strong>Custom</Strong> — manual order set via drag &amp; drop (see below).</Li>
+          <Li><Strong>Name</Strong> — alphabetical order.</Li>
+          <Li><Strong>Most Used</Strong> — what you have been opening lately (see below for how it is worked out).</Li>
+          <Li><Strong>Date Added</Strong> — sorted by when the bookmark was added.</Li>
+          <Li><Strong>My Order</Strong> — manual order set via drag &amp; drop (see below).</Li>
         </Ul>
-        <P>Each sort key supports <Strong>ascending / descending</Strong> order. Settings are saved.</P>
+        <P>Each sort key supports <Strong>ascending / descending</Strong> order. Settings are saved. The starting point is <Strong>Name</Strong>, ascending.</P>
+
+        <H3>How Most Used is calculated</H3>
+        <P>The number of times you opened a bookmark, divided down by how long ago you last opened it. Highest first.</P>
+        <Formula>score = (times opened + 1) × 0.5 ^ (days since ÷ 30)</Formula>
+        <Ul>
+          <Li><Strong>Halves every 30 days</Strong> — a month after you stop touching it, a bookmark is worth half what it was. However often you once opened it, leaving it alone brings it down.</Li>
+          <Li><Strong>Days since</Strong> counts from the last time you opened it, or from the day you added it if you never have.</Li>
+          <Li><Strong>+ 1</Strong> keeps a bookmark you have not opened yet from scoring zero, so one added today never sinks below one you abandoned six months ago.</Li>
+        </Ul>
+        <P>Compared at the same moment:</P>
+        <div className="mb-3">
+          <StatRow label="5 times, 2 days ago" value="5.7" />
+          <StatRow label="200 times, 6 months ago" value="3.1" />
+          <StatRow label="Added today, never opened" value="1.0" />
+          <StatRow label="Once, 90 days ago" value="0.25" />
+        </div>
+        <P>The score is never stored. It is worked out from the count and timestamp already kept, each time the list is sorted. As time passes every score falls by the same proportion, so the order never rearranges itself while you are away — it moves only when you actually open something.</P>
       </section>
 
       <div className="border-t" />
@@ -589,11 +646,11 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
       <section ref={registerRef("reorder")}>
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Manual Reordering</h2>
         <H3>Toggle Reorder Mode</H3>
-        <P>Select <Strong>Custom</Strong> in the sort controls, then turn on the <Strong>Edit</Strong> switch. Search and filters are disabled during reorder mode.</P>
+        <P>Select <Strong>My Order</Strong> in the sort controls, then turn on the <Strong>Edit</Strong> switch. Search and filters are disabled during reorder mode.</P>
         <H3>Reordering</H3>
         <P>Drag and drop rows to rearrange freely. Pinned and unpinned bookmarks are reordered in separate groups.</P>
         <H3>Saving</H3>
-        <P>Turn off the <Strong>Edit</Strong> switch to auto-save the order. An overlay is shown while saving. Set sort to <Strong>Custom</Strong> to view your custom order.</P>
+        <P>Turn off the <Strong>Edit</Strong> switch to auto-save the order. An overlay is shown while saving. Set sort to <Strong>My Order</Strong> to view your custom order.</P>
       </section>
 
       <div className="border-t" />
@@ -758,10 +815,15 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
 
 // ---- main component ---------------------------------------------------------
 
-export function HelpDialog() {
+export function HelpDialog({
+  lang,
+  onLangChange,
+}: {
+  lang: UiLang;
+  onLangChange: (lang: UiLang) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [activeId, setActiveId] = useState("basic");
-  const [lang, setLang] = useState<"ja" | "en">("ja");
   const contentRef = useRef<HTMLDivElement | null>(null);
   // State-backed container node: a callback ref guarantees the scroll-spy effect
   // re-runs once the (portaled) content element is actually mounted in the DOM.
@@ -774,6 +836,13 @@ export function HelpDialog() {
   }, []);
 
   const SECTIONS = lang === "ja" ? SECTIONS_JA : SECTIONS_EN;
+
+  // Switching language rebuilds the whole document, so the old scroll offset
+  // points at nothing meaningful.
+  useEffect(() => {
+    setActiveId("basic");
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [lang]);
 
   const scrollTo = (id: string) => {
     setActiveId(id);
@@ -822,12 +891,6 @@ export function HelpDialog() {
     };
   }, [open, containerEl, SECTIONS]);
 
-  const handleLangChange = (newLang: "ja" | "en") => {
-    setLang(newLang);
-    setActiveId("basic");
-    contentRef.current?.scrollTo({ top: 0 });
-  };
-
   return (
     <>
       <Button
@@ -845,26 +908,7 @@ export function HelpDialog() {
               <DialogTitle className="text-xl">
                 Book<span className="text-blue-500">marks</span>{lang === "ja" ? " — 使い方ガイド" : " — Help"}
               </DialogTitle>
-              <div className="flex items-center border rounded-md overflow-hidden text-sm mr-6">
-                <button
-                  onClick={() => handleLangChange("ja")}
-                  className={cn(
-                    "px-3 py-1 transition-colors",
-                    lang === "ja" ? "bg-blue-500 text-white" : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  JA
-                </button>
-                <button
-                  onClick={() => handleLangChange("en")}
-                  className={cn(
-                    "px-3 py-1 transition-colors",
-                    lang === "en" ? "bg-blue-500 text-white" : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  EN
-                </button>
-              </div>
+              <LanguageToggle lang={lang} onChange={onLangChange} className="mr-6" />
             </div>
           </DialogHeader>
 

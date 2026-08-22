@@ -7,6 +7,8 @@ export interface UserSettings {
   sort_option: SortOption;
   sort_order: SortOrder;
   summon_shortcut: string;
+  shortcut_dir_enabled: boolean;
+  shortcut_dir_path: string | null;
 }
 
 export interface UserSettingsUI {
@@ -15,4 +17,8 @@ export interface UserSettingsUI {
   sortOrder: SortOrder;
   /** Tauri accelerator string for the global summon hotkey, e.g. "CmdOrCtrl+Alt+Space". */
   summonShortcut: string;
+  /** Mirror bookmarked files/folders into a Windows folder as `.lnk` shortcuts. */
+  shortcutDirEnabled: boolean;
+  /** Where those shortcuts go. Empty means the default (`%USERPROFILE%\Bookmarks`). */
+  shortcutDirPath: string;
 }

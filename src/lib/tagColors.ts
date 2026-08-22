@@ -27,58 +27,56 @@ export type TagColor = (typeof TAG_COLORS)[number];
 /** Used for tags with no color stored — keeps the app's blue accent as the default. */
 export const DEFAULT_TAG_COLOR: TagColor = "blue";
 
+/**
+ * Chip while the tag is off. Colorless on purpose, and identical for every
+ * color: tinting the whole filter bar turns it into a wall of color in which
+ * the handful of tags actually switched on no longer stand out. Color is what
+ * marks a tag as active, so it only appears once the tag is on.
+ */
+export const TAG_CHIP_OFF = "bg-secondary border border-input";
+
 interface TagColorStyles {
-  /** Chip in its normal (unselected) state. */
-  chip: string;
   /**
-   * Chip while the tag is selected as a filter, or shown on a bookmark card.
-   * The text tone is picked per color so it stays readable on the solid fill —
-   * white on the deep hues, near-black on the light ones.
+   * Chip while the tag is on — selected as a filter, or listed on a bookmark
+   * card. A light tint rather than a solid fill, so a card carrying three tags
+   * stays quiet enough to read the title over.
    */
-  chipSelected: string;
+  chipOn: string;
   /** Solid dot used by the color picker in Tag Manager. */
   swatch: string;
 }
 
 export const TAG_COLOR_STYLES: Record<TagColor, TagColorStyles> = {
   red: {
-    chip: "bg-red-500/10 text-red-700 dark:text-red-300 border border-red-500/30",
-    chipSelected: "bg-red-600 text-white border border-red-600",
+    chipOn: "bg-red-500/10 text-red-700 dark:text-red-300 border border-red-500/30",
     swatch: "bg-red-500",
   },
   orange: {
-    chip: "bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/30",
-    chipSelected: "bg-orange-500 text-neutral-900 border border-orange-500",
+    chipOn: "bg-orange-500/10 text-orange-700 dark:text-orange-300 border border-orange-500/30",
     swatch: "bg-orange-500",
   },
   amber: {
-    chip: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30",
-    chipSelected: "bg-amber-500 text-neutral-900 border border-amber-500",
+    chipOn: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30",
     swatch: "bg-amber-500",
   },
   green: {
-    chip: "bg-green-500/10 text-green-700 dark:text-green-300 border border-green-500/30",
-    chipSelected: "bg-green-500 text-neutral-900 border border-green-500",
+    chipOn: "bg-green-500/10 text-green-700 dark:text-green-300 border border-green-500/30",
     swatch: "bg-green-500",
   },
   teal: {
-    chip: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30",
-    chipSelected: "bg-teal-500 text-neutral-900 border border-teal-500",
+    chipOn: "bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/30",
     swatch: "bg-teal-500",
   },
   blue: {
-    chip: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30",
-    chipSelected: "bg-blue-500 text-white border border-blue-500",
+    chipOn: "bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/30",
     swatch: "bg-blue-500",
   },
   violet: {
-    chip: "bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/30",
-    chipSelected: "bg-violet-500 text-white border border-violet-500",
+    chipOn: "bg-violet-500/10 text-violet-700 dark:text-violet-300 border border-violet-500/30",
     swatch: "bg-violet-500",
   },
   pink: {
-    chip: "bg-pink-500/10 text-pink-700 dark:text-pink-300 border border-pink-500/30",
-    chipSelected: "bg-pink-600 text-white border border-pink-600",
+    chipOn: "bg-pink-500/10 text-pink-700 dark:text-pink-300 border border-pink-500/30",
     swatch: "bg-pink-500",
   },
 };

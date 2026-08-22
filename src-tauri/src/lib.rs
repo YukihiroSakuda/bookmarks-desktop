@@ -4,6 +4,7 @@ mod favicon;
 mod page_title;
 mod folder_search;
 mod server;
+mod shortcutdir;
 #[cfg(target_os = "windows")]
 mod winpkg;
 
@@ -80,6 +81,13 @@ pub fn run() {
             if let Err(e) = commands::sync_summon_inner(app.handle()) {
                 log::warn!("summon shortcut sync failed: {e}");
             }
+
+            // Bring the shortcut folder in line with the database. Writes that
+            // bypass the Tauri commands — the extension's HTTP server, a file
+            // edited while the app was closed — are caught here, so a missed
+            // sync can never outlive one restart. No-op while the feature is
+            // off, and it runs off the setup thread either way.
+            shortcutdir::request_sync(app.handle());
 
             // Auto-register right-click context menu entry and launch-at-login.
             //
@@ -205,6 +213,12 @@ pub fn run() {
             commands::unregister_context_menu,
             commands::save_extension_zip,
             folder_search::search_in_folders,
+            shortcutdir::sync_shortcut_dir,
+            shortcutdir::pick_shortcut_dir,
+            shortcutdir::open_shortcut_dir,
+            shortcutdir::pin_shortcut_dir,
+            shortcutdir::unpin_shortcut_dir,
+            shortcutdir::shortcut_dir_pinned,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

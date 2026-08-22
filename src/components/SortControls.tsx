@@ -31,8 +31,8 @@ export function SortControls({
 }: SortControlsProps) {
   const getDefaultOrder = (sortOption: SortOption): SortOrder => {
     switch (sortOption) {
-      case "accessCount":
-        return "desc"; // アクセスが多い順
+      case "recency":
+        return "desc"; // 最近よく使っている順
       case "title":
         return "asc"; // 昇順
       case "createdAt":
@@ -55,19 +55,23 @@ export function SortControls({
     }
   };
 
+  // Ordered the way the list is reached for: the neutral starting point first,
+  // then the two the app derives, then the one the user arranged by hand. My
+  // Order sits last so its Edit switch lands at the end of the row rather than
+  // splitting the group.
   const sortOptions = [
+    { value: "title" as SortOption, label: "Name", icon: TypeOutline },
     {
-      value: "custom" as SortOption,
-      label: "Custom",
-      icon: UserRound,
-    },
-    {
-      value: "accessCount" as SortOption,
-      label: "Access Count",
+      value: "recency" as SortOption,
+      label: "Most Used",
       icon: TrendingUp,
     },
-    { value: "title" as SortOption, label: "Title", icon: TypeOutline },
-    { value: "createdAt" as SortOption, label: "Created Date", icon: Clock },
+    { value: "createdAt" as SortOption, label: "Date Added", icon: Clock },
+    {
+      value: "custom" as SortOption,
+      label: "My Order",
+      icon: UserRound,
+    },
   ];
 
   return (
