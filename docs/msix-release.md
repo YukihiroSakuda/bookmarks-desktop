@@ -92,9 +92,14 @@ WACK は検証中にパッケージをインストールするため、**テス�
 
 1. [Partner Center](https://partner.microsoft.com/dashboard) → Bookmarks & Tags → 新しい申請（Update）
 2. **パッケージ**: 未署名の `bookmarks.msix` をアップロード
-3. **ストアの掲載情報**: 更新内容（What's new）を記入。UI が変わった場合はスクリーンショットも差し替える
-4. **プライバシーポリシー URL**: `docs/privacy-policy.md` を更新した場合、登録済み URL の指す先が最新かを確認する
-5. 年齢区分・価格・提供国などは通常据え置きのまま申請を送信
+3. **更新内容（What's new）**: `promo/store-listing-<version>.md` の文章を貼る
+4. **説明文・機能・検索キーワード**: `promo/store-listing-base.md` が現行の原稿。
+   **用途が増えた回・探されかたが変わる回は、What's new だけでなくここも直す。**
+   What's new は既にインストールした人しか読まず、新規の訪問者が読むのは説明文なので、
+   目玉機能が What's new にしか無いと一番効く相手に届かない。判断の目安は base 側の末尾にある
+5. **スクリーンショット**: UI が変わった場合は差し替える
+6. **プライバシーポリシー URL**: `docs/privacy-policy.md` を更新した場合、登録済み URL の指す先が最新かを確認する
+7. 年齢区分・価格・提供国などは通常据え置きのまま申請を送信
 
 審査は通常、数時間〜数日。
 
@@ -113,4 +118,5 @@ Get-AppxPackage -Name YukihiroSakuda.BookmarksTags | Select-Object Version, Sign
 - [ ] WACK を通した
 - [ ] **未署名で再パックした**（テスト署名したまま提出しない）
 - [ ] Partner Center にアップロードし、更新内容・スクリーンショットを反映した
+- [ ] 説明文に手を入れるべき回かを `promo/store-listing-base.md` の「見直しの目安」で確認した
 - [ ] 公開後に `Get-AppxPackage` でバージョンと SignatureKind を確認した
