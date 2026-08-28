@@ -1,5 +1,22 @@
 import { useMemo, useRef, useState } from "react";
-import { Folder, Globe, Layers, Loader2, Play, SquarePen, Trash2, X } from "lucide-react";
+import { Folder, Globe, GripVertical, Layers, Loader2, Play, SquarePen, Trash2, X } from "lucide-react";
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { BookmarkUI } from "@/types/bookmark";
 import { GroupUI } from "@/types/group";
 import { Button } from "./Button";
@@ -23,12 +40,69 @@ interface GroupCardProps {
   isOpening: boolean;
   /** Any group is opening — the others disable to prevent a double launch. */
   isAnyOpening: boolean;
-  confirmThreshold: number;
   onOpen: (id: string) => void;
   onEdit: (group: GroupUI) => void;
   onDelete: (id: string) => void;
   onAddMembers: (id: string, bookmarkIds: string[]) => void;
   onRemoveMember: (id: string, bookmarkId: string) => void;
+  /** New member order after a drag, as the full id list. */
+  onReorderMembers: (id: string, bookmarkIds: string[]) => void;
+  /** Grip rendered in the header, letting the card itself be reordered. */
+  dragHandle?: React.ReactNode;
+}
+
+interface SortableMemberProps {
+  bookmark: BookmarkUI;
+  index: number;
+  onRemove: () => void;
+}
+
+/**
+ * One member row. The grip is the only drag handle: the row is otherwise
+ * hoverable and carries a remove button, and making the whole row draggable
+ * would swallow those clicks.
+ */
+function SortableMember({ bookmark, index, onRemove }: SortableMemberProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: bookmark.id,
+  });
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+      className="flex items-center gap-2 text-sm rounded-md px-2 py-1 hover:bg-accent group/member"
+    >
+      <button
+        type="button"
+        title="Drag to reorder"
+        className="cursor-grab active:cursor-grabbing text-muted-foreground shrink-0 opacity-0 group-hover/member:opacity-100 transition-opacity"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="size-3.5" />
+      </button>
+      <span className="text-xs text-muted-foreground w-4 shrink-0">{index + 1}</span>
+      {bookmark.kind === "path" ? (
+        <Folder className="size-3.5 text-muted-foreground shrink-0" />
+      ) : (
+        <Globe className="size-3.5 text-muted-foreground shrink-0" />
+      )}
+      <span className="truncate flex-1">{bookmark.title}</span>
+      <button
+        type="button"
+        onClick={onRemove}
+        className="opacity-0 group-hover/member:opacity-100 text-muted-foreground hover:text-foreground transition-opacity shrink-0"
+        title="Remove from group"
+      >
+        <X size={14} />
+      </button>
+    </li>
+  );
 }
 
 const MAX_SUGGESTIONS = 6;
@@ -38,16 +112,16 @@ export function GroupCard({
   bookmarks,
   isOpening,
   isAnyOpening,
-  confirmThreshold,
   onOpen,
   onEdit,
   onDelete,
   onAddMembers,
   onRemoveMember,
+  onReorderMembers,
+  dragHandle,
 }: GroupCardProps) {
   const [query, setQuery] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [openConfirmOpen, setOpenConfirmOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const byId = useMemo(() => new Map(bookmarks.map((b) => [b.id, b])), [bookmarks]);
@@ -82,13 +156,30 @@ export function GroupCard({
   };
 
   const requestOpen = () => {
-    if (isAnyOpening) return;
-    if (members.length === 0) return;
-    if (members.length > confirmThreshold) {
-      setOpenConfirmOpen(true);
-      return;
-    }
+    if (isAnyOpening || members.length === 0) return;
+    // Whether this needs confirming is decided by the caller, so that a
+    // keyboard shortcut is held to the same threshold as a click.
     onOpen(group.id);
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleMemberDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = members.findIndex((m) => m.id === active.id);
+    const newIndex = members.findIndex((m) => m.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    // Only resolvable members have rows to drag, but the reorder replaces the
+    // membership wholesale — so ids that did not resolve (a bookmark list that
+    // has not finished loading) are carried through rather than deleted.
+    const reordered = arrayMove(members, oldIndex, newIndex).map((m) => m.id);
+    const shown = new Set(reordered);
+    const unresolved = group.bookmarkIds.filter((id) => !shown.has(id));
+    onReorderMembers(group.id, [...reordered, ...unresolved]);
   };
 
   const chip = getTagColorStyles(group.color).chipOn;
@@ -96,6 +187,7 @@ export function GroupCard({
   return (
     <div className="bg-card border shadow-sm rounded-xl backdrop-blur-sm p-4 group">
       <div className="flex items-center justify-between gap-2 mb-3">
+        {dragHandle}
         <button
           type="button"
           onClick={requestOpen}
@@ -135,30 +227,27 @@ export function GroupCard({
       </div>
 
       {members.length > 0 && (
-        <ul className="space-y-1 mb-3">
-          {members.map((bookmark, index) => (
-            <li
-              key={bookmark.id}
-              className="flex items-center gap-2 text-sm rounded-md px-2 py-1 hover:bg-accent group/member"
-            >
-              <span className="text-xs text-muted-foreground w-4 shrink-0">{index + 1}</span>
-              {bookmark.kind === "path" ? (
-                <Folder className="size-3.5 text-muted-foreground shrink-0" />
-              ) : (
-                <Globe className="size-3.5 text-muted-foreground shrink-0" />
-              )}
-              <span className="truncate flex-1">{bookmark.title}</span>
-              <button
-                type="button"
-                onClick={() => onRemoveMember(group.id, bookmark.id)}
-                className="opacity-0 group-hover/member:opacity-100 text-muted-foreground hover:text-foreground transition-opacity shrink-0"
-                title="Remove from group"
-              >
-                <X size={14} />
-              </button>
-            </li>
-          ))}
-        </ul>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleMemberDragEnd}
+        >
+          <SortableContext
+            items={members.map((m) => m.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul className="space-y-1 mb-3">
+              {members.map((bookmark, index) => (
+                <SortableMember
+                  key={bookmark.id}
+                  bookmark={bookmark}
+                  index={index}
+                  onRemove={() => onRemoveMember(group.id, bookmark.id)}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
 
       <div className="relative">
@@ -220,22 +309,6 @@ export function GroupCard({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={openConfirmOpen} onOpenChange={setOpenConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Open {members.length} bookmarks?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {members.length}件を一度に開きます。よろしいですか？
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { onOpen(group.id); setOpenConfirmOpen(false); }}>
-              Open
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

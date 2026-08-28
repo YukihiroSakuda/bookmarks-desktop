@@ -23,12 +23,12 @@ export function useBookmarkGroups() {
   }, []);
 
   const createGroup = useCallback(
-    async (name: string, color?: string): Promise<boolean> => {
+    async (name: string, color?: string, shortcut?: string): Promise<boolean> => {
       try {
         const res = await fetch("/api/groups", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, color }),
+          body: JSON.stringify({ name, color, shortcut }),
         });
         const body = await res.json();
         if (!res.ok) throw new Error(body?.error || "Failed to create group");

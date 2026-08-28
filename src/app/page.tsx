@@ -38,6 +38,7 @@ import {
   useNewBookmarkFromUrl,
   useFolderSearch,
   useBookmarkGroups,
+  useGroupHotkeys,
 } from "@/hooks";
 import { toast } from "sonner";
 import { readAppCache, writeAppCache } from "@/lib/appCache";
@@ -169,23 +170,25 @@ export default function BookmarksPage() {
     setIsOrderingMode,
   });
 
-  const { fetchGroups } = groups;
+  const { fetchGroups, setGroups } = groups;
 
   const refreshData = useCallback(async () => {
     try {
-      const [fetchedSettings, fetchedTags, fetchedTagRules, fetchedBookmarks] = await Promise.all([
-        fetchUserSettings(),
-        fetchTags(),
-        fetchTagRules(),
-        fetchBookmarks(),
-        fetchGroups(),
-      ]);
+      const [fetchedSettings, fetchedTags, fetchedTagRules, fetchedBookmarks, fetchedGroups] =
+        await Promise.all([
+          fetchUserSettings(),
+          fetchTags(),
+          fetchTagRules(),
+          fetchBookmarks(),
+          fetchGroups(),
+        ]);
       if (fetchedSettings && fetchedTags && fetchedTagRules && fetchedBookmarks) {
         writeAppCache({
           bookmarks: fetchedBookmarks,
           tags: fetchedTags,
           tagRules: fetchedTagRules,
           settings: fetchedSettings,
+          groups: fetchedGroups,
         });
       }
     } catch (error) {
@@ -201,9 +204,10 @@ export default function BookmarksPage() {
       setAvailableTags(cache.tags);
       setTagRules(cache.tagRules);
       applySettings(cache.settings);
+      if (cache.groups) setGroups(cache.groups);
     }
     refreshData();
-  }, [refreshData, setBookmarks, setAvailableTags, setTagRules, applySettings]);
+  }, [refreshData, setBookmarks, setAvailableTags, setTagRules, applySettings, setGroups]);
 
   // Refresh when tab becomes visible (e.g. after using browser extension)
   useEffect(() => {
@@ -234,10 +238,48 @@ export default function BookmarksPage() {
     return () => { unlisten?.(); };
   }, [setSearchQuery]);
 
+  const [confirmGroupId, setConfirmGroupId] = useState<string | null>(null);
+
+  const groupsList = groups.groups;
+  const openGroup = groups.openGroup;
+  const confirmThreshold = settings.userSettings?.groupOpenConfirmThreshold ?? 10;
+
+  /** Members that still resolve to a bookmark — the count the user will see. */
+  const resolvableCount = useCallback(
+    (groupId: string) => {
+      const group = groupsList.find((g) => g.id === groupId);
+      if (!group) return 0;
+      const ids = new Set(bookmarks.map((b) => b.id));
+      return group.bookmarkIds.filter((id) => ids.has(id)).length;
+    },
+    [groupsList, bookmarks]
+  );
+
+  const requestOpenGroup = useCallback(
+    (groupId: string) => {
+      if (resolvableCount(groupId) > confirmThreshold) {
+        setConfirmGroupId(groupId);
+        return;
+      }
+      openGroup(groupId);
+    },
+    [resolvableCount, confirmThreshold, openGroup]
+  );
+
   useBookmarkHotkeys({
     bookmarks,
     isModalOpen,
     onActivate: handleBookmarkClick,
+    searchInputRef,
+  });
+
+  // Group shortcuts run the same launch as clicking the card, and work from
+  // either view — the point of a shortcut is not having to navigate first.
+  useGroupHotkeys({
+    groups: groups.groups,
+    bookmarks,
+    isModalOpen,
+    onActivate: requestOpenGroup,
     searchInputRef,
   });
 
@@ -362,13 +404,14 @@ export default function BookmarksPage() {
                 groups={groups.groups}
                 bookmarks={bookmarks}
                 openingGroupId={groups.openingGroupId}
-                confirmThreshold={settings.userSettings?.groupOpenConfirmThreshold ?? 10}
-                onOpenGroup={groups.openGroup}
+                onOpenGroup={requestOpenGroup}
                 onCreateGroup={groups.createGroup}
                 onUpdateGroup={groups.updateGroup}
                 onDeleteGroup={groups.deleteGroup}
                 onAddMembers={groups.addToGroup}
                 onRemoveMember={groups.removeFromGroup}
+                onReorderMembers={groups.setGroupMembers}
+                onReorderGroups={groups.reorderGroups}
               />
             </div>
           ) : (
@@ -499,6 +542,33 @@ export default function BookmarksPage() {
           )}
         </div>
       </main>
+
+      <AlertDialog
+        open={confirmGroupId !== null}
+        onOpenChange={(open) => { if (!open) setConfirmGroupId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Open {confirmGroupId ? resolvableCount(confirmGroupId) : 0} bookmarks?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmGroupId ? resolvableCount(confirmGroupId) : 0}件を一度に開きます。よろしいですか？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmGroupId) openGroup(confirmGroupId);
+                setConfirmGroupId(null);
+              }}
+            >
+              Open
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <SavingOrderOverlay isVisible={ordering.isSavingOrder} />
       <DropOverlay visible={isDragging} />

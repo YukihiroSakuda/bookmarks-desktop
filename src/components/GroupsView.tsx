@@ -1,5 +1,22 @@
 import { useState } from "react";
-import { Layers, Plus } from "lucide-react";
+import { GripVertical, Layers, Plus } from "lucide-react";
+import {
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { BookmarkUI } from "@/types/bookmark";
 import { GroupUI } from "@/types/group";
 import { Button } from "./Button";
@@ -10,29 +27,88 @@ interface GroupsViewProps {
   groups: GroupUI[];
   bookmarks: BookmarkUI[];
   openingGroupId: string | null;
-  confirmThreshold: number;
   onOpenGroup: (id: string) => void;
-  onCreateGroup: (name: string, color?: string) => Promise<boolean>;
-  onUpdateGroup: (id: string, data: { name: string; color?: string }) => Promise<boolean>;
+  onCreateGroup: (name: string, color?: string, shortcut?: string) => Promise<boolean>;
+  onUpdateGroup: (
+    id: string,
+    data: { name: string; color?: string; shortcut?: string }
+  ) => Promise<boolean>;
   onDeleteGroup: (id: string) => void;
   onAddMembers: (id: string, bookmarkIds: string[]) => void;
   onRemoveMember: (id: string, bookmarkId: string) => void;
+  onReorderMembers: (id: string, bookmarkIds: string[]) => void;
+  onReorderGroups: (ordered: GroupUI[]) => void;
+}
+
+interface SortableGroupCardProps {
+  group: GroupUI;
+  children: (dragHandle: React.ReactNode) => React.ReactNode;
+}
+
+/**
+ * Wraps a group card so it can be dragged. The card body is a click target
+ * that launches the group, so dragging is restricted to an explicit grip.
+ */
+function SortableGroupCard({ group, children }: SortableGroupCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: group.id,
+  });
+
+  const handle = (
+    <button
+      type="button"
+      title="Drag to reorder"
+      className="cursor-grab active:cursor-grabbing text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+      {...attributes}
+      {...listeners}
+    >
+      <GripVertical className="size-4" />
+    </button>
+  );
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+    >
+      {children(handle)}
+    </div>
+  );
 }
 
 export function GroupsView({
   groups,
   bookmarks,
   openingGroupId,
-  confirmThreshold,
   onOpenGroup,
   onCreateGroup,
   onUpdateGroup,
   onDeleteGroup,
   onAddMembers,
   onRemoveMember,
+  onReorderMembers,
+  onReorderGroups,
 }: GroupsViewProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<GroupUI | undefined>(undefined);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = groups.findIndex((g) => g.id === active.id);
+    const newIndex = groups.findIndex((g) => g.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    onReorderGroups(arrayMove(groups, oldIndex, newIndex));
+  };
 
   const openCreate = () => {
     setEditing(undefined);
@@ -69,33 +145,47 @@ export function GroupsView({
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {groups.map((group) => (
-            <GroupCard
-              key={group.id}
-              group={group}
-              bookmarks={bookmarks}
-              isOpening={openingGroupId === group.id}
-              isAnyOpening={openingGroupId !== null}
-              confirmThreshold={confirmThreshold}
-              onOpen={onOpenGroup}
-              onEdit={openEdit}
-              onDelete={onDeleteGroup}
-              onAddMembers={onAddMembers}
-              onRemoveMember={onRemoveMember}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={groups.map((g) => g.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {groups.map((group) => (
+                <SortableGroupCard key={group.id} group={group}>
+                  {(dragHandle) => (
+                    <GroupCard
+                      group={group}
+                      bookmarks={bookmarks}
+                      isOpening={openingGroupId === group.id}
+                      isAnyOpening={openingGroupId !== null}
+                      onOpen={onOpenGroup}
+                      onEdit={openEdit}
+                      onDelete={onDeleteGroup}
+                      onAddMembers={onAddMembers}
+                      onRemoveMember={onRemoveMember}
+                      onReorderMembers={onReorderMembers}
+                      dragHandle={dragHandle}
+                    />
+                  )}
+                </SortableGroupCard>
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {formOpen && (
         <GroupForm
           group={editing}
+          otherGroups={groups}
+          bookmarks={bookmarks}
           onClose={() => setFormOpen(false)}
-          onSave={async (name, color) => {
+          onSave={async (name, color, shortcut) => {
             const ok = editing
-              ? await onUpdateGroup(editing.id, { name, color })
-              : await onCreateGroup(name, color);
+              ? await onUpdateGroup(editing.id, { name, color, shortcut })
+              : await onCreateGroup(name, color, shortcut);
             if (ok) setFormOpen(false);
             return ok;
           }}
