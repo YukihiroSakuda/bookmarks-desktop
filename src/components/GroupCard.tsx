@@ -21,6 +21,7 @@ import { BookmarkUI } from "@/types/bookmark";
 import { GroupUI } from "@/types/group";
 import { Button } from "./Button";
 import { getTagColorStyles } from "@/lib/tagColors";
+import { formatAcceleratorForDisplay } from "@/lib/shortcut";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -185,7 +186,15 @@ export function GroupCard({
   const chip = getTagColorStyles(group.color).chipOn;
 
   return (
-    <div className="bg-card border shadow-sm rounded-xl backdrop-blur-sm p-4 group">
+    <div
+      className={cn(
+        "bg-card border shadow-sm rounded-xl backdrop-blur-sm p-4 group",
+        // `backdrop-blur` makes each card its own stacking context, so a z-index
+        // on the suggestion list cannot lift it over a later card. Raising the
+        // whole card while the list is open is what actually gets it on top.
+        suggestions.length > 0 && "relative z-20"
+      )}
+    >
       <div className="flex items-center justify-between gap-2 mb-3">
         {dragHandle}
         <button
@@ -214,6 +223,11 @@ export function GroupCard({
             <Play className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           )}
         </button>
+        {group.shortcut && (
+          <kbd className="text-[10px] font-mono text-muted-foreground border rounded px-1.5 py-0.5 bg-muted whitespace-nowrap shrink-0">
+            {formatAcceleratorForDisplay(group.shortcut)}
+          </kbd>
+        )}
         <div className="flex items-center gap-1 shrink-0 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto transition-opacity">
           <Button
             onClick={(e) => { e.stopPropagation(); onEdit(group); }}
@@ -228,6 +242,7 @@ export function GroupCard({
 
       {members.length > 0 && (
         <DndContext
+          id={`group-members-${group.id}`}
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleMemberDragEnd}

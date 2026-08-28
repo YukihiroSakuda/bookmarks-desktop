@@ -146,12 +146,13 @@ export function GroupsView({
         </div>
       ) : (
         <DndContext
+          id="groups-reorder"
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={handleDragEnd}
         >
           <SortableContext items={groups.map((g) => g.id)} strategy={rectSortingStrategy}>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
               {groups.map((group) => (
                 <SortableGroupCard key={group.id} group={group}>
                   {(dragHandle) => (

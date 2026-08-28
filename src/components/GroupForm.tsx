@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Keyboard, TriangleAlert, X } from "lucide-react";
 import { BookmarkUI } from "@/types/bookmark";
 import { GroupUI } from "@/types/group";
@@ -42,6 +42,15 @@ export function GroupForm({
     if (g) return g.name;
     return bookmarks.find((b) => b.shortcut === shortcut)?.title;
   }, [shortcut, otherGroups, bookmarks, group?.id]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // While capturing, Escape cancels the capture rather than the dialog.
+      if (e.key === "Escape" && !isCapturing) onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isCapturing, onClose]);
 
   const handleShortcutKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     e.preventDefault();
@@ -88,12 +97,6 @@ export function GroupForm({
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.stopPropagation();
-              onClose();
-            }
-          }}
           placeholder="e.g. Project A morning"
           className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
