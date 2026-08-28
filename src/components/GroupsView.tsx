@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GripVertical, Layers, Plus } from "lucide-react";
+import { Download, GripVertical, Layers, Plus } from "lucide-react";
 import {
   DndContext,
   DragEndEvent,
@@ -18,17 +18,20 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BookmarkUI } from "@/types/bookmark";
-import { GroupUI } from "@/types/group";
+import { GroupUI, OpenFolder } from "@/types/group";
 import { Button } from "./Button";
 import { GroupCard } from "./GroupCard";
 import { GroupForm } from "./GroupForm";
+import { CaptureDialog } from "./CaptureDialog";
 
 interface GroupsViewProps {
   groups: GroupUI[];
   bookmarks: BookmarkUI[];
   openingGroupId: string | null;
   onOpenGroup: (id: string) => void;
-  onCreateGroup: (name: string, color?: string, shortcut?: string) => Promise<boolean>;
+  onCreateGroup: (name: string, color?: string, shortcut?: string) => Promise<string | null>;
+  onLoadOpenFolders: () => Promise<OpenFolder[]>;
+  onCapture: (name: string, paths: string[]) => Promise<boolean>;
   onUpdateGroup: (
     id: string,
     data: { name: string; color?: string; shortcut?: string }
@@ -92,8 +95,11 @@ export function GroupsView({
   onRemoveMember,
   onReorderMembers,
   onReorderGroups,
+  onLoadOpenFolders,
+  onCapture,
 }: GroupsViewProps) {
   const [formOpen, setFormOpen] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const [editing, setEditing] = useState<GroupUI | undefined>(undefined);
 
   const sensors = useSensors(
@@ -126,9 +132,14 @@ export function GroupsView({
         <h2 className="text-sm font-medium tracking-tight">
           <span className="text-blue-500">#</span> Groups
         </h2>
-        <Button onClick={openCreate} variant="primary" size="sm" icon={Plus}>
-          Create group
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setCaptureOpen(true)} variant="secondary" size="sm" icon={Download}>
+            Capture open folders
+          </Button>
+          <Button onClick={openCreate} variant="primary" size="sm" icon={Plus}>
+            Create group
+          </Button>
+        </div>
       </div>
 
       {groups.length === 0 ? (
@@ -140,9 +151,14 @@ export function GroupsView({
               A group opens all of its bookmarks in one click.
             </p>
           </div>
-          <Button onClick={openCreate} variant="secondary" size="sm" icon={Plus}>
-            Create group
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setCaptureOpen(true)} variant="secondary" size="sm" icon={Download}>
+              Capture open folders
+            </Button>
+            <Button onClick={openCreate} variant="secondary" size="sm" icon={Plus}>
+              Create group
+            </Button>
+          </div>
         </div>
       ) : (
         <DndContext
@@ -186,10 +202,18 @@ export function GroupsView({
           onSave={async (name, color, shortcut) => {
             const ok = editing
               ? await onUpdateGroup(editing.id, { name, color, shortcut })
-              : await onCreateGroup(name, color, shortcut);
+              : Boolean(await onCreateGroup(name, color, shortcut));
             if (ok) setFormOpen(false);
             return ok;
           }}
+        />
+      )}
+
+      {captureOpen && (
+        <CaptureDialog
+          onClose={() => setCaptureOpen(false)}
+          onLoad={onLoadOpenFolders}
+          onCapture={onCapture}
         />
       )}
     </div>

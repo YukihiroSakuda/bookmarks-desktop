@@ -1,6 +1,7 @@
 mod commands;
 mod db;
 mod explorertabs;
+mod explorerwindows;
 mod groups;
 mod favicon;
 mod page_title;
@@ -219,6 +220,7 @@ pub fn run() {
             groups::remove_bookmark_from_group,
             groups::set_group_members,
             groups::open_group,
+            groups::list_open_folders,
             commands::get_pending_path,
             commands::register_context_menu,
             commands::unregister_context_menu,

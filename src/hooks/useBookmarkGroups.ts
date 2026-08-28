@@ -1,6 +1,10 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import { GroupUI, Group, OpenGroupResult, convertGroupToUI } from "@/types/group";
+import { GroupUI, Group, OpenFolder, OpenGroupResult, convertGroupToUI } from "@/types/group";
+import { BookmarkUI } from "@/types/bookmark";
+import { Tag } from "@/types/tag";
+import { TagRule } from "@/types/tagRule";
+import { findDuplicateBookmark, getAutoTagNames, pathBasename } from "@/shared/bookmarks/form";
 import { tauriFetch as fetch } from "@/lib/tauriFetch";
 
 export function useBookmarkGroups() {
@@ -23,7 +27,7 @@ export function useBookmarkGroups() {
   }, []);
 
   const createGroup = useCallback(
-    async (name: string, color?: string, shortcut?: string): Promise<boolean> => {
+    async (name: string, color?: string, shortcut?: string): Promise<string | null> => {
       try {
         const res = await fetch("/api/groups", {
           method: "POST",
@@ -33,10 +37,10 @@ export function useBookmarkGroups() {
         const body = await res.json();
         if (!res.ok) throw new Error(body?.error || "Failed to create group");
         await fetchGroups();
-        return true;
+        return (body?.id as string) ?? null;
       } catch (error) {
         toast.error(error instanceof Error ? error.message : String(error));
-        return false;
+        return null;
       }
     },
     [fetchGroups]
@@ -199,6 +203,69 @@ export function useBookmarkGroups() {
     [openingGroupId]
   );
 
+  /** Folders currently open in File Explorer, as capture candidates. */
+  const listOpenFolders = useCallback(async (): Promise<OpenFolder[]> => {
+    try {
+      const res = await fetch("/api/groups/open-folders");
+      if (!res.ok) throw new Error("Failed to read open folders");
+      const body = await res.json();
+      return (body?.folders as OpenFolder[]) ?? [];
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+      return [];
+    }
+  }, []);
+
+  /**
+   * Turn a set of open folders into a group.
+   *
+   * Paths that already have a bookmark reuse it. Without that, every capture
+   * would add another bookmark for the same folder and the list would fill up
+   * with duplicates within a week.
+   */
+  const captureFromFolders = useCallback(
+    async (
+      name: string,
+      paths: string[],
+      context: { bookmarks: BookmarkUI[]; tagRules: TagRule[]; availableTags: Tag[] }
+    ): Promise<boolean> => {
+      const { bookmarks, tagRules, availableTags } = context;
+      const bookmarkIds: string[] = [];
+
+      try {
+        for (const path of paths) {
+          const existing = findDuplicateBookmark(bookmarks, path);
+          if (existing) {
+            bookmarkIds.push(existing.id);
+            continue;
+          }
+
+          const title = pathBasename(path) || path;
+          const tags = getAutoTagNames(tagRules, availableTags, { title, url: path });
+          const res = await fetch("/api/bookmarks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title, url: path, kind: "path", tags }),
+          });
+          const body = await res.json();
+          if (!res.ok) throw new Error(body?.error || `Failed to add ${title}`);
+          bookmarkIds.push(body.id as string);
+        }
+
+        const groupId = await createGroup(name);
+        if (!groupId) return false;
+        if (bookmarkIds.length > 0) await addToGroup(groupId, bookmarkIds);
+
+        toast.success(`Captured ${bookmarkIds.length} folders into "${name}"`);
+        return true;
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : String(error));
+        return false;
+      }
+    },
+    [createGroup, addToGroup]
+  );
+
   return {
     groups,
     setGroups,
@@ -212,5 +279,7 @@ export function useBookmarkGroups() {
     setGroupMembers,
     reorderGroups,
     openGroup,
+    listOpenFolders,
+    captureFromFolders,
   };
 }

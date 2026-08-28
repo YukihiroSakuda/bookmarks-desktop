@@ -412,6 +412,19 @@ export default function BookmarksPage() {
                 onRemoveMember={groups.removeFromGroup}
                 onReorderMembers={groups.setGroupMembers}
                 onReorderGroups={groups.reorderGroups}
+                onLoadOpenFolders={groups.listOpenFolders}
+                onCapture={async (name, paths) => {
+                  const ok = await groups.captureFromFolders(name, paths, {
+                    bookmarks,
+                    tagRules,
+                    availableTags,
+                  });
+                  // Capture creates bookmarks, and the group card resolves its
+                  // members out of this list — without a refetch the folders it
+                  // just captured render as an empty group.
+                  if (ok) await fetchBookmarks();
+                  return ok;
+                }}
               />
             </div>
           ) : (
