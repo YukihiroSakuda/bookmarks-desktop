@@ -9,6 +9,8 @@ import { BookmarkForm } from "@/components/BookmarkForm";
 import { SavingOrderOverlay } from "@/components/SavingOrderOverlay";
 import { DropOverlay } from "@/components/DropOverlay";
 import { FolderSearchResults } from "@/components/FolderSearchResults";
+import { ViewSwitcher } from "@/components/ViewSwitcher";
+import { GroupsView } from "@/components/GroupsView";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,11 +37,13 @@ import {
   useTypeToSearch,
   useNewBookmarkFromUrl,
   useFolderSearch,
+  useBookmarkGroups,
 } from "@/hooks";
 import { toast } from "sonner";
 import { readAppCache, writeAppCache } from "@/lib/appCache";
 import { formatAcceleratorForDisplay } from "@/lib/shortcut";
 import { BookmarkUI } from "@/types/bookmark";
+import { AppView, readAppView, writeAppView } from "@/lib/appView";
 
 export default function BookmarksPage() {
   const { fetchUserSettings, applySettings, ...settings } = useUserSettings();
@@ -91,6 +95,21 @@ export default function BookmarksPage() {
       ),
     [availableTags]
   );
+
+  const groups = useBookmarkGroups();
+
+  // Which top-level view is showing. Read from localStorage after mount rather
+  // than in the initializer: the server render has no localStorage, and
+  // seeding state from it directly would make the first client render
+  // disagree with the markup React just hydrated.
+  const [view, setView] = useState<AppView>("bookmarks");
+  useEffect(() => {
+    setView(readAppView());
+  }, []);
+  const handleViewChange = useCallback((next: AppView) => {
+    setView(next);
+    writeAppView(next);
+  }, []);
 
   const [isOrderingMode, setIsOrderingMode] = useState(false);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
@@ -150,6 +169,8 @@ export default function BookmarksPage() {
     setIsOrderingMode,
   });
 
+  const { fetchGroups } = groups;
+
   const refreshData = useCallback(async () => {
     try {
       const [fetchedSettings, fetchedTags, fetchedTagRules, fetchedBookmarks] = await Promise.all([
@@ -157,6 +178,7 @@ export default function BookmarksPage() {
         fetchTags(),
         fetchTagRules(),
         fetchBookmarks(),
+        fetchGroups(),
       ]);
       if (fetchedSettings && fetchedTags && fetchedTagRules && fetchedBookmarks) {
         writeAppCache({
@@ -169,7 +191,7 @@ export default function BookmarksPage() {
     } catch (error) {
       console.error("Error fetching data:", error);
     }
-  }, [fetchUserSettings, fetchTags, fetchTagRules, fetchBookmarks]);
+  }, [fetchUserSettings, fetchTags, fetchTagRules, fetchBookmarks, fetchGroups]);
 
   // Initial data fetch: show cache immediately, then fetch fresh
   useEffect(() => {
@@ -326,6 +348,31 @@ export default function BookmarksPage() {
     <div className="h-screen flex flex-col overflow-hidden">
       <main className="flex flex-col flex-1 min-h-0 p-2">
         <div className="flex flex-col flex-1 min-h-0">
+          <div className="mb-2">
+            <ViewSwitcher
+              view={view}
+              onViewChange={handleViewChange}
+              disabled={isOrderingMode}
+            />
+          </div>
+
+          {view === "groups" ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <GroupsView
+                groups={groups.groups}
+                bookmarks={bookmarks}
+                openingGroupId={groups.openingGroupId}
+                confirmThreshold={settings.userSettings?.groupOpenConfirmThreshold ?? 10}
+                onOpenGroup={groups.openGroup}
+                onCreateGroup={groups.createGroup}
+                onUpdateGroup={groups.updateGroup}
+                onDeleteGroup={groups.deleteGroup}
+                onAddMembers={groups.addToGroup}
+                onRemoveMember={groups.removeFromGroup}
+              />
+            </div>
+          ) : (
+          <>
           <BookmarkHeader
             listColumns={settings.listColumns}
             summonShortcut={settings.userSettings?.summonShortcut ?? "CmdOrCtrl+Alt+Space"}
@@ -338,6 +385,11 @@ export default function BookmarksPage() {
                     .join(", ")}`
                 );
               }
+            }}
+            groupFolderOpenMode={settings.userSettings?.groupFolderOpenMode ?? "tabs"}
+            groupOpenConfirmThreshold={settings.userSettings?.groupOpenConfirmThreshold ?? 10}
+            onGroupSettingsChange={async (patch) => {
+              await settings.updateUserSettings(patch);
             }}
             shortcutDirEnabled={settings.userSettings?.shortcutDirEnabled ?? false}
             shortcutDirPath={settings.userSettings?.shortcutDirPath ?? ""}
@@ -442,6 +494,8 @@ export default function BookmarksPage() {
                   : bookmarks
               }
             />
+          )}
+          </>
           )}
         </div>
       </main>

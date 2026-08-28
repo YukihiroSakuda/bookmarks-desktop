@@ -64,6 +64,10 @@ pub struct SettingsInput {
     shortcut_dir_enabled: Option<bool>,
     #[serde(default)]
     shortcut_dir_path: Option<String>,
+    #[serde(default)]
+    group_folder_open_mode: Option<String>,
+    #[serde(default)]
+    group_open_confirm_threshold: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -621,7 +625,8 @@ pub fn get_settings(state: State<AppState>) -> Result<Value, String> {
     let value = conn
         .query_row(
             "SELECT list_columns, sort_option, sort_order, summon_shortcut, \
-             shortcut_dir_enabled, shortcut_dir_path \
+             shortcut_dir_enabled, shortcut_dir_path, group_folder_open_mode, \
+             group_open_confirm_threshold \
              FROM user_settings WHERE id = 1",
             [],
             |r| {
@@ -632,6 +637,8 @@ pub fn get_settings(state: State<AppState>) -> Result<Value, String> {
                     "summon_shortcut": r.get::<_, String>(3)?,
                     "shortcut_dir_enabled": r.get::<_, i64>(4)? != 0,
                     "shortcut_dir_path": r.get::<_, Option<String>>(5)?,
+                    "group_folder_open_mode": r.get::<_, String>(6)?,
+                    "group_open_confirm_threshold": r.get::<_, i64>(7)?,
                 }))
             },
         )
@@ -651,14 +658,19 @@ pub fn update_settings(
             "UPDATE user_settings SET list_columns = ?1, sort_option = ?2, sort_order = ?3, \
              summon_shortcut = ?4, \
              shortcut_dir_enabled = COALESCE(?5, shortcut_dir_enabled), \
-             shortcut_dir_path = COALESCE(?6, shortcut_dir_path) WHERE id = 1",
+             shortcut_dir_path = COALESCE(?6, shortcut_dir_path), \
+             group_folder_open_mode = COALESCE(?7, group_folder_open_mode), \
+             group_open_confirm_threshold = COALESCE(?8, group_open_confirm_threshold) \
+             WHERE id = 1",
             rusqlite::params![
                 data.list_columns,
                 data.sort_option,
                 data.sort_order,
                 data.summon_shortcut,
                 data.shortcut_dir_enabled.map(|v| v as i64),
-                data.shortcut_dir_path
+                data.shortcut_dir_path,
+                data.group_folder_open_mode,
+                data.group_open_confirm_threshold
             ],
         )
         .map_err(|e| e.to_string())?;

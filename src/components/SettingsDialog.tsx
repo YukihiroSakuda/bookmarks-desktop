@@ -16,6 +16,7 @@ import { tauriFetch } from "@/lib/tauriFetch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { UiLang } from "@/lib/uiLanguage";
+import { GroupFolderOpenMode } from "@/types/userSettings";
 import { LanguageToggle } from "./LanguageToggle";
 import { SETTINGS_TEXT } from "@/lib/settingsText";
 
@@ -30,6 +31,7 @@ const SETTINGS_SECTIONS = [
   { id: "appearance" },
   { id: "shortcuts" },
   { id: "files" },
+  { id: "groups" },
   { id: "data" },
   { id: "about" },
 ] as const;
@@ -92,6 +94,12 @@ interface SettingsDialogProps {
     shortcutDirEnabled?: boolean;
     shortcutDirPath?: string;
   }) => void;
+  groupFolderOpenMode?: GroupFolderOpenMode;
+  groupOpenConfirmThreshold?: number;
+  onGroupSettingsChange?: (patch: {
+    groupFolderOpenMode?: GroupFolderOpenMode;
+    groupOpenConfirmThreshold?: number;
+  }) => void;
   bookmarks: BookmarkUI[];
   onBookmarksUpdate: (bookmarks: BookmarkUI[]) => void;
   onDeleteAll: () => void;
@@ -109,6 +117,9 @@ export function SettingsDialog({
   shortcutDirEnabled,
   shortcutDirPath,
   onShortcutDirChange,
+  groupFolderOpenMode = "tabs",
+  groupOpenConfirmThreshold = 10,
+  onGroupSettingsChange,
   bookmarks,
   onBookmarksUpdate,
   onDeleteAll,
@@ -804,6 +815,64 @@ export function SettingsDialog({
                           </Button>
                         </>
                       )}
+                    </div>
+                  </div>
+                </section>
+
+                <div className="border-t" />
+
+                <section ref={registerRef("groups")}>
+                  <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">{t.sections.groups}</h2>
+                  <div className="flex flex-col gap-5">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">{t.groupFolderMode}</label>
+                      <div className="flex gap-1.5">
+                        {([
+                          [t.groupFolderModeTabs, "tabs"],
+                          [t.groupFolderModeWindows, "windows"],
+                        ] as const).map(([label, value]) => (
+                          <button
+                            key={value}
+                            onClick={() => onGroupSettingsChange?.({ groupFolderOpenMode: value })}
+                            className={`flex-1 py-1.5 text-sm rounded-md border transition-colors ${
+                              groupFolderOpenMode === value
+                                ? "bg-foreground text-background border-foreground"
+                                : "bg-secondary text-muted-foreground border-border hover:bg-accent"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {t.groupFolderModeNote.before}
+                        <strong className="font-medium text-foreground">
+                          {t.groupFolderModeNote.strong}
+                        </strong>
+                        {t.groupFolderModeNote.after}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">
+                        {t.groupConfirmThreshold}
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={groupOpenConfirmThreshold}
+                        onChange={(e) => {
+                          const next = Number(e.target.value);
+                          if (Number.isFinite(next) && next >= 1 && next <= 99) {
+                            onGroupSettingsChange?.({ groupOpenConfirmThreshold: next });
+                          }
+                        }}
+                        className="w-24 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {t.groupConfirmThresholdNote}
+                      </p>
                     </div>
                   </div>
                 </section>

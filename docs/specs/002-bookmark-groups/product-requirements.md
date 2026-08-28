@@ -225,7 +225,7 @@ version: "1.0"
 | フォールバック | 上記が前提を満たさない／途中で失敗した場合、残りを個別ウィンドウで開く | 確実 |
 
 **実装上の要点:**
-- 対象ウィンドウの特定は `IShellWindows`（`Win32_UI_Shell`、`shortcutdir.rs` ですでに使っている COM 経路）でシェルウィンドウを列挙して HWND を得る。ウィンドウクラス名（`CabinetWClass`）決め打ちの `FindWindow` より、自分が開いたパスと突き合わせられる分こちらが確実
+- 対象ウィンドウの特定は **`EnumWindows` でウィンドウクラス `CabinetWClass` を列挙し、1件目を開く前後の差分を取る**（実装時に当初案の `IShellWindows` から変更）。「今しがた現れたウィンドウ」を直接同定できるうえ、`IWebBrowser2` 経由でパスを突き合わせる必要がなく、「フォルダー ウィンドウを別のプロセスで開く」設定下でも列挙結果が変わらない
 - キー送出は `SendInput`（`Win32_UI_Input_KeyboardAndMouse` フィーチャの追加が必要）。パス文字列は1文字ずつ `KEYEVENTF_UNICODE` で送る。クリップボード経由（`Ctrl+V`）はユーザーのクリップボードを破壊するため使わない。日本語を含むパスも IME を経由せずに入力できる
 - `SetForegroundWindow` はフォアグラウンド権限を持つプロセスからしか成功しない。ユーザーのクリック起点で走るため本アプリはフォアグラウンドにあり、通常は成功する。失敗したらフォールバックへ
 - 各ステップ間に待機（`Ctrl+T` 後 150ms、アドレスバー確定後 250ms 程度）が必要。したがってこの処理は**必ず専用スレッド**で実行し、UI をブロックしない
@@ -346,13 +346,25 @@ POST   /api/groups/:id/open        → open_group
 
 | Phase | 内容 | 完了条件 |
 |-------|------|----------|
-| **P1: 土台** | スキーマ2テーブル、CRUD コマンド、`tauriFetch` ルート、`useBookmarkGroups` | グループを作成・編集・削除でき、再起動後も残る |
-| **P2: 起動（確実な方）** | `open_group`（URL 順次 + フォルダは個別ウィンドウ）、確認ダイアログ、アクセス数更新 | グループ1クリックで全部開く。フォルダはウィンドウで開く |
-| **P3: ビュー分離** | `ViewSwitcher`、`GroupsView`、`GroupCard`、アクティブビューの永続化 | Groups ビューで完結し、**Bookmarks ビューの差分がゼロ**である |
-| **P4: Explorer タブ化** | `explorertabs.rs`、設定2列と Settings UI、フォールバック経路 | Win11 22H2+ でタブにまとまる。OFF / 非対応環境で P2 の挙動に戻る |
-| **P5: 仕上げ** | グループ内並び替え、ショートカット、色 | Should Have を満たす |
+| ✅ **P1: 土台** | スキーマ2テーブル、CRUD コマンド、`tauriFetch` ルート、`useBookmarkGroups` | グループを作成・編集・削除でき、再起動後も残る |
+| ✅ **P2: 起動（確実な方）** | `open_group`（URL 順次 + フォルダは個別ウィンドウ）、確認ダイアログ、アクセス数更新 | グループ1クリックで全部開く。フォルダはウィンドウで開く |
+| ✅ **P3: ビュー分離** | `ViewSwitcher`、`GroupsView`、`GroupCard`、アクティブビューの永続化 | Groups ビューで完結し、**Bookmarks ビューの差分がゼロ**である |
+| ✅ **P4: Explorer タブ化** | `explorertabs.rs`、設定2列と Settings UI、フォールバック経路 | Win11 22H2+ でタブにまとまる。OFF / 非対応環境で P2 の挙動に戻る |
+| ⬜ **P5: 仕上げ** | グループ内並び替え、グループカードの並び替え、ショートカット | Should Have を満たす。色は P3 で実装済み。バックエンド（`set_group_members` / `reorder_groups`）は用意済みで、残るのは dnd-kit の配線 |
 
 P4 は単独で切り離せる設計にする。**P4 が期待どおり動かなくても P1〜P3 は完成した機能として成立する**ことが、この分割の目的である。
+
+### 実装時の検証状況
+
+| 対象 | 結果 |
+|------|------|
+| `npx tsc --noEmit` / `npm run lint` / `npm run build` | 通過 |
+| `cargo check --target x86_64-pc-windows-gnu`（`cfg(windows)` を含む全体） | 通過 |
+| `BookmarkCard` / `BookmarkForm` / `BookmarkList` の差分 | **ゼロ**（前提どおり） |
+| `BookmarkHeader` の差分 | **13行**。`SettingsDialog` がこのコンポーネント内にあるため、グループ設定を渡すための props の受け渡しのみ。描画には一切変更なし |
+| 実機での動作（Explorer タブ化を含む） | **未検証**。Windows 実機が必要 |
+
+`BookmarkHeader` を完全なゼロ差分にするには `SettingsDialog` をこのコンポーネントの外に出すリファクタが要る。既存コードへの変更が増えるため、props の受け渡し13行の方を選んだ。
 
 ---
 

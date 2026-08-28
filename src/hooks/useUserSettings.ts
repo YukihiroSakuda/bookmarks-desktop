@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS: UserSettingsUI = {
   summonShortcut: DEFAULT_SUMMON_SHORTCUT,
   shortcutDirEnabled: false,
   shortcutDirPath: "",
+  groupFolderOpenMode: "tabs",
+  groupOpenConfirmThreshold: 10,
 };
 
 export function useUserSettings() {
@@ -60,6 +62,8 @@ export function useUserSettings() {
           summon_shortcut: applied.summonShortcut,
           shortcut_dir_enabled: applied.shortcutDirEnabled,
           shortcut_dir_path: applied.shortcutDirPath,
+          group_folder_open_mode: applied.groupFolderOpenMode,
+          group_open_confirm_threshold: applied.groupOpenConfirmThreshold,
         }),
       });
       if (!res.ok) throw new Error("Failed to save settings");
@@ -98,6 +102,8 @@ export function useUserSettings() {
         summonShortcut: data.summon_shortcut || DEFAULT_SUMMON_SHORTCUT,
         shortcutDirEnabled: Boolean(data.shortcut_dir_enabled),
         shortcutDirPath: data.shortcut_dir_path ?? "",
+        groupFolderOpenMode: data.group_folder_open_mode === "windows" ? "windows" : "tabs",
+        groupOpenConfirmThreshold: data.group_open_confirm_threshold ?? 10,
       };
 
       applySettings(uiSettings);
