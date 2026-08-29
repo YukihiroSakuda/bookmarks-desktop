@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, GripVertical, Layers, Plus } from "lucide-react";
 import {
   DndContext,
@@ -41,6 +41,9 @@ interface GroupsViewProps {
   onRemoveMember: (id: string, bookmarkId: string) => void;
   onReorderMembers: (id: string, bookmarkIds: string[]) => void;
   onReorderGroups: (ordered: GroupUI[]) => void;
+  /** Told when a dialog here opens or closes, so app-wide keyboard
+   *  shortcuts can stand down for it. */
+  onDialogOpenChange?: (open: boolean) => void;
 }
 
 interface SortableGroupCardProps {
@@ -97,10 +100,19 @@ export function GroupsView({
   onReorderGroups,
   onLoadOpenFolders,
   onCapture,
+  onDialogOpenChange,
 }: GroupsViewProps) {
   const [formOpen, setFormOpen] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [editing, setEditing] = useState<GroupUI | undefined>(undefined);
+
+  useEffect(() => {
+    onDialogOpenChange?.(formOpen || captureOpen);
+  }, [formOpen, captureOpen, onDialogOpenChange]);
+
+  // Leaving the view with a dialog open would otherwise strand the flag at
+  // true and leave every shortcut dead.
+  useEffect(() => () => onDialogOpenChange?.(false), [onDialogOpenChange]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
