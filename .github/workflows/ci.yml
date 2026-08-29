@@ -5,10 +5,16 @@ on:
   push:
     branches: [main]
 
-# 同じブランチに続けて push したとき、古い実行は用済みなので打ち切る。
+# PR に続けて push したとき、古い実行は用済みなので打ち切る。main への push
+# は打ち切らない — main の各コミットには完了した結果が残っていてほしい。
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# どのジョブもリポジトリを読むだけ。サードパーティの install / build
+# スクリプトを走らせるので、既定より広い権限を渡さない。
+permissions:
+  contents: read
 
 jobs:
   frontend:
@@ -40,12 +46,25 @@ jobs:
       - name: Build
         run: npm run build
 
+      # 拡張機能は独立した Vite プロジェクトだが、
+      # ../../src/shared/bookmarks/form をプロジェクト境界を越えて import
+      # している。ルートの tsconfig からは除外されているので、ここで
+      # ビルドしない限り共有コードの変更が拡張機能を壊しても気づけない。
+      # `npm run build` が tsc --noEmit と vite build の両方を回す。
+      - name: Install extension dependencies
+        run: npm ci
+        working-directory: extension
+
+      - name: Build extension
+        run: npm run build
+        working-directory: extension
+
   rust:
     name: Rust (Windows)
     # windows-latest でなければならない。src-tauri/Cargo.toml では rusqlite・
     # reqwest・axum などが [target.'cfg(windows)'.dependencies] にあり、
     # Linux では依存が解決せずビルドできない。加えて #[cfg(windows)] の
-    # コード（explorertabs / shortcutdir / winpkg）は Windows 向けに
+    # コード（shortcutdir / winpkg / folder_search）は Windows 向けに
     # コンパイルしない限り型検査すらされない。
     runs-on: windows-latest
 
@@ -58,12 +77,24 @@ jobs:
       - name: Cache Rust build artifacts
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: './src-tauri -> target'
+          workspaces: |
+            ./src-tauri -> target
+            ./src-tauri/context-menu -> target
 
-      # フロントのビルド出力（out/）は cargo check には不要なので、
-      # このジョブは frontend ジョブと独立して並列に走れる。
+      # --all-targets: --lib だけだと src/main.rs がどこからもコンパイル
+      # されず、app_lib::run の改名が素通りする。
+      # --locked: Cargo.lock が Cargo.toml とずれていたら、黙って作り直す
+      # のではなく失敗させる。
+      # フロントのビルド出力（out/）は不要なので、このジョブは frontend
+      # ジョブと独立して並列に走れる。
       - name: Check
-        run: cargo check --lib --manifest-path src-tauri/Cargo.toml
+        run: cargo check --all-targets --locked --manifest-path src-tauri/Cargo.toml
 
       - name: Test
-        run: cargo test --lib --manifest-path src-tauri/Cargo.toml
+        run: cargo test --lib --locked --manifest-path src-tauri/Cargo.toml
+
+      # context-menu は自前の [workspace] を持つ独立クレートなので、
+      # 上の --manifest-path では一切触れられない。ここで見ておかないと、
+      # コンパイルできない変更が scripts/build-msix.ps1 まで露見しない。
+      - name: Check context-menu crate
+        run: cargo check --all-targets --locked --manifest-path src-tauri/context-menu/Cargo.toml
