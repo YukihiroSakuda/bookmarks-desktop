@@ -18,17 +18,33 @@
 //!   wherever focus happens to be, so if the user clicks away mid-run we stop
 //!   immediately rather than type a path into whatever they clicked on.
 
+/// What actually happened when a set of folders was opened.
+pub struct FolderOpenOutcome {
+    /// The mode actually used: `"tabs"` or `"windows"`.
+    pub mode: String,
+    /// Paths that could not be opened, each with its reason. Reported per path
+    /// rather than as one error: the caller bumps an access count per folder,
+    /// and counting a folder that never opened would push a stale path up the
+    /// recency sort.
+    pub failed: Vec<(String, String)>,
+}
+
 /// Open `paths`, as tabs in a single window when `want_tabs` and the platform
-/// allow it. Returns the mode actually used: `"tabs"` or `"windows"`.
-pub fn open_folders(paths: &[String], want_tabs: bool) -> Result<String, String> {
+/// allow it.
+pub fn open_folders(paths: &[String], want_tabs: bool) -> FolderOpenOutcome {
     if paths.is_empty() {
-        return Ok("windows".into());
+        return FolderOpenOutcome { mode: "windows".into(), failed: Vec::new() };
     }
     #[cfg(windows)]
     {
         if want_tabs && paths.len() > 1 && supports_tabs() {
             match windows_impl::open_as_tabs(paths) {
-                Ok(()) => return Ok("tabs".into()),
+                // Whether a tab was really created is unknowable (see the module
+                // docs), so nothing is reported as failed here — only as
+                // attempted.
+                Ok(()) => {
+                    return FolderOpenOutcome { mode: "tabs".into(), failed: Vec::new() }
+                }
                 // Partial progress: `rest` is the first path the tab attempt
                 // never opened. Falling back over the whole list would open the
                 // earlier ones a second time.
@@ -42,19 +58,14 @@ pub fn open_folders(paths: &[String], want_tabs: bool) -> Result<String, String>
     open_each_in_window(paths)
 }
 
-fn open_each_in_window(paths: &[String]) -> Result<String, String> {
-    let mut last_err: Option<String> = None;
-    let mut opened = 0;
+fn open_each_in_window(paths: &[String]) -> FolderOpenOutcome {
+    let mut failed = Vec::new();
     for p in paths {
-        match tauri_plugin_opener::open_path(p, None::<&str>) {
-            Ok(()) => opened += 1,
-            Err(e) => last_err = Some(e.to_string()),
+        if let Err(e) = tauri_plugin_opener::open_path(p, None::<&str>) {
+            failed.push((p.clone(), e.to_string()));
         }
     }
-    if opened == 0 {
-        return Err(last_err.unwrap_or_else(|| "フォルダを開けませんでした".into()));
-    }
-    Ok("windows".into())
+    FolderOpenOutcome { mode: "windows".into(), failed }
 }
 
 /// File Explorer grew tabs in Windows 11 22H2 (build 22621). Below that the
@@ -180,6 +191,17 @@ mod windows_impl {
     /// focus is, so a user clicking away mid-run would otherwise get a file
     /// path typed into their editor.
     fn add_tab(hwnd: HWND, path: &str) -> Result<(), ()> {
+        match add_tab_inner(hwnd, path) {
+            Ok(()) => Ok(()),
+            Err(()) => {
+                // Any bail-out mid-sequence can leave a modifier down.
+                release_modifiers();
+                Err(())
+            }
+        }
+    }
+
+    fn add_tab_inner(hwnd: HWND, path: &str) -> Result<(), ()> {
         focus(hwnd)?;
         chord(VK_T)?;
         sleep(AFTER_NEW_TAB);
@@ -258,13 +280,29 @@ mod windows_impl {
         }
     }
 
+    /// Ctrl + `vk`, pressed and released.
+    ///
+    /// `SendInput` can inject fewer events than it was given. A batch that
+    /// stops after the Ctrl key-down leaves Ctrl logically held for every
+    /// application on the desktop, so a failure always tries to release it
+    /// before giving up.
     fn chord(vk: VIRTUAL_KEY) -> Result<(), ()> {
-        send(&[
+        let result = send(&[
             key(VK_CONTROL, false),
             key(vk, false),
             key(vk, true),
             key(VK_CONTROL, true),
-        ])
+        ]);
+        if result.is_err() {
+            release_modifiers();
+        }
+        result
+    }
+
+    /// Best-effort release of the keys `chord` presses. Nothing useful can be
+    /// done if this fails too, so its result is dropped.
+    fn release_modifiers() {
+        let _ = send(&[key(VK_T, true), key(VK_L, true), key(VK_CONTROL, true)]);
     }
 
     fn tap(vk: VIRTUAL_KEY) -> Result<(), ()> {

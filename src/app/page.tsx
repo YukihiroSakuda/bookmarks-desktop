@@ -182,7 +182,13 @@ export default function BookmarksPage() {
           fetchBookmarks(),
           fetchGroups(),
         ]);
-      if (fetchedSettings && fetchedTags && fetchedTagRules && fetchedBookmarks) {
+      if (
+        fetchedSettings &&
+        fetchedTags &&
+        fetchedTagRules &&
+        fetchedBookmarks &&
+        fetchedGroups
+      ) {
         writeAppCache({
           bookmarks: fetchedBookmarks,
           tags: fetchedTags,
@@ -284,7 +290,11 @@ export default function BookmarksPage() {
   });
 
   // Type any plain character to focus the search box and start searching.
+  // Only in the bookmarks view: the Groups view has no search box, so
+  // keystrokes would pile up in a query nobody can see — and each one starts a
+  // `search_in_folders` walk of the filesystem.
   useTypeToSearch({
+    enabled: view === "bookmarks",
     isModalOpen,
     searchInputRef,
     onTypeCharacter: (char) =>
@@ -515,6 +525,8 @@ export default function BookmarksPage() {
               onOpenContaining={handleOpenContainingFolder}
             />
           </div>
+          </>
+          )}
 
           {isModalOpen && (
             <BookmarkForm
@@ -537,8 +549,6 @@ export default function BookmarksPage() {
                   : bookmarks
               }
             />
-          )}
-          </>
           )}
         </div>
       </main>
