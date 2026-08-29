@@ -245,6 +245,11 @@ export default function BookmarksPage() {
   }, [setSearchQuery]);
 
   const [confirmGroupId, setConfirmGroupId] = useState<string | null>(null);
+  // The Groups view owns its own dialogs (create/edit, capture). They are
+  // modals like BookmarkForm, so the keyboard hooks have to stand down for
+  // them too — otherwise a shortcut typed into one launches a group behind it.
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const isAnyModalOpen = isModalOpen || isGroupDialogOpen;
 
   const groupsList = groups.groups;
   const openGroup = groups.openGroup;
@@ -263,7 +268,15 @@ export default function BookmarksPage() {
 
   const requestOpenGroup = useCallback(
     (groupId: string) => {
-      if (resolvableCount(groupId) > confirmThreshold) {
+      const count = resolvableCount(groupId);
+      // The card disables itself when empty, but a shortcut has no such state
+      // to sit in — without this it reaches the backend and surfaces a raw
+      // error string as a toast.
+      if (count === 0) {
+        toast.info("このグループにはブックマークがありません");
+        return;
+      }
+      if (count > confirmThreshold) {
         setConfirmGroupId(groupId);
         return;
       }
@@ -274,7 +287,7 @@ export default function BookmarksPage() {
 
   useBookmarkHotkeys({
     bookmarks,
-    isModalOpen,
+    isModalOpen: isAnyModalOpen,
     onActivate: handleBookmarkClick,
     searchInputRef,
   });
@@ -284,7 +297,7 @@ export default function BookmarksPage() {
   useGroupHotkeys({
     groups: groups.groups,
     bookmarks,
-    isModalOpen,
+    isModalOpen: isAnyModalOpen,
     onActivate: requestOpenGroup,
     searchInputRef,
   });
@@ -422,6 +435,7 @@ export default function BookmarksPage() {
                 onRemoveMember={groups.removeFromGroup}
                 onReorderMembers={groups.setGroupMembers}
                 onReorderGroups={groups.reorderGroups}
+                onDialogOpenChange={setIsGroupDialogOpen}
               />
             </div>
           ) : (

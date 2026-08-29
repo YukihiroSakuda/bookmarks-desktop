@@ -276,12 +276,19 @@ pub fn set_group_members(
     )
     .map_err(|e| e.to_string())?;
     for (index, bid) in bookmark_ids.iter().enumerate() {
-        tx.execute(
+        // A row whose bookmark no longer exists is skipped, not fatal. The
+        // frontend deliberately passes through ids it could not draw (a
+        // bookmark list still loading), so one that has genuinely been deleted
+        // must not take the entire reorder down with it: the foreign key
+        // rejects that row, and dropping it is the correct outcome.
+        let inserted = tx.execute(
             "INSERT INTO bookmark_group_items (group_id, bookmark_id, position, created_at) \
              VALUES (?1, ?2, ?3, ?4) ON CONFLICT(group_id, bookmark_id) DO NOTHING",
             rusqlite::params![id, bid, index as i64 + 1, ts],
-        )
-        .map_err(|e| e.to_string())?;
+        );
+        if let Err(e) = inserted {
+            log::warn!("skipping group member {bid}: {e}");
+        }
     }
     tx.commit().map_err(|e| e.to_string())?;
     Ok(json!({ "ok": true }))
@@ -385,10 +392,16 @@ pub async fn open_group(
         // stale path up the recency sort — the exact thing this command
         // promises not to do.
         for (path, reason) in &outcome.failed {
-            if let Some(member) = folders.iter().find(|m| &m.url == path) {
+            // Every member pointing at this path failed, not just the first —
+            // two bookmarks can name the same folder, and `find` would have
+            // left the second counted as opened.
+            let mut matched = false;
+            for member in folders.iter().filter(|m| &m.url == path) {
+                matched = true;
                 opened_ids.retain(|oid| oid != &member.id);
                 failures.push(json!({ "title": member.title, "reason": reason }));
-            } else {
+            }
+            if !matched {
                 failures.push(json!({ "title": path, "reason": reason }));
             }
         }
@@ -426,12 +439,17 @@ pub async fn open_group(
             )
             .map_err(|e| e.to_string())?;
         }
-        tx.execute(
-            "UPDATE bookmark_groups SET open_count = open_count + 1, last_opened_at = ?1 \
-             WHERE id = ?2",
-            rusqlite::params![ts, id],
-        )
-        .map_err(|e| e.to_string())?;
+        // Only count a launch that opened something. Recording one where every
+        // member failed would be the group-level version of the stale-path
+        // problem the per-bookmark update above avoids.
+        if !opened_ids.is_empty() {
+            tx.execute(
+                "UPDATE bookmark_groups SET open_count = open_count + 1, last_opened_at = ?1 \
+                 WHERE id = ?2",
+                rusqlite::params![ts, id],
+            )
+            .map_err(|e| e.to_string())?;
+        }
         tx.commit().map_err(|e| e.to_string())?;
     }
 

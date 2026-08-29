@@ -182,7 +182,7 @@ export function SettingsDialog({
   }, [groupOpenConfirmThreshold]);
 
   /** Save the typed threshold, or put the stored one back if it is not usable. */
-  const commitThreshold = () => {
+  const commitThreshold = useCallback(() => {
     const next = Number(thresholdDraft);
     if (Number.isInteger(next) && next >= 1 && next <= 99) {
       if (next !== groupOpenConfirmThreshold) {
@@ -191,7 +191,7 @@ export function SettingsDialog({
     } else {
       setThresholdDraft(String(groupOpenConfirmThreshold));
     }
-  };
+  }, [thresholdDraft, groupOpenConfirmThreshold, onGroupSettingsChange]);
 
   useEffect(() => {
     const container = containerEl;
@@ -258,11 +258,16 @@ export function SettingsDialog({
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isCapturingSummon) setOpen(false);
+      if (e.key === "Escape" && !isCapturingSummon) {
+        // The threshold input commits on blur, and closing the dialog from a
+        // key event never blurs it — without this the typed number is lost.
+        commitThreshold();
+        setOpen(false);
+      }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [open, isCapturingSummon]);
+  }, [open, isCapturingSummon, commitThreshold]);
 
   function handleThemeChange(selected: Theme) {
     setTheme(selected);

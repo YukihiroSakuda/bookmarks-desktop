@@ -8,7 +8,9 @@ export function useBookmarkGroups() {
   /** Id of the group currently being opened, so it cannot be launched twice. */
   const [openingGroupId, setOpeningGroupId] = useState<string | null>(null);
 
-  const fetchGroups = useCallback(async (): Promise<GroupUI[]> => {
+  /** Null on failure — an empty array is a real result and must stay
+   *  distinguishable from one, or a failed fetch gets cached as "no groups". */
+  const fetchGroups = useCallback(async (): Promise<GroupUI[] | null> => {
     try {
       const res = await fetch("/api/groups");
       if (!res.ok) throw new Error("Failed to fetch groups");
@@ -18,7 +20,7 @@ export function useBookmarkGroups() {
       return ui;
     } catch (error) {
       console.error("Error fetching groups:", error);
-      return [];
+      return null;
     }
   }, []);
 
