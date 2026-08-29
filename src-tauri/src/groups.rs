@@ -381,24 +381,31 @@ pub async fn open_group(
         .await
         .map_err(|e| e.to_string())?;
 
-        match outcome {
-            Ok(mode) => Some(mode),
-            Err(e) => {
-                // The whole folder batch failed to open; drop those ids back out
-                // of the access-count update.
-                opened_ids.retain(|oid| !folders.iter().any(|m| &m.id == oid));
-                failures.push(json!({ "title": "フォルダ", "reason": e }));
-                None
+        // Drop every folder that did not open back out of the access-count
+        // update, and report it. Counting one that never opened would push a
+        // stale path up the recency sort — the exact thing this command
+        // promises not to do.
+        for (path, reason) in &outcome.failed {
+            if let Some(member) = folders.iter().find(|m| &m.url == path) {
+                opened_ids.retain(|oid| oid != &member.id);
+                failures.push(json!({ "title": member.title, "reason": reason }));
+            } else {
+                failures.push(json!({ "title": path, "reason": reason }));
             }
         }
+
+        Some(outcome.mode)
     };
 
     // --- URLs ---
     let urls: Vec<&Member> = members.iter().filter(|m| m.kind != "path").collect();
     for (index, m) in urls.iter().enumerate() {
         // Browsers drop or reorder tabs when handed a burst of URLs at once.
+        // `tokio::time::sleep`, not `std::thread::sleep`: this is an async fn,
+        // and parking the worker thread is exactly what the `spawn_blocking`
+        // above exists to avoid.
         if index > 0 {
-            std::thread::sleep(std::time::Duration::from_millis(100));
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         match tauri_plugin_opener::open_url(&m.url, None::<&str>) {
             Ok(()) => opened_ids.push(m.id.clone()),

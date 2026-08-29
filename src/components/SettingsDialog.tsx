@@ -132,6 +132,11 @@ export function SettingsDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [isCapturingSummon, setIsCapturingSummon] = useState(false);
+  // Held as text while typing. A controlled number bound straight to the stored
+  // value cannot be cleared — emptying it to type a new number snaps it back —
+  // and every accepted keystroke would save, which re-registers the global
+  // summon hotkey. Committed on blur instead.
+  const [thresholdDraft, setThresholdDraft] = useState(String(groupOpenConfirmThreshold));
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
@@ -172,6 +177,22 @@ export function SettingsDialog({
   };
 
   // Scroll spy: keep the sidebar entry in sync with the section in view.
+  useEffect(() => {
+    setThresholdDraft(String(groupOpenConfirmThreshold));
+  }, [groupOpenConfirmThreshold]);
+
+  /** Save the typed threshold, or put the stored one back if it is not usable. */
+  const commitThreshold = () => {
+    const next = Number(thresholdDraft);
+    if (Number.isInteger(next) && next >= 1 && next <= 99) {
+      if (next !== groupOpenConfirmThreshold) {
+        onGroupSettingsChange?.({ groupOpenConfirmThreshold: next });
+      }
+    } else {
+      setThresholdDraft(String(groupOpenConfirmThreshold));
+    }
+  };
+
   useEffect(() => {
     const container = containerEl;
     if (!open || !container) return;
@@ -861,11 +882,13 @@ export function SettingsDialog({
                         type="number"
                         min={1}
                         max={99}
-                        value={groupOpenConfirmThreshold}
-                        onChange={(e) => {
-                          const next = Number(e.target.value);
-                          if (Number.isFinite(next) && next >= 1 && next <= 99) {
-                            onGroupSettingsChange?.({ groupOpenConfirmThreshold: next });
+                        value={thresholdDraft}
+                        onChange={(e) => setThresholdDraft(e.target.value)}
+                        onBlur={commitThreshold}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
                           }
                         }}
                         className="w-24 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
