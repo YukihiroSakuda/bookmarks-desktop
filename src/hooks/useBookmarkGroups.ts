@@ -205,17 +205,18 @@ export function useBookmarkGroups() {
     [openingGroupId]
   );
 
-  /** Folders currently open in File Explorer, as capture candidates. */
+  /**
+   * Folders currently open in File Explorer, as capture candidates.
+   *
+   * Throws on failure rather than returning an empty list: "the shell would not
+   * answer" and "nothing is open" are different things, and reporting the first
+   * as the second sends the user looking for a window they already have open.
+   */
   const listOpenFolders = useCallback(async (): Promise<OpenFolder[]> => {
-    try {
-      const res = await fetch("/api/groups/open-folders");
-      if (!res.ok) throw new Error("Failed to read open folders");
-      const body = await res.json();
-      return (body?.folders as OpenFolder[]) ?? [];
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-      return [];
-    }
+    const res = await fetch("/api/groups/open-folders");
+    const body = await res.json();
+    if (!res.ok) throw new Error(body?.error || "Failed to read open folders");
+    return (body?.folders as OpenFolder[]) ?? [];
   }, []);
 
   /**

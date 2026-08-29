@@ -7,8 +7,21 @@
 //! Unlike creating a tab (`explorertabs`), reading is a supported operation.
 //! The shell publishes its open browser windows through `IShellWindows`, and
 //! each one reports where it is pointing via `IWebBrowser2::LocationURL`. No
-//! automation, nothing undocumented — so `explorertabs`' caveats do not apply
-//! here.
+//! automation, nothing undocumented.
+//!
+//! # One folder per window, not per tab
+//!
+//! `IShellWindows` enumerates *windows*. A Windows 11 window showing three
+//! tabs is still one entry, and `LocationURL` gives the active tab's folder —
+//! the other two are invisible here. This is the same gap as `explorertabs`,
+//! from the other side: Windows exposes no way to enumerate Explorer tabs, for
+//! the same reason it exposes no way to create one.
+//!
+//! It bites hardest in combination with `explorertabs`: opening a three-folder
+//! group in the default `tabs` mode produces one window with three tabs, and
+//! capturing that back finds one folder. Nothing here can close that gap, so
+//! the capture UI says so rather than quietly returning less than the user can
+//! see on screen.
 //!
 //! `IShellWindows` also enumerates Internet Explorer windows and shell views
 //! with no filesystem location behind them (This PC, Control Panel, Recycle
@@ -55,6 +68,13 @@ fn path_from_file_url(url: &str) -> Option<String> {
         .ok()?
         .into_owned();
 
+    // Checked here rather than on the finished path: the UNC branch below
+    // prepends `\\`, so a bare `file://` would survive an is_empty test on the
+    // result and become a bookmark pointing at `\\`.
+    if decoded.is_empty() {
+        return None;
+    }
+
     // A UNC path arrives as `file://server/share`, so the host is part of the
     // path and the `\\` prefix has to be put back. A local path arrives as
     // `file:///C:/x` and the leading slash is already gone above.
@@ -64,11 +84,7 @@ fn path_from_file_url(url: &str) -> Option<String> {
         format!("\\\\{}", decoded.replace('/', "\\"))
     };
 
-    if path.is_empty() {
-        None
-    } else {
-        Some(path)
-    }
+    Some(path)
 }
 
 #[cfg(target_os = "windows")]
@@ -175,6 +191,14 @@ mod tests {
             path_from_file_url("file://server/share/dir").as_deref(),
             Some("\\\\server\\share\\dir")
         );
+    }
+
+    #[test]
+    fn rejects_a_location_with_no_path() {
+        // Both branches: the local one and the UNC one, which used to return
+        // `Some("\\\\")`.
+        assert_eq!(path_from_file_url("file:///"), None);
+        assert_eq!(path_from_file_url("file://"), None);
     }
 
     #[test]

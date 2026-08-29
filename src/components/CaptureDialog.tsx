@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Folder, Loader2, RefreshCw } from "lucide-react";
+import { Folder, Loader2, RefreshCw, TriangleAlert } from "lucide-react";
 import { OpenFolder } from "@/types/group";
 import { Button } from "./Button";
 import { cn } from "@/lib/utils";
@@ -19,19 +19,29 @@ const PRESELECT_LIMIT = 8;
 
 export function CaptureDialog({ onClose, onLoad, onCapture }: CaptureDialogProps) {
   const [folders, setFolders] = useState<OpenFolder[] | null>(null);
+  // Distinct from `folders === null`, which is the loading state. Without it a
+  // rejected load leaves the dialog reading "Reading open windows…" forever.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    onLoad().then((found) => {
-      if (cancelled) return;
-      setFolders(found);
-      setSelected(
-        found.length <= PRESELECT_LIMIT ? new Set(found.map((f) => f.path)) : new Set()
-      );
-    });
+    onLoad()
+      .then((found) => {
+        if (cancelled) return;
+        setLoadError(null);
+        setFolders(found);
+        setSelected(
+          found.length <= PRESELECT_LIMIT ? new Set(found.map((f) => f.path)) : new Set()
+        );
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setLoadError(error instanceof Error ? error.message : String(error));
+        setFolders([]);
+      });
     return () => { cancelled = true; };
   }, [onLoad]);
 
@@ -58,9 +68,15 @@ export function CaptureDialog({ onClose, onLoad, onCapture }: CaptureDialogProps
 
   const reload = async () => {
     setFolders(null);
-    const found = await onLoad();
-    setFolders(found);
-    setSelected(found.length <= PRESELECT_LIMIT ? new Set(found.map((f) => f.path)) : new Set());
+    setLoadError(null);
+    try {
+      const found = await onLoad();
+      setFolders(found);
+      setSelected(found.length <= PRESELECT_LIMIT ? new Set(found.map((f) => f.path)) : new Set());
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : String(error));
+      setFolders([]);
+    }
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -99,6 +115,7 @@ export function CaptureDialog({ onClose, onLoad, onCapture }: CaptureDialogProps
         </div>
         <p className="text-xs text-muted-foreground mb-4">
           エクスプローラーで開いているフォルダをグループにします。ブラウザのタブは含まれません。
+          エクスプローラーのタブは、各ウィンドウで<strong className="font-medium text-foreground">表示中のものだけ</strong>が対象です。
         </p>
 
         <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
@@ -106,6 +123,17 @@ export function CaptureDialog({ onClose, onLoad, onCapture }: CaptureDialogProps
             <div className="flex items-center gap-2 py-8 justify-center text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
               Reading open windows…
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <TriangleAlert className="size-5 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                開いているウィンドウを読み取れませんでした。
+              </p>
+              <p className="text-xs text-muted-foreground break-all max-w-sm">{loadError}</p>
+              <Button type="button" variant="secondary" size="sm" icon={RefreshCw} onClick={reload}>
+                Retry
+              </Button>
             </div>
           ) : folders.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
