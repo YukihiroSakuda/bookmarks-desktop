@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同じブランチに続けて push したとき、古い実行は用済みなので打ち切る。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      # next build も型検査と lint を含むが、個別に走らせた方が
+      # 「何が壊れたか」がログの先頭で分かる。
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      # 静的エクスポートまで通すことで、型検査では出ない
+      # プリレンダリング時のエラーを捕まえる。
+      - name: Build
+        run: npm run build
+
+  rust:
+    name: Rust (Windows)
+    # windows-latest でなければならない。src-tauri/Cargo.toml では rusqlite・
+    # reqwest・axum などが [target.'cfg(windows)'.dependencies] にあり、
+    # Linux では依存が解決せずビルドできない。加えて #[cfg(windows)] の
+    # コード（explorertabs / shortcutdir / winpkg）は Windows 向けに
+    # コンパイルしない限り型検査すらされない。
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      # フロントのビルド出力（out/）は cargo check には不要なので、
+      # このジョブは frontend ジョブと独立して並列に走れる。
+      - name: Check
+        run: cargo check --lib --manifest-path src-tauri/Cargo.toml
+
+      - name: Test
+        run: cargo test --lib --manifest-path src-tauri/Cargo.toml
