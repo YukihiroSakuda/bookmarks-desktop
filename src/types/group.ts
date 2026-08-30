@@ -56,3 +56,12 @@ export const convertGroupToUI = (group: Group): GroupUI => ({
   updatedAt: group.updated_at,
   bookmarkIds: group.bookmark_ids || [],
 });
+
+/** A folder currently open in File Explorer, offered as a capture candidate. */
+export interface OpenFolder {
+  path: string;
+  /** Leaf name, for display when the path is long. */
+  name: string;
+  /** The window it is open in, for a later "close the session". */
+  hwnd: number;
+}

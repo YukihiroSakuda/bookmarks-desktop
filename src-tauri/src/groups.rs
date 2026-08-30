@@ -12,6 +12,7 @@
 
 use crate::db::AppState;
 use crate::explorertabs;
+use crate::explorerwindows;
 use chrono::{SecondsFormat, Utc};
 use rusqlite::{Connection, OptionalExtension};
 use serde::Deserialize;
@@ -458,4 +459,18 @@ pub async fn open_group(
         "failures": failures,
         "folder_mode": tab_mode_used,
     }))
+}
+
+// ---------- Capture ----------
+
+/// The folders currently open in File Explorer, as capture candidates.
+///
+/// Runs on a blocking thread: it is a COM round trip per open window, and the
+/// async runtime's workers should not be held for that.
+#[tauri::command]
+pub async fn list_open_folders() -> Result<Value, String> {
+    let folders = tauri::async_runtime::spawn_blocking(explorerwindows::list_open_folders)
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(json!({ "folders": folders }))
 }

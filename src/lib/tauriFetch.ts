@@ -90,6 +90,8 @@ async function dispatch(
       if (method === "POST") return invoke("create_group", { data: body });
     } else if (b === "reorder") {
       return invoke("reorder_groups", { order: body?.order });
+    } else if (b === "open-folders") {
+      return invoke("list_open_folders");
     } else {
       const id = b;
       if (c === "open") return invoke("open_group", { id });
