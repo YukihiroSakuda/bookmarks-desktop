@@ -84,6 +84,35 @@ async function dispatch(
     }
   }
 
+  if (a === "groups") {
+    if (b === undefined) {
+      if (method === "GET") return invoke("list_groups");
+      if (method === "POST") return invoke("create_group", { data: body });
+    } else if (b === "reorder") {
+      return invoke("reorder_groups", { order: body?.order });
+    } else if (b === "open-folders") {
+      return invoke("list_open_folders");
+    } else {
+      const id = b;
+      if (c === "open") return invoke("open_group", { id });
+      if (c === "members") {
+        // PUT replaces the whole membership (drag to reorder), POST appends
+        // (the search field), DELETE removes the one named in the body.
+        if (method === "PUT")
+          return invoke("set_group_members", { id, bookmarkIds: body?.bookmarkIds });
+        if (method === "POST")
+          return invoke("add_bookmarks_to_group", { id, bookmarkIds: body?.bookmarkIds });
+        if (method === "DELETE")
+          return invoke("remove_bookmark_from_group", { id, bookmarkId: body?.bookmarkId });
+      }
+      if (c === undefined) {
+        if (method === "PUT" || method === "PATCH")
+          return invoke("update_group", { id, data: body });
+        if (method === "DELETE") return invoke("delete_group", { id });
+      }
+    }
+  }
+
   if (a === "tag-rules") {
     if (b === undefined) {
       if (method === "GET") return invoke("list_tag_rules");

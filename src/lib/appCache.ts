@@ -2,12 +2,15 @@ import { BookmarkUI } from "@/types/bookmark";
 import { Tag } from "@/types/tag";
 import { TagRule } from "@/types/tagRule";
 import { UserSettingsUI } from "@/types/userSettings";
+import { GroupUI } from "@/types/group";
 
 interface AppCache {
   bookmarks: BookmarkUI[];
   tags: Tag[];
   tagRules: TagRule[];
   settings: UserSettingsUI;
+  /** Optional: entries written before groups existed do not carry it. */
+  groups?: GroupUI[];
 }
 
 const CACHE_KEY = "bm_app_cache";

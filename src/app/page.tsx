@@ -9,6 +9,8 @@ import { BookmarkForm } from "@/components/BookmarkForm";
 import { SavingOrderOverlay } from "@/components/SavingOrderOverlay";
 import { DropOverlay } from "@/components/DropOverlay";
 import { FolderSearchResults } from "@/components/FolderSearchResults";
+import { ViewSwitcher } from "@/components/ViewSwitcher";
+import { GroupsView } from "@/components/GroupsView";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,11 +37,14 @@ import {
   useTypeToSearch,
   useNewBookmarkFromUrl,
   useFolderSearch,
+  useBookmarkGroups,
+  useGroupHotkeys,
 } from "@/hooks";
 import { toast } from "sonner";
 import { readAppCache, writeAppCache } from "@/lib/appCache";
 import { formatAcceleratorForDisplay } from "@/lib/shortcut";
 import { BookmarkUI } from "@/types/bookmark";
+import { AppView, readAppView, writeAppView } from "@/lib/appView";
 
 export default function BookmarksPage() {
   const { fetchUserSettings, applySettings, ...settings } = useUserSettings();
@@ -91,6 +96,21 @@ export default function BookmarksPage() {
       ),
     [availableTags]
   );
+
+  const groups = useBookmarkGroups();
+
+  // Which top-level view is showing. Read from localStorage after mount rather
+  // than in the initializer: the server render has no localStorage, and
+  // seeding state from it directly would make the first client render
+  // disagree with the markup React just hydrated.
+  const [view, setView] = useState<AppView>("bookmarks");
+  useEffect(() => {
+    setView(readAppView());
+  }, []);
+  const handleViewChange = useCallback((next: AppView) => {
+    setView(next);
+    writeAppView(next);
+  }, []);
 
   const [isOrderingMode, setIsOrderingMode] = useState(false);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
@@ -150,26 +170,37 @@ export default function BookmarksPage() {
     setIsOrderingMode,
   });
 
+  const { fetchGroups, setGroups } = groups;
+
   const refreshData = useCallback(async () => {
     try {
-      const [fetchedSettings, fetchedTags, fetchedTagRules, fetchedBookmarks] = await Promise.all([
-        fetchUserSettings(),
-        fetchTags(),
-        fetchTagRules(),
-        fetchBookmarks(),
-      ]);
-      if (fetchedSettings && fetchedTags && fetchedTagRules && fetchedBookmarks) {
+      const [fetchedSettings, fetchedTags, fetchedTagRules, fetchedBookmarks, fetchedGroups] =
+        await Promise.all([
+          fetchUserSettings(),
+          fetchTags(),
+          fetchTagRules(),
+          fetchBookmarks(),
+          fetchGroups(),
+        ]);
+      if (
+        fetchedSettings &&
+        fetchedTags &&
+        fetchedTagRules &&
+        fetchedBookmarks &&
+        fetchedGroups
+      ) {
         writeAppCache({
           bookmarks: fetchedBookmarks,
           tags: fetchedTags,
           tagRules: fetchedTagRules,
           settings: fetchedSettings,
+          groups: fetchedGroups,
         });
       }
     } catch (error) {
       console.error("Error fetching data:", error);
     }
-  }, [fetchUserSettings, fetchTags, fetchTagRules, fetchBookmarks]);
+  }, [fetchUserSettings, fetchTags, fetchTagRules, fetchBookmarks, fetchGroups]);
 
   // Initial data fetch: show cache immediately, then fetch fresh
   useEffect(() => {
@@ -179,9 +210,10 @@ export default function BookmarksPage() {
       setAvailableTags(cache.tags);
       setTagRules(cache.tagRules);
       applySettings(cache.settings);
+      if (cache.groups) setGroups(cache.groups);
     }
     refreshData();
-  }, [refreshData, setBookmarks, setAvailableTags, setTagRules, applySettings]);
+  }, [refreshData, setBookmarks, setAvailableTags, setTagRules, applySettings, setGroups]);
 
   // Refresh when tab becomes visible (e.g. after using browser extension)
   useEffect(() => {
@@ -212,15 +244,70 @@ export default function BookmarksPage() {
     return () => { unlisten?.(); };
   }, [setSearchQuery]);
 
+  const [confirmGroupId, setConfirmGroupId] = useState<string | null>(null);
+  // The Groups view owns its own dialogs (create/edit, capture). They are
+  // modals like BookmarkForm, so the keyboard hooks have to stand down for
+  // them too — otherwise a shortcut typed into one launches a group behind it.
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
+  const isAnyModalOpen = isModalOpen || isGroupDialogOpen;
+
+  const groupsList = groups.groups;
+  const openGroup = groups.openGroup;
+  const confirmThreshold = settings.userSettings?.groupOpenConfirmThreshold ?? 10;
+
+  /** Members that still resolve to a bookmark — the count the user will see. */
+  const resolvableCount = useCallback(
+    (groupId: string) => {
+      const group = groupsList.find((g) => g.id === groupId);
+      if (!group) return 0;
+      const ids = new Set(bookmarks.map((b) => b.id));
+      return group.bookmarkIds.filter((id) => ids.has(id)).length;
+    },
+    [groupsList, bookmarks]
+  );
+
+  const requestOpenGroup = useCallback(
+    (groupId: string) => {
+      const count = resolvableCount(groupId);
+      // The card disables itself when empty, but a shortcut has no such state
+      // to sit in — without this it reaches the backend and surfaces a raw
+      // error string as a toast.
+      if (count === 0) {
+        toast.info("このグループにはブックマークがありません");
+        return;
+      }
+      if (count > confirmThreshold) {
+        setConfirmGroupId(groupId);
+        return;
+      }
+      openGroup(groupId);
+    },
+    [resolvableCount, confirmThreshold, openGroup]
+  );
+
   useBookmarkHotkeys({
     bookmarks,
-    isModalOpen,
+    isModalOpen: isAnyModalOpen,
     onActivate: handleBookmarkClick,
     searchInputRef,
   });
 
+  // Group shortcuts run the same launch as clicking the card, and work from
+  // either view — the point of a shortcut is not having to navigate first.
+  useGroupHotkeys({
+    groups: groups.groups,
+    bookmarks,
+    isModalOpen: isAnyModalOpen,
+    onActivate: requestOpenGroup,
+    searchInputRef,
+  });
+
   // Type any plain character to focus the search box and start searching.
+  // Only in the bookmarks view: the Groups view has no search box, so
+  // keystrokes would pile up in a query nobody can see — and each one starts a
+  // `search_in_folders` walk of the filesystem.
   useTypeToSearch({
+    enabled: view === "bookmarks",
     isModalOpen,
     searchInputRef,
     onTypeCharacter: (char) =>
@@ -326,6 +413,46 @@ export default function BookmarksPage() {
     <div className="h-screen flex flex-col overflow-hidden">
       <main className="flex flex-col flex-1 min-h-0 p-2">
         <div className="flex flex-col flex-1 min-h-0">
+          <div className="mb-2">
+            <ViewSwitcher
+              view={view}
+              onViewChange={handleViewChange}
+              disabled={isOrderingMode}
+            />
+          </div>
+
+          {view === "groups" ? (
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              <GroupsView
+                groups={groups.groups}
+                bookmarks={bookmarks}
+                openingGroupId={groups.openingGroupId}
+                onOpenGroup={requestOpenGroup}
+                onCreateGroup={groups.createGroup}
+                onUpdateGroup={groups.updateGroup}
+                onDeleteGroup={groups.deleteGroup}
+                onAddMembers={groups.addToGroup}
+                onRemoveMember={groups.removeFromGroup}
+                onReorderMembers={groups.setGroupMembers}
+                onReorderGroups={groups.reorderGroups}
+                onDialogOpenChange={setIsGroupDialogOpen}
+                onLoadOpenFolders={groups.listOpenFolders}
+                onCapture={async (name, paths) => {
+                  const ok = await groups.captureFromFolders(name, paths, {
+                    bookmarks,
+                    tagRules,
+                    availableTags,
+                  });
+                  // Capture creates bookmarks, and the group card resolves its
+                  // members out of this list — without a refetch the folders it
+                  // just captured render as an empty group.
+                  if (ok) await fetchBookmarks();
+                  return ok;
+                }}
+              />
+            </div>
+          ) : (
+          <>
           <BookmarkHeader
             listColumns={settings.listColumns}
             summonShortcut={settings.userSettings?.summonShortcut ?? "CmdOrCtrl+Alt+Space"}
@@ -338,6 +465,11 @@ export default function BookmarksPage() {
                     .join(", ")}`
                 );
               }
+            }}
+            groupFolderOpenMode={settings.userSettings?.groupFolderOpenMode ?? "tabs"}
+            groupOpenConfirmThreshold={settings.userSettings?.groupOpenConfirmThreshold ?? 10}
+            onGroupSettingsChange={async (patch) => {
+              await settings.updateUserSettings(patch);
             }}
             shortcutDirEnabled={settings.userSettings?.shortcutDirEnabled ?? false}
             shortcutDirPath={settings.userSettings?.shortcutDirPath ?? ""}
@@ -420,6 +552,8 @@ export default function BookmarksPage() {
               onOpenContaining={handleOpenContainingFolder}
             />
           </div>
+          </>
+          )}
 
           {isModalOpen && (
             <BookmarkForm
@@ -445,6 +579,33 @@ export default function BookmarksPage() {
           )}
         </div>
       </main>
+
+      <AlertDialog
+        open={confirmGroupId !== null}
+        onOpenChange={(open) => { if (!open) setConfirmGroupId(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Open {confirmGroupId ? resolvableCount(confirmGroupId) : 0} bookmarks?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmGroupId ? resolvableCount(confirmGroupId) : 0}件を一度に開きます。よろしいですか？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmGroupId) openGroup(confirmGroupId);
+                setConfirmGroupId(null);
+              }}
+            >
+              Open
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <SavingOrderOverlay isVisible={ordering.isSavingOrder} />
       <DropOverlay visible={isDragging} />
