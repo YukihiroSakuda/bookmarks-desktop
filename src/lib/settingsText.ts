@@ -18,7 +18,6 @@ export const SETTINGS_TEXT = {
       appearance: "表示",
       shortcuts: "ショートカット",
       files: "ファイルショートカット",
-      groups: "グループ",
       data: "データ",
       about: "このアプリについて",
     },
@@ -33,17 +32,6 @@ export const SETTINGS_TEXT = {
     noShortcutsYet: "まだ設定されていません。",
     perBookmarkNote:
       "アプリが開いている間だけ有効です。各ブックマークの編集フォームで割り当てます。",
-    groupFolderMode: "グループ内のフォルダの開き方",
-    groupFolderModeTabs: "1つのウィンドウのタブ",
-    groupFolderModeWindows: "個別のウィンドウ",
-    groupFolderModeNote: {
-      before: "Windows にはエクスプローラーのタブを作る API がありません。タブは キー操作の自動化で実現しているため、",
-      strong: "確実ではありません",
-      after: "。Windows 11 22H2 以降でのみ試行し、失敗したときは自動的に個別のウィンドウで開きます。うまく動かない場合は「個別のウィンドウ」を選んでください。",
-    },
-    groupConfirmThreshold: "確認なしで開ける件数",
-    groupConfirmThresholdNote:
-      "グループの件数がこれを超えるとき、開く前に確認します。",
     fileShortcuts: "ファイルショートカット",
     off: "オフ",
     on: "オン",
@@ -127,7 +115,6 @@ export const SETTINGS_TEXT = {
       appearance: "Appearance",
       shortcuts: "Shortcuts",
       files: "File shortcuts",
-      groups: "Groups",
       data: "Data",
       about: "About",
     },
@@ -142,17 +129,6 @@ export const SETTINGS_TEXT = {
     noShortcutsYet: "No shortcuts assigned yet.",
     perBookmarkNote:
       "Active while the app is open. Assign keys in each bookmark's edit form.",
-    groupFolderMode: "How group folders open",
-    groupFolderModeTabs: "Tabs in one window",
-    groupFolderModeWindows: "Separate windows",
-    groupFolderModeNote: {
-      before: "Windows has no API for creating a File Explorer tab. Tabs are driven by keystroke automation, so they are ",
-      strong: "not guaranteed",
-      after: ". It is only attempted on Windows 11 22H2 and later, and falls back to separate windows on any failure. Choose \"Separate windows\" if it misbehaves.",
-    },
-    groupConfirmThreshold: "Ask before opening more than",
-    groupConfirmThresholdNote:
-      "Opening a group larger than this asks for confirmation first.",
     fileShortcuts: "File shortcuts",
     off: "Off",
     on: "On",

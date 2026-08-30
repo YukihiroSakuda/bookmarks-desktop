@@ -64,10 +64,6 @@ pub struct SettingsInput {
     shortcut_dir_enabled: Option<bool>,
     #[serde(default)]
     shortcut_dir_path: Option<String>,
-    #[serde(default)]
-    group_folder_open_mode: Option<String>,
-    #[serde(default)]
-    group_open_confirm_threshold: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -625,8 +621,7 @@ pub fn get_settings(state: State<AppState>) -> Result<Value, String> {
     let value = conn
         .query_row(
             "SELECT list_columns, sort_option, sort_order, summon_shortcut, \
-             shortcut_dir_enabled, shortcut_dir_path, group_folder_open_mode, \
-             group_open_confirm_threshold \
+             shortcut_dir_enabled, shortcut_dir_path \
              FROM user_settings WHERE id = 1",
             [],
             |r| {
@@ -637,8 +632,6 @@ pub fn get_settings(state: State<AppState>) -> Result<Value, String> {
                     "summon_shortcut": r.get::<_, String>(3)?,
                     "shortcut_dir_enabled": r.get::<_, i64>(4)? != 0,
                     "shortcut_dir_path": r.get::<_, Option<String>>(5)?,
-                    "group_folder_open_mode": r.get::<_, String>(6)?,
-                    "group_open_confirm_threshold": r.get::<_, i64>(7)?,
                 }))
             },
         )
@@ -658,19 +651,14 @@ pub fn update_settings(
             "UPDATE user_settings SET list_columns = ?1, sort_option = ?2, sort_order = ?3, \
              summon_shortcut = ?4, \
              shortcut_dir_enabled = COALESCE(?5, shortcut_dir_enabled), \
-             shortcut_dir_path = COALESCE(?6, shortcut_dir_path), \
-             group_folder_open_mode = COALESCE(?7, group_folder_open_mode), \
-             group_open_confirm_threshold = COALESCE(?8, group_open_confirm_threshold) \
-             WHERE id = 1",
+             shortcut_dir_path = COALESCE(?6, shortcut_dir_path) WHERE id = 1",
             rusqlite::params![
                 data.list_columns,
                 data.sort_option,
                 data.sort_order,
                 data.summon_shortcut,
                 data.shortcut_dir_enabled.map(|v| v as i64),
-                data.shortcut_dir_path,
-                data.group_folder_open_mode,
-                data.group_open_confirm_threshold
+                data.shortcut_dir_path
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -746,27 +734,6 @@ struct ImportSettings {
 }
 
 #[derive(Deserialize)]
-struct ImportGroup {
-    id: String,
-    name: String,
-    #[serde(default)]
-    color: Option<String>,
-    #[serde(default)]
-    sort_order: i64,
-    #[serde(default)]
-    shortcut: Option<String>,
-    #[serde(default)]
-    open_count: i64,
-    #[serde(default)]
-    last_opened_at: Option<String>,
-    created_at: String,
-    updated_at: String,
-    /// Member bookmark ids in open order.
-    #[serde(default)]
-    bookmark_ids: Vec<String>,
-}
-
-#[derive(Deserialize)]
 struct ImportData {
     #[serde(default)]
     bookmarks: Vec<ImportBookmark>,
@@ -774,10 +741,6 @@ struct ImportData {
     tags: Vec<ImportTag>,
     #[serde(default)]
     tag_rules: Vec<ImportTagRule>,
-    // Absent in backups taken before groups existed; `default` restores those
-    // as "no groups" rather than failing the whole import.
-    #[serde(default)]
-    groups: Vec<ImportGroup>,
     #[serde(default)]
     settings: Option<ImportSettings>,
 }
@@ -907,65 +870,12 @@ fn build_export_snapshot(conn: &rusqlite::Connection) -> Result<Value, String> {
         )
         .map_err(|e| e.to_string())?;
 
-    // Groups, with their members in open order. Without these a restore would
-    // silently empty every group: `apply_import` deletes all bookmarks, and
-    // `bookmark_group_items` cascades away with them.
-    let mut member_map: HashMap<String, Vec<String>> = HashMap::new();
-    {
-        let mut stmt = conn
-            .prepare(
-                "SELECT group_id, bookmark_id FROM bookmark_group_items \
-                 ORDER BY group_id ASC, position ASC",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            let (gid, bid) = row.map_err(|e| e.to_string())?;
-            member_map.entry(gid).or_default().push(bid);
-        }
-    }
-
-    let mut groups = Vec::new();
-    {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, name, color, sort_order, shortcut, open_count, last_opened_at, \
-                 created_at, updated_at FROM bookmark_groups ORDER BY sort_order ASC",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |r| {
-                Ok(json!({
-                    "id": r.get::<_, String>(0)?,
-                    "name": r.get::<_, String>(1)?,
-                    "color": r.get::<_, Option<String>>(2)?,
-                    "sort_order": r.get::<_, i64>(3)?,
-                    "shortcut": r.get::<_, Option<String>>(4)?,
-                    "open_count": r.get::<_, i64>(5)?,
-                    "last_opened_at": r.get::<_, Option<String>>(6)?,
-                    "created_at": r.get::<_, String>(7)?,
-                    "updated_at": r.get::<_, String>(8)?,
-                }))
-            })
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            let mut obj = row.map_err(|e| e.to_string())?;
-            let id = obj["id"].as_str().unwrap_or_default().to_string();
-            let members = member_map.remove(&id).unwrap_or_default();
-            obj["bookmark_ids"] = Value::Array(members.into_iter().map(Value::String).collect());
-            groups.push(obj);
-        }
-    }
-
     Ok(json!({
         "version": 1,
         "exported_at": now(),
         "bookmarks": bookmarks,
         "tags": tags,
         "tag_rules": tag_rules,
-        "groups": groups,
         "settings": settings,
     }))
 }
@@ -977,9 +887,6 @@ fn apply_import(conn: &mut rusqlite::Connection, data: &ImportData) -> Result<Va
 
     tx.execute("DELETE FROM bookmarks_tags", []).map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM tag_rules", []).map_err(|e| e.to_string())?;
-    // Deleting the bookmarks cascades bookmark_group_items away, so the groups
-    // are rebuilt from the backup below rather than left pointing at nothing.
-    tx.execute("DELETE FROM bookmark_groups", []).map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM bookmarks", []).map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM tags", []).map_err(|e| e.to_string())?;
 
@@ -1036,37 +943,6 @@ fn apply_import(conn: &mut rusqlite::Connection, data: &ImportData) -> Result<Va
         .map_err(|e| e.to_string())?;
     }
 
-    for g in &data.groups {
-        tx.execute(
-            "INSERT INTO bookmark_groups (id, name, color, sort_order, shortcut, open_count, \
-             last_opened_at, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
-            rusqlite::params![
-                g.id,
-                g.name,
-                g.color,
-                g.sort_order,
-                g.shortcut,
-                g.open_count,
-                g.last_opened_at,
-                g.created_at,
-                g.updated_at
-            ],
-        )
-        .map_err(|e| e.to_string())?;
-
-        for (index, bid) in g.bookmark_ids.iter().enumerate() {
-            // A member whose bookmark is missing from the backup is skipped
-            // rather than failing the restore: the foreign key would reject it,
-            // and losing one member beats losing the whole import.
-            let _ = tx.execute(
-                "INSERT INTO bookmark_group_items (group_id, bookmark_id, position, created_at) \
-                 VALUES (?1, ?2, ?3, ?4)",
-                rusqlite::params![g.id, bid, index as i64 + 1, g.created_at],
-            );
-        }
-    }
-
     if let Some(s) = &data.settings {
         tx.execute(
             "UPDATE user_settings SET list_columns = ?1, sort_option = ?2, sort_order = ?3, \
@@ -1083,7 +959,6 @@ fn apply_import(conn: &mut rusqlite::Connection, data: &ImportData) -> Result<Va
         "bookmarks": data.bookmarks.len(),
         "tags": data.tags.len(),
         "tag_rules": data.tag_rules.len(),
-        "groups": data.groups.len(),
     }))
 }
 

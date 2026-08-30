@@ -3,8 +3,6 @@ import { eventToAccelerator } from "@/lib/shortcut";
 
 interface UseTypeToSearchOptions {
   /** Disabled while a modal/form is open. */
-  /** Off outside the view that owns the search box. */
-  enabled?: boolean;
   isModalOpen: boolean;
   /** The search input to focus when typing begins. */
   searchInputRef: RefObject<HTMLInputElement | null>;
@@ -24,21 +22,18 @@ interface UseTypeToSearchOptions {
  * Refs keep the listener stable while reading fresh state.
  */
 export function useTypeToSearch({
-  enabled = true,
   isModalOpen,
   searchInputRef,
   onTypeCharacter,
 }: UseTypeToSearchOptions) {
   const isModalOpenRef = useRef(isModalOpen);
   isModalOpenRef.current = isModalOpen;
-  const enabledRef = useRef(enabled);
-  enabledRef.current = enabled;
   const onTypeCharacterRef = useRef(onTypeCharacter);
   onTypeCharacterRef.current = onTypeCharacter;
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!enabledRef.current || isModalOpenRef.current) return;
+      if (isModalOpenRef.current) return;
       // Don't hijack typing while a field already has focus.
       const target = e.target as HTMLElement;
       if (

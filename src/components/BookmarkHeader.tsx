@@ -20,7 +20,6 @@ import { SortControls } from "./SortControls";
 import { SettingsDialog } from "./SettingsDialog";
 import { HelpDialog } from "./HelpDialog";
 import { DEFAULT_UI_LANG, readStoredUiLang, storeUiLang, UiLang } from "@/lib/uiLanguage";
-import { GroupFolderOpenMode } from "@/types/userSettings";
 
 interface BookmarkHeaderProps {
   listColumns: 1 | 2 | 3 | 4;
@@ -32,12 +31,6 @@ interface BookmarkHeaderProps {
   onShortcutDirChange: (patch: {
     shortcutDirEnabled?: boolean;
     shortcutDirPath?: string;
-  }) => void;
-  groupFolderOpenMode?: GroupFolderOpenMode;
-  groupOpenConfirmThreshold?: number;
-  onGroupSettingsChange?: (patch: {
-    groupFolderOpenMode?: GroupFolderOpenMode;
-    groupOpenConfirmThreshold?: number;
   }) => void;
   selectedTags: string[];
   onAddBookmark: () => void;
@@ -79,9 +72,6 @@ export function BookmarkHeader({
   shortcutDirEnabled,
   shortcutDirPath,
   onShortcutDirChange,
-  groupFolderOpenMode = "tabs",
-  groupOpenConfirmThreshold = 10,
-  onGroupSettingsChange,
   selectedTags,
   onAddBookmark,
   searchQuery,
@@ -289,9 +279,6 @@ export function BookmarkHeader({
               onListColumnsChange={onListColumnsChange}
               summonShortcut={summonShortcut}
               onSummonShortcutChange={onSummonShortcutChange}
-              groupFolderOpenMode={groupFolderOpenMode}
-              groupOpenConfirmThreshold={groupOpenConfirmThreshold}
-              onGroupSettingsChange={onGroupSettingsChange}
               shortcutDirEnabled={shortcutDirEnabled}
               shortcutDirPath={shortcutDirPath}
               onShortcutDirChange={onShortcutDirChange}

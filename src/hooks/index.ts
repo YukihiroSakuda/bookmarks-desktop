@@ -12,5 +12,3 @@ export { useBookmarkHotkeys } from "./useBookmarkHotkeys";
 export { useTypeToSearch } from "./useTypeToSearch";
 export { useNewBookmarkFromUrl } from "./useNewBookmarkFromUrl";
 export { useFolderSearch } from "./useFolderSearch";
-export { useBookmarkGroups } from "./useBookmarkGroups";
-export { useGroupHotkeys } from "./useGroupHotkeys";

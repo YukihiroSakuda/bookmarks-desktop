@@ -1,8 +1,5 @@
 mod commands;
 mod db;
-mod explorertabs;
-mod explorerwindows;
-mod groups;
 mod favicon;
 mod page_title;
 mod folder_search;
@@ -211,16 +208,6 @@ pub fn run() {
             commands::fetch_missing_favicons,
             commands::cancel_fetch_favicons,
             commands::open_path,
-            groups::list_groups,
-            groups::create_group,
-            groups::update_group,
-            groups::delete_group,
-            groups::reorder_groups,
-            groups::add_bookmarks_to_group,
-            groups::remove_bookmark_from_group,
-            groups::set_group_members,
-            groups::open_group,
-            groups::list_open_folders,
             commands::get_pending_path,
             commands::register_context_menu,
             commands::unregister_context_menu,

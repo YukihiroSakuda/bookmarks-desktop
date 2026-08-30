@@ -16,7 +16,6 @@ import { tauriFetch } from "@/lib/tauriFetch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { UiLang } from "@/lib/uiLanguage";
-import { GroupFolderOpenMode } from "@/types/userSettings";
 import { LanguageToggle } from "./LanguageToggle";
 import { SETTINGS_TEXT } from "@/lib/settingsText";
 
@@ -31,7 +30,6 @@ const SETTINGS_SECTIONS = [
   { id: "appearance" },
   { id: "shortcuts" },
   { id: "files" },
-  { id: "groups" },
   { id: "data" },
   { id: "about" },
 ] as const;
@@ -94,12 +92,6 @@ interface SettingsDialogProps {
     shortcutDirEnabled?: boolean;
     shortcutDirPath?: string;
   }) => void;
-  groupFolderOpenMode?: GroupFolderOpenMode;
-  groupOpenConfirmThreshold?: number;
-  onGroupSettingsChange?: (patch: {
-    groupFolderOpenMode?: GroupFolderOpenMode;
-    groupOpenConfirmThreshold?: number;
-  }) => void;
   bookmarks: BookmarkUI[];
   onBookmarksUpdate: (bookmarks: BookmarkUI[]) => void;
   onDeleteAll: () => void;
@@ -117,9 +109,6 @@ export function SettingsDialog({
   shortcutDirEnabled,
   shortcutDirPath,
   onShortcutDirChange,
-  groupFolderOpenMode = "tabs",
-  groupOpenConfirmThreshold = 10,
-  onGroupSettingsChange,
   bookmarks,
   onBookmarksUpdate,
   onDeleteAll,
@@ -132,11 +121,6 @@ export function SettingsDialog({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [isCapturingSummon, setIsCapturingSummon] = useState(false);
-  // Held as text while typing. A controlled number bound straight to the stored
-  // value cannot be cleared — emptying it to type a new number snaps it back —
-  // and every accepted keystroke would save, which re-registers the global
-  // summon hotkey. Committed on blur instead.
-  const [thresholdDraft, setThresholdDraft] = useState(String(groupOpenConfirmThreshold));
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
@@ -177,22 +161,6 @@ export function SettingsDialog({
   };
 
   // Scroll spy: keep the sidebar entry in sync with the section in view.
-  useEffect(() => {
-    setThresholdDraft(String(groupOpenConfirmThreshold));
-  }, [groupOpenConfirmThreshold]);
-
-  /** Save the typed threshold, or put the stored one back if it is not usable. */
-  const commitThreshold = useCallback(() => {
-    const next = Number(thresholdDraft);
-    if (Number.isInteger(next) && next >= 1 && next <= 99) {
-      if (next !== groupOpenConfirmThreshold) {
-        onGroupSettingsChange?.({ groupOpenConfirmThreshold: next });
-      }
-    } else {
-      setThresholdDraft(String(groupOpenConfirmThreshold));
-    }
-  }, [thresholdDraft, groupOpenConfirmThreshold, onGroupSettingsChange]);
-
   useEffect(() => {
     const container = containerEl;
     if (!open || !container) return;
@@ -258,16 +226,11 @@ export function SettingsDialog({
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isCapturingSummon) {
-        // The threshold input commits on blur, and closing the dialog from a
-        // key event never blurs it — without this the typed number is lost.
-        commitThreshold();
-        setOpen(false);
-      }
+      if (e.key === "Escape" && !isCapturingSummon) setOpen(false);
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [open, isCapturingSummon, commitThreshold]);
+  }, [open, isCapturingSummon]);
 
   function handleThemeChange(selected: Theme) {
     setTheme(selected);
@@ -841,66 +804,6 @@ export function SettingsDialog({
                           </Button>
                         </>
                       )}
-                    </div>
-                  </div>
-                </section>
-
-                <div className="border-t" />
-
-                <section ref={registerRef("groups")}>
-                  <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">{t.sections.groups}</h2>
-                  <div className="flex flex-col gap-5">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">{t.groupFolderMode}</label>
-                      <div className="flex gap-1.5">
-                        {([
-                          [t.groupFolderModeTabs, "tabs"],
-                          [t.groupFolderModeWindows, "windows"],
-                        ] as const).map(([label, value]) => (
-                          <button
-                            key={value}
-                            onClick={() => onGroupSettingsChange?.({ groupFolderOpenMode: value })}
-                            className={`flex-1 py-1.5 text-sm rounded-md border transition-colors ${
-                              groupFolderOpenMode === value
-                                ? "bg-foreground text-background border-foreground"
-                                : "bg-secondary text-muted-foreground border-border hover:bg-accent"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1.5">
-                        {t.groupFolderModeNote.before}
-                        <strong className="font-medium text-foreground">
-                          {t.groupFolderModeNote.strong}
-                        </strong>
-                        {t.groupFolderModeNote.after}
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        {t.groupConfirmThreshold}
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={thresholdDraft}
-                        onChange={(e) => setThresholdDraft(e.target.value)}
-                        onBlur={commitThreshold}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            e.currentTarget.blur();
-                          }
-                        }}
-                        className="w-24 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      />
-                      <p className="text-xs text-muted-foreground mt-1.5">
-                        {t.groupConfirmThresholdNote}
-                      </p>
                     </div>
                   </div>
                 </section>

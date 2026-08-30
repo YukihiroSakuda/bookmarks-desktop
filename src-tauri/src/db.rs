@@ -67,29 +67,6 @@ CREATE TABLE IF NOT EXISTS tag_rules (
   updated_at TEXT NOT NULL
 );
 
--- Named sets of bookmarks opened together in one click. Not `groups`:
--- GROUPS is a SQLite keyword (window-function frames), so an unquoted
--- table of that name is a parse hazard.
-CREATE TABLE IF NOT EXISTS bookmark_groups (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  color TEXT,
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  shortcut TEXT,
-  open_count INTEGER NOT NULL DEFAULT 0,
-  last_opened_at TEXT,
-  created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS bookmark_group_items (
-  group_id TEXT NOT NULL REFERENCES bookmark_groups(id) ON DELETE CASCADE,
-  bookmark_id TEXT NOT NULL REFERENCES bookmarks(id) ON DELETE CASCADE,
-  position INTEGER NOT NULL DEFAULT 0,
-  created_at TEXT NOT NULL,
-  PRIMARY KEY (group_id, bookmark_id)
-);
-
 INSERT INTO user_settings (id, display_mode, list_columns, sort_option, sort_order)
 VALUES (1, 'list', 4, 'title', 'asc')
 ON CONFLICT(id) DO NOTHING;
@@ -130,23 +107,6 @@ pub fn init_db(app: &AppHandle) -> Result<Connection, String> {
         "INTEGER NOT NULL DEFAULT 0",
     )?;
     add_column_if_missing(&conn, "user_settings", "shortcut_dir_path", "TEXT")?;
-    // Whether opening a group tries to put its folders in one Explorer window's
-    // tabs. Windows exposes no API for that, so the tab path is UI automation
-    // with a fallback to one window per folder — see `explorertabs.rs`. Stored
-    // as text ('tabs' / 'windows') rather than a flag so a third strategy can
-    // be added without another migration.
-    add_column_if_missing(
-        &conn,
-        "user_settings",
-        "group_folder_open_mode",
-        "TEXT NOT NULL DEFAULT 'tabs'",
-    )?;
-    add_column_if_missing(
-        &conn,
-        "user_settings",
-        "group_open_confirm_threshold",
-        "INTEGER NOT NULL DEFAULT 10",
-    )?;
     ensure_api_token(&conn)?;
 
     Ok(conn)
