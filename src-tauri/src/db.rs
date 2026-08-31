@@ -107,6 +107,14 @@ pub fn init_db(app: &AppHandle) -> Result<Connection, String> {
         "INTEGER NOT NULL DEFAULT 0",
     )?;
     add_column_if_missing(&conn, "user_settings", "shortcut_dir_path", "TEXT")?;
+    // On by default: searching inside bookmarked folders is the expected
+    // behavior, so existing installs pick it up without any action.
+    add_column_if_missing(
+        &conn,
+        "user_settings",
+        "folder_search_enabled",
+        "INTEGER NOT NULL DEFAULT 1",
+    )?;
     ensure_api_token(&conn)?;
 
     Ok(conn)

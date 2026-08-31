@@ -37,6 +37,9 @@ export const SETTINGS_TEXT = {
     on: "オン",
     fileShortcutsNote:
       "ブックマークしたファイルとフォルダへのショートカットを1つの Windows フォルダにまとめ、どのアプリのファイルダイアログからでも選べるようにします。クイックアクセスにピン留めするとそこから開けます。URL は含まれません。",
+    folderSearch: "フォルダ内のファイル検索",
+    folderSearchNote:
+      "検索時に、ブックマークしたフォルダの中のファイル名も検索対象に含めます。",
     change: "変更",
     openFolder: "開く",
     syncNow: "今すぐ同期",
@@ -134,6 +137,9 @@ export const SETTINGS_TEXT = {
     on: "On",
     fileShortcutsNote:
       "Puts a shortcut to every bookmarked file and folder in one Windows folder, so they can be picked from any app's file dialog. Pin it to Quick Access to reach it there. URLs are not included.",
+    folderSearch: "Search inside bookmarked folders",
+    folderSearchNote:
+      "When searching, also match file names inside bookmarked folders.",
     change: "Change",
     openFolder: "Open",
     syncNow: "Sync now",

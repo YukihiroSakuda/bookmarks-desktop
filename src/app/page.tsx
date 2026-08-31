@@ -201,16 +201,18 @@ export default function BookmarksPage() {
     return () => { unlisten?.(); };
   }, [refreshData]);
 
-  // Clear the search box whenever the window is summoned via the global
-  // shortcut, so it doesn't reopen with a stale query from last time.
+  // Clear the search box and tag filter whenever the window is summoned via
+  // the global shortcut, so it doesn't reopen with stale filters from last time.
   const setSearchQuery = filtering.setSearchQuery;
+  const setSelectedTags = filtering.setSelectedTags;
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     listen("summon", () => {
       setSearchQuery("");
+      setSelectedTags([]);
     }).then((fn) => { unlisten = fn; });
     return () => { unlisten?.(); };
-  }, [setSearchQuery]);
+  }, [setSearchQuery, setSelectedTags]);
 
   useBookmarkHotkeys({
     bookmarks,
@@ -234,7 +236,7 @@ export default function BookmarksPage() {
     showProgress: isFolderSearchSlow,
   } = useFolderSearch({
     searchQuery: filtering.searchQuery,
-    enabled: !isOrderingMode,
+    enabled: !isOrderingMode && (settings.userSettings?.folderSearchEnabled ?? true),
   });
 
   const handleOpenFoundPath = useCallback(async (fullPath: string) => {
@@ -343,6 +345,10 @@ export default function BookmarksPage() {
             shortcutDirPath={settings.userSettings?.shortcutDirPath ?? ""}
             onShortcutDirChange={async (patch) => {
               await settings.updateUserSettings(patch);
+            }}
+            folderSearchEnabled={settings.userSettings?.folderSearchEnabled ?? true}
+            onFolderSearchChange={async (enabled) => {
+              await settings.updateUserSettings({ folderSearchEnabled: enabled });
             }}
             onListColumnsChange={async (columns) => {
               await settings.updateUserSettings({

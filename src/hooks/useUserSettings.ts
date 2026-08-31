@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: UserSettingsUI = {
   summonShortcut: DEFAULT_SUMMON_SHORTCUT,
   shortcutDirEnabled: false,
   shortcutDirPath: "",
+  folderSearchEnabled: true,
 };
 
 export function useUserSettings() {
@@ -60,6 +61,7 @@ export function useUserSettings() {
           summon_shortcut: applied.summonShortcut,
           shortcut_dir_enabled: applied.shortcutDirEnabled,
           shortcut_dir_path: applied.shortcutDirPath,
+          folder_search_enabled: applied.folderSearchEnabled,
         }),
       });
       if (!res.ok) throw new Error("Failed to save settings");
@@ -98,6 +100,10 @@ export function useUserSettings() {
         summonShortcut: data.summon_shortcut || DEFAULT_SUMMON_SHORTCUT,
         shortcutDirEnabled: Boolean(data.shortcut_dir_enabled),
         shortcutDirPath: data.shortcut_dir_path ?? "",
+        folderSearchEnabled:
+          data.folder_search_enabled === undefined
+            ? true
+            : Boolean(data.folder_search_enabled),
       };
 
       applySettings(uiSettings);

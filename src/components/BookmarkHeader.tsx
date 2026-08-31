@@ -32,6 +32,8 @@ interface BookmarkHeaderProps {
     shortcutDirEnabled?: boolean;
     shortcutDirPath?: string;
   }) => void;
+  folderSearchEnabled: boolean;
+  onFolderSearchChange: (enabled: boolean) => void;
   selectedTags: string[];
   onAddBookmark: () => void;
   searchQuery: string;
@@ -72,6 +74,8 @@ export function BookmarkHeader({
   shortcutDirEnabled,
   shortcutDirPath,
   onShortcutDirChange,
+  folderSearchEnabled,
+  onFolderSearchChange,
   selectedTags,
   onAddBookmark,
   searchQuery,
@@ -282,6 +286,8 @@ export function BookmarkHeader({
               shortcutDirEnabled={shortcutDirEnabled}
               shortcutDirPath={shortcutDirPath}
               onShortcutDirChange={onShortcutDirChange}
+              folderSearchEnabled={folderSearchEnabled}
+              onFolderSearchChange={onFolderSearchChange}
               bookmarks={bookmarks}
               onBookmarksUpdate={onBookmarksUpdate}
               onDeleteAll={onDeleteAll}

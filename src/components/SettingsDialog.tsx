@@ -92,6 +92,8 @@ interface SettingsDialogProps {
     shortcutDirEnabled?: boolean;
     shortcutDirPath?: string;
   }) => void;
+  folderSearchEnabled: boolean;
+  onFolderSearchChange: (enabled: boolean) => void;
   bookmarks: BookmarkUI[];
   onBookmarksUpdate: (bookmarks: BookmarkUI[]) => void;
   onDeleteAll: () => void;
@@ -109,6 +111,8 @@ export function SettingsDialog({
   shortcutDirEnabled,
   shortcutDirPath,
   onShortcutDirChange,
+  folderSearchEnabled,
+  onFolderSearchChange,
   bookmarks,
   onBookmarksUpdate,
   onDeleteAll,
@@ -804,6 +808,32 @@ export function SettingsDialog({
                           </Button>
                         </>
                       )}
+                    </div>
+
+                    {/* Folder search */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">{t.folderSearch}</label>
+                      <div className="flex gap-1.5">
+                        {([
+                          [t.off, false],
+                          [t.on, true],
+                        ] as const).map(([label, value]) => (
+                          <button
+                            key={label}
+                            onClick={() => onFolderSearchChange(value)}
+                            className={`flex-1 py-1.5 text-sm rounded-md border transition-colors ${
+                              folderSearchEnabled === value
+                                ? "bg-foreground text-background border-foreground"
+                                : "bg-secondary text-muted-foreground border-border hover:bg-accent"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {t.folderSearchNote}
+                      </p>
                     </div>
                   </div>
                 </section>

@@ -9,6 +9,7 @@ export interface UserSettings {
   summon_shortcut: string;
   shortcut_dir_enabled: boolean;
   shortcut_dir_path: string | null;
+  folder_search_enabled: boolean;
 }
 
 export interface UserSettingsUI {
@@ -21,4 +22,6 @@ export interface UserSettingsUI {
   shortcutDirEnabled: boolean;
   /** Where those shortcuts go. Empty means the default (`%USERPROFILE%\Bookmarks`). */
   shortcutDirPath: string;
+  /** Search file names inside bookmarked folders while typing a query. On by default. */
+  folderSearchEnabled: boolean;
 }
