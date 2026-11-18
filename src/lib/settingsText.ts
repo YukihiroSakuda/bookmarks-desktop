@@ -46,15 +46,32 @@ export const SETTINGS_TEXT = {
       "MCP に対応した AI アシスタント（Claude Desktop、Claude Code、ChatGPT・Codex のデスクトップアプリなど）が、ブックマーク・タグ・メモと、ブックマークしたフォルダの中のファイル名を読めるようになります。どこに何があるかを、AI が自分で引けるようになります。",
     mcpCommand: "起動コマンド",
     copy: "コピー",
-    mcpHowToDesktop:
-      "Claude Desktop: 設定の「開発者」から開く claude_desktop_config.json に貼り付けて、再起動します。ほかのサーバーが登録済みなら、mcpServers の中に bookmarks の項目だけを追加します。",
-    mcpHowToCode:
-      "Claude Code: ターミナルに貼り付けて実行します。すべてのプロジェクトで使えるよう、ユーザー単位で登録します。",
-    mcpHowToOpenAi:
-      "ChatGPT / Codex デスクトップアプリ: 設定の「MCP servers」→「Add server」で STDIO を選び、コマンドに「ChatGPT / Codex」でコピーしたパス、引数に --mcp を入力して保存し、「Restart」を押します。2つのアプリは MCP の設定を共有しているので、どちらかで登録すれば両方で使えます（Codex CLI なら codex mcp add bookmarks -- に続けて起動コマンドを実行しても同じです）。Web 版の ChatGPT はこのパソコン上のサーバーを使えません。",
-    mcpHowToOther: "その他のアシスタント: 起動コマンドを stdio サーバーとして登録します。",
+    mcpCopyConfig: "設定をコピー",
+    mcpCopyCommand: "コマンドをコピー",
+    mcpCopyPath: "パスをコピー",
+    mcpClaudeDesktopSteps: [
+      "Claude Desktop の「設定」→「開発者」→「設定を編集」を開き、claude_desktop_config.json を開く",
+      "上の「設定をコピー」で内容をコピーして貼り付け、保存する（すでに mcpServers がある場合は、その中に bookmarks の部分だけを足す）",
+      "Claude Desktop を再起動する",
+    ],
+    mcpClaudeCodeSteps: [
+      "ターミナルを開く",
+      "「コマンドをコピー」で内容をコピーして貼り付け、実行する（すべてのプロジェクトで使えるようになる）",
+    ],
+    mcpOpenAiSteps: [
+      "ChatGPT または Codex のデスクトップアプリで「設定」→「MCP servers」→「Add server」を開く",
+      "「STDIO」を選び、名前に bookmarks と入力する",
+      "コマンドに「パスをコピー」でコピーした内容を貼り付け、引数に --mcp と入力する",
+      "保存して「Restart」を押す",
+    ],
+    mcpOpenAiNote:
+      "ChatGPT と Codex は設定を共有しているので、どちらかで登録すれば両方で使えます。Web 版の ChatGPT は、このパソコンのアプリを使えません。",
+    mcpOtherTitle: "その他のアシスタント",
+    mcpOtherNote: "次の起動コマンドを、stdio の MCP サーバーとして登録します。",
+    mcpVerify:
+      "登録できたか確かめるには、AI に「ブックマークの概要を教えて」と頼んでみてください。",
     mcpPrivacy:
-      "読み取り専用で、AI がブックマークを変更・削除することはできません。アプリを起動していなくても使えます。AI が読んだ内容は、そのアシスタントの AI サービスに送られます。",
+      "読み取り専用で、AI がブックマークを変更・削除することはできません。AI にできるのは、役に立ちそうなページ・ファイル・フォルダを「提案」することだけです。提案はヘッダーの「Suggestions」に届き、内容を確認して保存したものだけが登録されます（アプリの起動中のみ届きます）。読むだけなら、アプリを起動していなくても使えます。AI が読んだ内容は、そのアシスタントの AI サービスに送られます。",
     copied: "コピーしました。",
     copyFailed: "コピーできませんでした。",
     change: "変更",
@@ -163,15 +180,32 @@ export const SETTINGS_TEXT = {
       "AI assistants that support MCP (Claude Desktop, Claude Code, the ChatGPT and Codex desktop apps, and others) can read your bookmarks, tags and memos, plus the file names inside bookmarked folders — so they can look up where things are on their own.",
     mcpCommand: "Launch command",
     copy: "Copy",
-    mcpHowToDesktop:
-      "Claude Desktop: paste into claude_desktop_config.json (open it from the Developer page of its settings), then restart it. If other servers are already listed, add just the bookmarks entry inside mcpServers.",
-    mcpHowToCode:
-      "Claude Code: paste into a terminal and run. It is registered for your user, so every project can use it.",
-    mcpHowToOpenAi:
-      "ChatGPT / Codex desktop apps: in Settings, open MCP servers → Add server, choose STDIO, enter the path copied with \"ChatGPT / Codex\" as the command and --mcp as the argument, save, then select Restart. The two apps share their MCP configuration, so adding it in either makes it available in both (with the Codex CLI, running codex mcp add bookmarks -- followed by the launch command does the same). ChatGPT on the web cannot use a server on this computer.",
-    mcpHowToOther: "Other assistants: register the launch command as a stdio server.",
+    mcpCopyConfig: "Copy config",
+    mcpCopyCommand: "Copy command",
+    mcpCopyPath: "Copy path",
+    mcpClaudeDesktopSteps: [
+      "In Claude Desktop, open Settings → Developer → Edit Config to open claude_desktop_config.json",
+      "Paste what \"Copy config\" copied and save (if mcpServers already exists, add just the bookmarks entry inside it)",
+      "Restart Claude Desktop",
+    ],
+    mcpClaudeCodeSteps: [
+      "Open a terminal",
+      "Paste what \"Copy command\" copied and run it (it is registered for your user, so every project can use it)",
+    ],
+    mcpOpenAiSteps: [
+      "In the ChatGPT or Codex desktop app, open Settings → MCP servers → Add server",
+      "Choose STDIO and enter bookmarks as the name",
+      "Paste what \"Copy path\" copied as the command, and enter --mcp as the argument",
+      "Save, then select Restart",
+    ],
+    mcpOpenAiNote:
+      "ChatGPT and Codex share their MCP settings, so adding it in either makes it available in both. ChatGPT on the web cannot use an app on this computer.",
+    mcpOtherTitle: "Other assistants",
+    mcpOtherNote: "Register this launch command as a stdio MCP server.",
+    mcpVerify:
+      "To check it worked, ask the assistant to \"give me an overview of my bookmarks\".",
     mcpPrivacy:
-      "Read-only: an assistant cannot change or delete your bookmarks. Works whether or not the app is running. What an assistant reads is sent to the AI service it uses.",
+      "Read-only: an assistant cannot change or delete your bookmarks. All it can do besides read is suggest a page, file or folder worth keeping. Suggestions appear under Suggestions in the header, and only what you review and save is added (they arrive only while the app is running). Reading works whether or not the app is running. What an assistant reads is sent to the AI service it uses.",
     copied: "Copied.",
     copyFailed: "Could not copy.",
     change: "Change",

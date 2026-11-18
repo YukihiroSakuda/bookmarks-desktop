@@ -103,6 +103,40 @@ interface SettingsDialogProps {
   isOrderingMode?: boolean;
 }
 
+/** One assistant's setup: a copy button for what it needs, then numbered steps. */
+function McpGuide({
+  title,
+  steps,
+  note,
+  copyLabel,
+  onCopy,
+  disabled,
+}: {
+  title: string;
+  steps: readonly string[];
+  note?: string;
+  copyLabel: string;
+  onCopy: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="rounded-md border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">{title}</p>
+        <Button variant="secondary" size="sm" icon={Copy} onClick={onCopy} disabled={disabled}>
+          {copyLabel}
+        </Button>
+      </div>
+      <ol className="mt-2 list-decimal pl-5 text-xs text-muted-foreground flex flex-col gap-1">
+        {steps.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+      {note && <p className="text-xs text-muted-foreground mt-2">{note}</p>}
+    </div>
+  );
+}
+
 export function SettingsDialog({
   lang,
   onLangChange,
@@ -886,62 +920,52 @@ export function SettingsDialog({
                       <label className="block text-sm font-medium mb-2">{t.mcpLabel}</label>
                       <p className="text-xs text-muted-foreground">{t.mcpIntro}</p>
 
-                      <p className="text-xs font-medium mt-3 mb-1.5">{t.mcpCommand}</p>
-                      <div className="flex gap-2">
-                        <div
-                          className="flex-1 min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-xs font-mono text-muted-foreground truncate"
-                          title={mcpSnippets?.command}
-                        >
-                          {mcpSnippets?.command ?? "…"}
+                      <div className="flex flex-col gap-2.5 mt-3">
+                        <McpGuide
+                          title="Claude Desktop"
+                          steps={t.mcpClaudeDesktopSteps}
+                          copyLabel={t.mcpCopyConfig}
+                          onCopy={() => mcpSnippets && copyText(mcpSnippets.claudeDesktop)}
+                          disabled={!mcpSnippets}
+                        />
+                        <McpGuide
+                          title="Claude Code"
+                          steps={t.mcpClaudeCodeSteps}
+                          copyLabel={t.mcpCopyCommand}
+                          onCopy={() => mcpSnippets && copyText(mcpSnippets.claudeCode)}
+                          disabled={!mcpSnippets}
+                        />
+                        <McpGuide
+                          title="ChatGPT / Codex"
+                          steps={t.mcpOpenAiSteps}
+                          note={t.mcpOpenAiNote}
+                          copyLabel={t.mcpCopyPath}
+                          onCopy={() => mcpSnippets && copyText(mcpSnippets.openAiPath)}
+                          disabled={!mcpSnippets}
+                        />
+                        <div className="rounded-md border p-3">
+                          <p className="text-sm font-medium">{t.mcpOtherTitle}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{t.mcpOtherNote}</p>
+                          <div className="flex gap-2 mt-2">
+                            <div
+                              className="flex-1 min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-xs font-mono text-muted-foreground truncate"
+                              title={mcpSnippets?.command}
+                            >
+                              {mcpSnippets?.command ?? "…"}
+                            </div>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              icon={Copy}
+                              onClick={() => mcpSnippets && copyText(mcpSnippets.command)}
+                              disabled={!mcpSnippets}
+                            >
+                              {t.copy}
+                            </Button>
+                          </div>
                         </div>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          icon={Copy}
-                          onClick={() => mcpSnippets && copyText(mcpSnippets.command)}
-                          disabled={!mcpSnippets}
-                        >
-                          {t.copy}
-                        </Button>
                       </div>
-                      <div className="flex gap-2 mt-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          icon={Copy}
-                          onClick={() => mcpSnippets && copyText(mcpSnippets.claudeDesktop)}
-                          disabled={!mcpSnippets}
-                          className="flex-1"
-                        >
-                          Claude Desktop
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          icon={Copy}
-                          onClick={() => mcpSnippets && copyText(mcpSnippets.claudeCode)}
-                          disabled={!mcpSnippets}
-                          className="flex-1"
-                        >
-                          Claude Code
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          icon={Copy}
-                          onClick={() => mcpSnippets && copyText(mcpSnippets.openAiPath)}
-                          disabled={!mcpSnippets}
-                          className="flex-1"
-                        >
-                          ChatGPT / Codex
-                        </Button>
-                      </div>
-                      <ul className="text-xs text-muted-foreground mt-1.5 flex flex-col gap-1">
-                        <li>{t.mcpHowToDesktop}</li>
-                        <li>{t.mcpHowToCode}</li>
-                        <li>{t.mcpHowToOpenAi}</li>
-                        <li>{t.mcpHowToOther}</li>
-                      </ul>
+                      <p className="text-xs text-muted-foreground mt-3">{t.mcpVerify}</p>
                       <p className="text-xs text-muted-foreground mt-2">{t.mcpPrivacy}</p>
                     </div>
                   </div>

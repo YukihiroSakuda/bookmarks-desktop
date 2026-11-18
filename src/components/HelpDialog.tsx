@@ -159,6 +159,7 @@ const SECTIONS_JA = [
   { id: "shortcuts", label: "ショートカット" },
   { id: "theme",    label: "テーマ" },
   { id: "extension", label: "ブラウザ拡張機能" },
+  { id: "ai",        label: "AI アシスタント連携" },
 ];
 
 const SECTIONS_EN = [
@@ -175,6 +176,7 @@ const SECTIONS_EN = [
   { id: "shortcuts", label: "Shortcuts" },
   { id: "theme",    label: "Theme" },
   { id: "extension", label: "Extension" },
+  { id: "ai",        label: "AI Assistants" },
 ];
 
 // ---- content ----------------------------------------------------------------
@@ -500,6 +502,43 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         </Ul>
         <DownloadExtensionButton label="ZIPをダウンロード（手動インストール用）" />
       </section>
+
+      <div className="border-t" />
+
+      <section ref={registerRef("ai")}>
+        <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">AI アシスタント連携</h2>
+        <H3>できること</H3>
+        <P>Claude や ChatGPT・Codex などの AI アシスタントが、あなたのブックマークを読めるようになります。たとえば「先月の経費精算の資料はどこ？」と聞くと、AI がブックマーク・タグ・メモ、そしてブックマークしたフォルダの中のファイル名から探して、場所を教えてくれます。</P>
+        <H3>始め方</H3>
+        <Ul>
+          <Li>ヘッダーの歯車から <Strong>設定</Strong> を開き、<Strong>AI アシスタント</Strong> を表示する。</Li>
+          <Li>使うアシスタントの枠で、コピーのボタン（<Strong>設定をコピー</Strong>・<Strong>コマンドをコピー</Strong>・<Strong>パスをコピー</Strong>）を押す。</Li>
+          <Li>同じ枠に書かれた番号の手順に沿って、そのアシスタントに登録する。</Li>
+          <Li>AI に「ブックマークの概要を教えて」と頼み、答えが返ってくれば完了です。</Li>
+        </Ul>
+        <H3>AI に頼めること</H3>
+        <Ul>
+          <Li>「〇〇の資料が入っているフォルダはどこ？」 — ブックマークから探す。</Li>
+          <Li>「請求書という名前のファイルを探して」 — ブックマークしたフォルダの中を、ファイル名で探す。</Li>
+          <Li>「最近よく使っているものを教えて」 — 開いた回数と日時から答える。</Li>
+        </Ul>
+        <P><Strong>メモ</Strong> に自分の呼び名を書いておくと、AI がその名前で見つけやすくなります（メモはタイトルと同じくらい重視されます）。</P>
+        <H3>AI からの提案</H3>
+        <P>AI が作業中に見つけたページ・ファイル・フォルダを「ブックマークしませんか」と提案することがあります。提案が届くと、ヘッダーに件数つきの <Strong>Suggestions</Strong> ボタンが現れます。</P>
+        <Ul>
+          <Li>開くと、アドレス（または場所）と、AI が勧める理由を確認できます。</Li>
+          <Li><Strong>Review &amp; add</Strong> を押すと通常の追加画面が開き、<Strong>保存したものだけ</Strong> が登録されます。<Strong>Dismiss</Strong> で捨てられます。</Li>
+          <Li>提案はアプリが起動している間だけ届きます。アプリを終了すると消えます。</Li>
+          <Li>プログラム・スクリプト・インストーラー・ショートカットのファイルや、ネットワーク上のフォルダは、提案されません。</Li>
+        </Ul>
+        <H3>安全のために</H3>
+        <Ul>
+          <Li>AI は読み取り専用です。ブックマークを変更・削除することはできません。</Li>
+          <Li>アプリを起動していなくても、AI は読むことができます。</Li>
+          <Li>AI が読んだ内容は、そのアシスタントの AI サービスに送られます。</Li>
+          <Li>やめるときは、アシスタント側の設定からこのアプリを削除してください。</Li>
+        </Ul>
+      </section>
     </>
   );
 }
@@ -824,6 +863,43 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
           <Li>Click <Strong>Add Bookmark</Strong> to save directly from the extension.</Li>
         </Ul>
         <DownloadExtensionButton label="Download ZIP (manual install)" />
+      </section>
+
+      <div className="border-t" />
+
+      <section ref={registerRef("ai")}>
+        <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">AI Assistants</h2>
+        <H3>What it does</H3>
+        <P>AI assistants such as Claude, ChatGPT and Codex can read your bookmarks. Ask &ldquo;where is last month&rsquo;s expense report?&rdquo; and the assistant looks through your bookmarks, tags, memos, and the file names inside bookmarked folders, then tells you where it is.</P>
+        <H3>Getting started</H3>
+        <Ul>
+          <Li>Open <Strong>Settings</Strong> from the gear in the header and go to <Strong>AI assistants</Strong>.</Li>
+          <Li>In the box for the assistant you use, press its copy button (<Strong>Copy config</Strong>, <Strong>Copy command</Strong> or <Strong>Copy path</Strong>).</Li>
+          <Li>Follow the numbered steps in that same box to register it with the assistant.</Li>
+          <Li>Ask the assistant to &ldquo;give me an overview of my bookmarks&rdquo;. If it answers, you are done.</Li>
+        </Ul>
+        <H3>What you can ask</H3>
+        <Ul>
+          <Li>&ldquo;Which folder has the &hellip; documents?&rdquo; &mdash; searches your bookmarks.</Li>
+          <Li>&ldquo;Find the file named invoice&rdquo; &mdash; searches inside bookmarked folders by file name.</Li>
+          <Li>&ldquo;What have I been using lately?&rdquo; &mdash; answers from how often and how recently you opened things.</Li>
+        </Ul>
+        <P>Put the name you call something by in its <Strong>memo</Strong> and the assistant will find it by that name (memos count about as much as titles).</P>
+        <H3>Suggestions from the AI</H3>
+        <P>While working, an assistant may suggest a page, file or folder worth bookmarking. When one arrives, a <Strong>Suggestions</Strong> button with a count appears in the header.</P>
+        <Ul>
+          <Li>Open it to see the address (or location) and why the assistant suggests it.</Li>
+          <Li><Strong>Review &amp; add</Strong> opens the usual add form, and <Strong>only what you save</Strong> is added. <Strong>Dismiss</Strong> throws it away.</Li>
+          <Li>Suggestions arrive only while the app is running, and are dropped when you quit it.</Li>
+          <Li>Programs, scripts, installers, shortcut files and network folders are never suggested.</Li>
+        </Ul>
+        <H3>Staying safe</H3>
+        <Ul>
+          <Li>The assistant is read-only. It cannot change or delete your bookmarks.</Li>
+          <Li>It can read them whether or not the app is running.</Li>
+          <Li>What an assistant reads is sent to the AI service it uses.</Li>
+          <Li>To stop, remove this app from the assistant&rsquo;s own settings.</Li>
+        </Ul>
       </section>
     </>
   );
