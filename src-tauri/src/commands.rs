@@ -1336,3 +1336,32 @@ pub fn open_path(path: String) -> Result<Value, String> {
 
     Ok(json!({ "ok": true }))
 }
+
+// ---------- MCP server launch command ----------
+
+/// What an AI assistant should run to start the MCP server (see mcp.rs). Shown
+/// in Settings so it can be copied into the assistant's configuration.
+#[tauri::command]
+pub fn mcp_launch_command() -> Result<Value, String> {
+    Ok(json!({ "command": mcp_executable()?, "args": ["--mcp"] }))
+}
+
+fn mcp_executable() -> Result<String, String> {
+    // The Store build's app.exe sits under WindowsApps, in a folder renamed on
+    // every update, and launching it directly drops package identity. The
+    // execution alias declared in msix/AppxManifest.xml is stable and keeps it.
+    #[cfg(target_os = "windows")]
+    if crate::winpkg::is_packaged() {
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            return Ok(std::path::PathBuf::from(local)
+                .join("Microsoft")
+                .join("WindowsApps")
+                .join("bookmarks-tags.exe")
+                .to_string_lossy()
+                .into_owned());
+        }
+    }
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| e.to_string())
+}

@@ -13,6 +13,7 @@ use serde_json::{json, Value};
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use rusqlite::Connection;
 use tauri::State;
 
 use crate::db::AppState;
@@ -93,7 +94,7 @@ struct Group {
 }
 
 /// A bookmarked folder to walk.
-struct Target {
+pub(crate) struct Target {
     id: String,
     title: String,
     path: String,
@@ -104,16 +105,25 @@ struct Target {
 // thread while the body itself stays blocking.
 #[tauri::command(async)]
 pub fn search_in_folders(query: String, state: State<'_, AppState>) -> Result<Value, String> {
+    // Read the targets and release the DB lock immediately — the walk below can
+    // take seconds and must never hold the connection other commands need.
+    let targets = {
+        let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        collect_targets(&conn)?
+    };
+    search_targets(&query, targets)
+}
+
+/// Walks `targets` for entries whose name contains `query`. Shared by the
+/// in-app search above and the MCP server's `search_files` tool, which runs in
+/// its own process with its own read-only connection.
+pub(crate) fn search_targets(query: &str, targets: Vec<Target>) -> Result<Value, String> {
     let needle = query.trim().to_lowercase();
     if needle.chars().count() < MIN_QUERY_CHARS {
-        return Ok(empty_result(&query, false));
+        return Ok(empty_result(query, false));
     }
 
     let ticket = SEARCH_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
-
-    // Read the targets and release the DB lock immediately — the walk below can
-    // take seconds and must never hold the connection other commands need.
-    let targets = collect_targets(&state)?;
     let limits = Limits::default();
 
     // Run the walk on a dedicated thread so its I/O priority can be lowered
@@ -135,7 +145,7 @@ pub fn search_in_folders(query: String, state: State<'_, AppState>) -> Result<Va
     if is_superseded(ticket) {
         // A newer query is already in flight; returning these results would let
         // them race it in the UI.
-        return Ok(empty_result(&query, true));
+        return Ok(empty_result(query, true));
     }
 
     let total: usize = groups.iter().map(|g| g.match_count).sum();
@@ -177,8 +187,7 @@ fn empty_result(query: &str, superseded: bool) -> Value {
 
 /// Path bookmarks, most recently used first, so the folders the user actually
 /// works in are walked (and appear) before the dormant ones.
-fn collect_targets(state: &State<'_, AppState>) -> Result<Vec<Target>, String> {
-    let conn = state.conn.lock().map_err(|e| e.to_string())?;
+pub(crate) fn collect_targets(conn: &Connection) -> Result<Vec<Target>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, title, url FROM bookmarks WHERE kind = 'path' \
@@ -380,7 +389,7 @@ fn file_attributes(_metadata: &std::fs::Metadata) -> u32 {
     0
 }
 
-fn is_hidden_or_system(metadata: &std::fs::Metadata) -> bool {
+pub(crate) fn is_hidden_or_system(metadata: &std::fs::Metadata) -> bool {
     file_attributes(metadata) & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM) != 0
 }
 
@@ -391,7 +400,7 @@ fn is_reparse_point(metadata: &std::fs::Metadata) -> bool {
 /// Network shares and removable media are excluded by default: walking them can
 /// block for seconds, or hang outright when the volume goes away mid-search.
 #[cfg(windows)]
-fn unsearchable_volume(path: &Path) -> Option<&'static str> {
+pub(crate) fn unsearchable_volume(path: &Path) -> Option<&'static str> {
     use windows::core::PCWSTR;
     use windows::Win32::Storage::FileSystem::GetDriveTypeW;
 
@@ -421,7 +430,7 @@ fn unsearchable_volume(path: &Path) -> Option<&'static str> {
 }
 
 #[cfg(not(windows))]
-fn unsearchable_volume(_path: &Path) -> Option<&'static str> {
+pub(crate) fn unsearchable_volume(_path: &Path) -> Option<&'static str> {
     None
 }
 

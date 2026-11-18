@@ -1,6 +1,7 @@
 use rusqlite::{Connection, OptionalExtension};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use uuid::Uuid;
 
@@ -83,41 +84,52 @@ pub fn init_db(app: &AppHandle) -> Result<Connection, String> {
     let db_path = dir.join("bookmarks.db");
 
     let conn = Connection::open(&db_path).map_err(|e| format!("failed to open database: {e}"))?;
+    // The MCP server (`app.exe --mcp`, see mcp.rs) reads this file from its own
+    // process. A write that lands while it holds a read lock waits for it —
+    // a few milliseconds — instead of failing outright with SQLITE_BUSY.
+    conn.busy_timeout(Duration::from_secs(5))
+        .map_err(|e| format!("failed to set busy timeout: {e}"))?;
+    migrate(&conn)?;
+    Ok(conn)
+}
+
+/// Create the schema and apply every migration. Split from `init_db` so tests
+/// can build the same schema in a scratch database without an `AppHandle`.
+pub(crate) fn migrate(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(SCHEMA)
         .map_err(|e| format!("failed to initialize schema: {e}"))?;
 
     // Idempotent migrations for columns added after the initial schema.
-    add_column_if_missing(&conn, "bookmarks", "shortcut", "TEXT")?;
+    add_column_if_missing(conn, "bookmarks", "shortcut", "TEXT")?;
     add_column_if_missing(
-        &conn,
+        conn,
         "user_settings",
         "summon_shortcut",
         "TEXT NOT NULL DEFAULT 'CmdOrCtrl+Alt+Space'",
     )?;
-    add_column_if_missing(&conn, "user_settings", "api_token", "TEXT")?;
-    add_column_if_missing(&conn, "tags", "color", "TEXT")?;
-    add_column_if_missing(&conn, "tags", "sort_order", "INTEGER NOT NULL DEFAULT 0")?;
+    add_column_if_missing(conn, "user_settings", "api_token", "TEXT")?;
+    add_column_if_missing(conn, "tags", "color", "TEXT")?;
+    add_column_if_missing(conn, "tags", "sort_order", "INTEGER NOT NULL DEFAULT 0")?;
     // Off by default: the shortcut folder writes into the user's profile, so it
     // is never created until it is asked for. A NULL path means the default
     // location (`%USERPROFILE%\Bookmarks`).
     add_column_if_missing(
-        &conn,
+        conn,
         "user_settings",
         "shortcut_dir_enabled",
         "INTEGER NOT NULL DEFAULT 0",
     )?;
-    add_column_if_missing(&conn, "user_settings", "shortcut_dir_path", "TEXT")?;
+    add_column_if_missing(conn, "user_settings", "shortcut_dir_path", "TEXT")?;
     // On by default: searching inside bookmarked folders is the expected
     // behavior, so existing installs pick it up without any action.
     add_column_if_missing(
-        &conn,
+        conn,
         "user_settings",
         "folder_search_enabled",
         "INTEGER NOT NULL DEFAULT 1",
     )?;
-    ensure_api_token(&conn)?;
-
-    Ok(conn)
+    ensure_api_token(conn)?;
+    Ok(())
 }
 
 /// Generate a random pairing token for the local HTTP API (used by the

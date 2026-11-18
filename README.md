@@ -112,6 +112,16 @@ Only files this app created are ever deleted — they are tracked in a manifest 
 - Automatic duplicate URL detection
 - Bookmarks added from the extension appear in the app in real time
 
+### AI assistants (MCP)
+
+Hands your bookmarks to an AI assistant as a map of where your work lives, so it can look things up instead of asking you.
+
+- The app's own executable started with `--mcp` is a stdio [MCP](https://modelcontextprotocol.io) server. Register it in Claude Desktop, Claude Code, or any MCP client — **Settings → AI assistants** copies the exact command or config for your install (Store or installer)
+- Tools: `get_overview` (tags, pinned, in use lately), `search_bookmarks` (title / memo / tags / URL or path, ranked by match and recent use), `get_bookmark` (full memo; for a folder, what is inside it), `search_files` (file names inside bookmarked folders)
+- Memos are matched as strongly as titles, since they are usually what you call the bookmark
+- **Read-only** — the database is opened read-only, so an assistant cannot change or delete anything
+- Runs in its own process and reads the database directly, so it works whether or not the app is running
+
 ### UI / UX
 
 - Modern design based on shadcn/ui (monochrome + a single blue accent)

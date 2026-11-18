@@ -9,8 +9,6 @@
 //! deployment modes apart.
 
 /// True when the process runs with MSIX package identity (Store build).
-// Only consulted by release builds, which are the only ones that self-register.
-#[cfg_attr(debug_assertions, allow(dead_code))]
 pub fn is_packaged() -> bool {
     use windows::Win32::Foundation::APPMODEL_ERROR_NO_PACKAGE;
     use windows::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName;

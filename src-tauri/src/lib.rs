@@ -3,6 +3,7 @@ mod db;
 mod favicon;
 mod page_title;
 mod folder_search;
+pub mod mcp;
 mod server;
 mod shortcutdir;
 #[cfg(target_os = "windows")]
@@ -212,6 +213,7 @@ pub fn run() {
             commands::register_context_menu,
             commands::unregister_context_menu,
             commands::save_extension_zip,
+            commands::mcp_launch_command,
             folder_search::search_in_folders,
             shortcutdir::sync_shortcut_dir,
             shortcutdir::pick_shortcut_dir,
