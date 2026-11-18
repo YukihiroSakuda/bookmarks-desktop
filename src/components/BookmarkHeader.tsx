@@ -18,6 +18,7 @@ import { Tag as TagType } from "@/types/tag";
 import { TagRule as TagRuleComponent } from "./TagRule";
 import { SortControls } from "./SortControls";
 import { SettingsDialog } from "./SettingsDialog";
+import { buildQueryForms, matchesAnyForm, normalizeForSearch } from "@/lib/searchNormalize";
 import { HelpDialog } from "./HelpDialog";
 import { DEFAULT_UI_LANG, readStoredUiLang, storeUiLang, UiLang } from "@/lib/uiLanguage";
 
@@ -126,10 +127,15 @@ export function BookmarkHeader({
 
   const filteredHistory = useMemo(() => {
     if (!searchQuery.trim()) return searchHistory;
-    const q = searchQuery.trim().toLowerCase();
-    return searchHistory.filter(
-      (h) => h.toLowerCase().includes(q) && h.toLowerCase() !== q
-    );
+    const queryForms = buildQueryForms(searchQuery);
+    const normalizedQuery = normalizeForSearch(searchQuery.trim());
+    return searchHistory.filter((h) => {
+      const normalizedHistory = normalizeForSearch(h);
+      return (
+        matchesAnyForm(normalizedHistory, queryForms) &&
+        normalizedHistory !== normalizedQuery
+      );
+    });
   }, [searchHistory, searchQuery]);
 
   const showHistory = isHistoryOpen && filteredHistory.length > 0 && !isOrderingMode;

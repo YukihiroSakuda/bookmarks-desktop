@@ -221,12 +221,16 @@ export default function BookmarksPage() {
     searchInputRef,
   });
 
-  // Type any plain character to focus the search box and start searching.
+  // Type any plain character to focus the search box and start searching;
+  // Backspace deletes back through the query from anywhere in the list.
   useTypeToSearch({
     isModalOpen,
     searchInputRef,
     onTypeCharacter: (char) =>
       filtering.setSearchQuery((prev) => prev + char),
+    // Split by code point so deleting never severs a surrogate pair (emoji).
+    onBackspace: () =>
+      filtering.setSearchQuery((prev) => Array.from(prev).slice(0, -1).join("")),
   });
 
   // The asynchronous half of search: file names inside bookmarked folders.

@@ -47,6 +47,27 @@ impl Default for Limits {
 }
 /// Shorter queries match too much to be useful and would make every keystroke walk.
 const MIN_QUERY_CHARS: usize = 2;
+
+/// Lowercases, then folds full-width ASCII (U+FF01-FF5E) to half-width and
+/// katakana (U+30A1-30F6) to hiragana. Mirrors the frontend's
+/// `normalizeForSearch` (`src/lib/searchNormalize.ts`) so a query already
+/// normalized/kana-converted there keeps matching consistently against file
+/// names found here. Latin letters and kanji are left untouched.
+fn normalize_for_search(s: &str) -> String {
+    s.to_lowercase()
+        .chars()
+        .map(|c| {
+            let code = c as u32;
+            if (0xff01..=0xff5e).contains(&code) {
+                char::from_u32(code - 0xfee0).unwrap_or(c)
+            } else if (0x30a1..=0x30f6).contains(&code) {
+                char::from_u32(code - 0x60).unwrap_or(c)
+            } else {
+                c
+            }
+        })
+        .collect()
+}
 /// How often the walk checks whether a newer query has superseded it.
 const CANCEL_CHECK_INTERVAL: usize = 512;
 
@@ -104,24 +125,42 @@ pub(crate) struct Target {
 // so a multi-second walk would freeze the window. This keeps it off the main
 // thread while the body itself stays blocking.
 #[tauri::command(async)]
-pub fn search_in_folders(query: String, state: State<'_, AppState>) -> Result<Value, String> {
+pub fn search_in_folders(
+    query: String,
+    query_forms: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
     // Read the targets and release the DB lock immediately — the walk below can
     // take seconds and must never hold the connection other commands need.
     let targets = {
         let conn = state.conn.lock().map_err(|e| e.to_string())?;
         collect_targets(&conn)?
     };
-    search_targets(&query, targets)
+    search_targets(&query, query_forms, targets)
 }
 
 /// Walks `targets` for entries whose name contains `query`. Shared by the
 /// in-app search above and the MCP server's `search_files` tool, which runs in
-/// its own process with its own read-only connection.
-pub(crate) fn search_targets(query: &str, targets: Vec<Target>) -> Result<Value, String> {
-    let needle = query.trim().to_lowercase();
-    if needle.chars().count() < MIN_QUERY_CHARS {
+/// its own process with its own read-only connection (and passes no
+/// `query_forms`, so the raw query is normalized here).
+pub(crate) fn search_targets(
+    query: &str,
+    query_forms: Vec<String>,
+    targets: Vec<Target>,
+) -> Result<Value, String> {
+    if query.trim().chars().count() < MIN_QUERY_CHARS {
         return Ok(empty_result(query, false));
     }
+    // The frontend (`buildQueryForms` in `src/lib/searchNormalize.ts`) already
+    // normalizes and romaji/katakana-converts these — a plain form and,
+    // typically, a hiragana form so a romaji query like "pasokon" can still
+    // match a file named with katakana. Falls back to the raw query normalized
+    // here in case the caller ever sends an empty list.
+    let needles = if query_forms.is_empty() {
+        vec![normalize_for_search(query.trim())]
+    } else {
+        query_forms
+    };
 
     let ticket = SEARCH_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let limits = Limits::default();
@@ -132,7 +171,7 @@ pub(crate) fn search_targets(query: &str, targets: Vec<Target>) -> Result<Value,
         .name("folder-search".into())
         .spawn(move || {
             enter_background_priority();
-            let result = walk_targets(&targets, &needle, ticket, limits);
+            let result = walk_targets(&targets, &needles, ticket, limits);
             leave_background_priority();
             result
         })
@@ -217,7 +256,7 @@ fn is_superseded(ticket: u64) -> bool {
 
 fn walk_targets(
     targets: &[Target],
-    needle: &str,
+    needles: &[String],
     ticket: u64,
     limits: Limits,
 ) -> (Vec<Group>, Vec<Skipped>) {
@@ -253,7 +292,7 @@ fn walk_targets(
             continue;
         }
 
-        let group = walk_one(target, &root, needle, ticket, limits);
+        let group = walk_one(target, &root, needles, ticket, limits);
         if group.match_count > 0 || group.truncated {
             groups.push(group);
         }
@@ -265,7 +304,7 @@ fn walk_targets(
 fn walk_one(
     target: &Target,
     root: &Path,
-    needle: &str,
+    needles: &[String],
     ticket: u64,
     limits: Limits,
 ) -> Group {
@@ -318,7 +357,8 @@ fn walk_one(
             let name = entry.file_name().to_string_lossy().into_owned();
             let is_dir = metadata.is_dir();
 
-            if name.to_lowercase().contains(needle) {
+            let normalized_name = normalize_for_search(&name);
+            if needles.iter().any(|n| normalized_name.contains(n.as_str())) {
                 group.match_count += 1;
                 if group.matches.len() < limits.max_matches_per_group {
                     let full = entry.path();
@@ -516,7 +556,7 @@ mod tests {
     }
 
     fn run(root: &Path, needle: &str, limits: Limits) -> Group {
-        walk_one(&target(root), root, needle, NEVER_CANCELLED, limits)
+        walk_one(&target(root), root, &[needle.to_string()], NEVER_CANCELLED, limits)
     }
 
     fn names(group: &Group) -> Vec<String> {
@@ -540,6 +580,19 @@ mod tests {
         assert_eq!(group.match_count, 2, "found: {found:?}");
         assert!(found.contains(&"見積書_最終.xlsx".to_string()));
         assert!(found.contains(&"見積根拠.docx".to_string()));
+    }
+
+    #[test]
+    fn matches_across_katakana_hiragana_and_full_width_forms() {
+        let tree = TempTree::new();
+        tree.file("パソコン設定.txt");
+        tree.file("ＡＢＣtest.txt");
+
+        let kana = run(tree.path(), "ぱそこん", Limits::default());
+        assert_eq!(kana.match_count, 1, "found: {:?}", names(&kana));
+
+        let full_width = run(tree.path(), "abctest", Limits::default());
+        assert_eq!(full_width.match_count, 1, "found: {:?}", names(&full_width));
     }
 
     #[test]

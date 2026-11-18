@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { BookmarkUI, SortOption, SortOrder } from "@/types/bookmark";
 import { createBookmarkComparator } from "@/lib/bookmarkScore";
+import { buildQueryForms, matchesAnyForm, normalizeForSearch } from "@/lib/searchNormalize";
 
 interface UseBookmarkFilteringOptions {
   bookmarks: BookmarkUI[];
@@ -37,18 +38,35 @@ export function useBookmarkFiltering({
     []
   );
 
+  // A bookmark's text is unchanged between keystrokes — only the query moves.
+  // Normalizing here, keyed on the list alone, keeps a keystroke down to the
+  // substring comparisons instead of re-normalizing every field of every
+  // bookmark to the same result it had a moment ago.
+  const searchableBookmarks = useMemo(
+    () =>
+      bookmarks.map((bookmark) => ({
+        bookmark,
+        title: normalizeForSearch(bookmark.title),
+        url: normalizeForSearch(bookmark.url),
+        memo: normalizeForSearch(bookmark.memo ?? ""),
+      })),
+    [bookmarks]
+  );
+
   const filteredAndSortedBookmarks = useMemo(() => {
-    const filtered = bookmarks.filter((bookmark) => {
-      const query = searchQuery.toLowerCase();
-      const matchesSearch =
-        bookmark.title.toLowerCase().includes(query) ||
-        bookmark.url.toLowerCase().includes(query) ||
-        (bookmark.memo ?? "").toLowerCase().includes(query);
-      const matchesTags =
-        selectedTags.length === 0 ||
-        selectedTags.some((tag) => bookmark.tags.includes(tag));
-      return matchesSearch && matchesTags;
-    });
+    const queryForms = buildQueryForms(searchQuery);
+    const filtered = searchableBookmarks
+      .filter(({ bookmark, title, url, memo }) => {
+        const matchesSearch =
+          matchesAnyForm(title, queryForms) ||
+          matchesAnyForm(url, queryForms) ||
+          matchesAnyForm(memo, queryForms);
+        const matchesTags =
+          selectedTags.length === 0 ||
+          selectedTags.some((tag) => bookmark.tags.includes(tag));
+        return matchesSearch && matchesTags;
+      })
+      .map(({ bookmark }) => bookmark);
 
     let sorted;
     if (isOrderingMode && currentSort === "custom") {
@@ -63,7 +81,7 @@ export function useBookmarkFiltering({
       pinned: sorted.filter((b) => b.isPinned),
       unpinned: sorted.filter((b) => !b.isPinned),
     };
-  }, [bookmarks, searchQuery, selectedTags, currentSort, currentOrder, isOrderingMode]);
+  }, [searchableBookmarks, searchQuery, selectedTags, currentSort, currentOrder, isOrderingMode]);
 
   return {
     searchQuery,

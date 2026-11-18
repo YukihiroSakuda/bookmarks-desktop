@@ -774,7 +774,7 @@ fn search_files(conn: Connection, query: &str, limit: usize) -> Result<Value, St
     let targets = folder_search::collect_targets(&conn)?;
     // The walk can take seconds; it never needs the database.
     drop(conn);
-    let raw = folder_search::search_targets(query, targets)?;
+    let raw = folder_search::search_targets(query, Vec::new(), targets)?;
 
     let empty = Vec::new();
     let groups = raw["groups"].as_array().unwrap_or(&empty);

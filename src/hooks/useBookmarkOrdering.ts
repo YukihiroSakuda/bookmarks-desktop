@@ -2,13 +2,16 @@ import { useState, useCallback, useRef } from "react";
 import { BookmarkUI, SortOption, SortOrder, convertToUI } from "@/types/bookmark";
 import { tauriFetch as fetch } from "@/lib/tauriFetch";
 import { createBookmarkComparator } from "@/lib/bookmarkScore";
+import { buildQueryForms, matchesAnyForm, normalizeForSearch } from "@/lib/searchNormalize";
 
+/** `queryForms` comes from `buildQueryForms` — built once by the caller, since
+ * every bookmark in a pass is tested against the same query. */
 function bookmarkMatchesFilter(
   bookmark: BookmarkUI,
-  searchQuery: string,
+  queryForms: string[],
   selectedTags: string[]
 ): boolean {
-  const matchesSearch = bookmark.title.toLowerCase().includes(searchQuery.toLowerCase());
+  const matchesSearch = matchesAnyForm(normalizeForSearch(bookmark.title), queryForms);
   const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => bookmark.tags.includes(tag));
   return matchesSearch && matchesTags;
 }
@@ -98,9 +101,10 @@ export function useBookmarkOrdering(options: UseBookmarkOrderingOptions) {
         // (array index). This way entering ordering mode never reshuffles
         // hidden bookmarks relative to visible ones just to display the
         // visible subset in customOrder sequence.
+        const queryForms = buildQueryForms(searchQuery);
         const visibleSlots: number[] = [];
         bookmarks.forEach((bookmark, index) => {
-          if (bookmarkMatchesFilter(bookmark, searchQuery, selectedTags)) {
+          if (bookmarkMatchesFilter(bookmark, queryForms, selectedTags)) {
             visibleSlots.push(index);
           }
         });
@@ -137,11 +141,12 @@ export function useBookmarkOrdering(options: UseBookmarkOrderingOptions) {
     (oldIndex: number, newIndex: number, isPinned: boolean) => {
       optionsRef.current.setBookmarks((prevBookmarks) => {
         const { searchQuery, selectedTags } = optionsRef.current;
+        const queryForms = buildQueryForms(searchQuery);
 
         // The visible group for this pin section, in the order currently shown.
         const visibleGroup = prevBookmarks.filter(
           (bookmark) =>
-            bookmark.isPinned === isPinned && bookmarkMatchesFilter(bookmark, searchQuery, selectedTags)
+            bookmark.isPinned === isPinned && bookmarkMatchesFilter(bookmark, queryForms, selectedTags)
         );
 
         if (

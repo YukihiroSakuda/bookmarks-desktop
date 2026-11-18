@@ -4,6 +4,7 @@ import {
   EMPTY_FOLDER_SEARCH_RESULT,
   FolderSearchResult,
 } from "@/types/folderSearch";
+import { buildQueryForms } from "@/lib/searchNormalize";
 
 /** Shorter queries match too much to be worth walking the disk for. */
 const MIN_QUERY_LENGTH = 2;
@@ -65,9 +66,11 @@ export function useFolderSearch({
       }, PROGRESS_AFTER_MS);
 
       try {
-        const response = await fetch(
-          `/api/folder-search?q=${encodeURIComponent(query)}`
-        );
+        const params = new URLSearchParams({ q: query });
+        for (const form of buildQueryForms(query)) {
+          params.append("form", form);
+        }
+        const response = await fetch(`/api/folder-search?${params.toString()}`);
         if (latestRequest.current !== ticket) return;
 
         if (!response.ok) {

@@ -212,6 +212,12 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">検索</h2>
         <H3>キーワード検索</H3>
         <P>ヘッダーの検索バーにキーワードを入力すると、<Strong>タイトル・URL・メモ</Strong> を対象に絞り込まれます。</P>
+        <H3>入力モードを気にせず検索</H3>
+        <P>検索は <Strong>ひらがな・カタカナ・全角・半角</Strong> の違いを無視して一致します。さらに <Strong>ローマ字のまま打っても、かな表記のブックマークが見つかります</Strong>（<Strong>pasokon</Strong> で「パソコン」）。逆にかなで打ったときも英字表記が見つかります（<Strong>あまぞん</Strong> で「Amazon」）。検索のたびにIMEを切り替え直す必要はありません。</P>
+        <Ul>
+          <Li>フォルダの中のファイル名・フォルダ名を探すときも同じように働きます。</Li>
+          <Li>長音符を含む語は、日本語入力のときと同じようにハイフンで打ってください（<Strong>ra-men</Strong> で「ラーメン」）。</Li>
+        </Ul>
         <H3>フォルダの中も検索</H3>
         <P><Strong>ブックマークしたフォルダの中にあるファイル名・フォルダ名</Strong> も検索対象になります。<Strong>2文字以上</Strong> 入力すると、一覧の下に「In your folders」として、どのブックマークの中で見つかったかごとにまとめて表示されます。</P>
         <Ul>
@@ -228,6 +234,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         </Ul>
         <H3>キー入力で検索を開始</H3>
         <P>一覧のどこにフォーカスがあっても、文字キーを打ち始めるだけで検索バーにフォーカスが移り、その文字から入力が始まります。入力欄にフォーカスがあるときや、修飾キー（Ctrl / Alt / Shift / ⌘）付きの組み合わせを押したときは無効です（ブックマークのショートカットや編集キーを優先）。</P>
+        <P>同じように <Kbd>Backspace</Kbd> はカードにフォーカスがあるままでも検索ワードを1文字削除します。打ち間違えたときにマウスで検索バーへ戻る必要はありません。</P>
         <H3>検索履歴</H3>
         <Ul>
           <Li>ブックマークをクリックしたときの検索キーワードが履歴として保存されます。</Li>
@@ -418,6 +425,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">ショートカット</h2>
         <div className="rounded-lg border overflow-hidden mb-3">
           <ShortcutRow keys={["文字キー"]} label="検索バーにフォーカスして入力開始" />
+          <ShortcutRow keys={["Backspace"]} label="検索ワードを1文字削除" />
           <ShortcutRow keys={["Tab"]} label="次のブックマークカードへフォーカス移動" />
           <ShortcutRow keys={["Shift", "Tab"]} label="前のブックマークカードへフォーカス移動" />
           <ShortcutRow keys={["Esc"]} label="モーダルを閉じる / 操作をキャンセル" />
@@ -529,6 +537,12 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Search</h2>
         <H3>Keyword Search</H3>
         <P>Type in the search bar to filter bookmarks by <Strong>title, URL, and memo</Strong>.</P>
+        <H3>Type in Either Script</H3>
+        <P>Search ignores the difference between <Strong>hiragana, katakana, full-width and half-width</Strong> characters. It also matches <Strong>romaji you type against kana in your bookmarks</Strong> (<Strong>pasokon</Strong> finds &ldquo;パソコン&rdquo;), and kana against Latin text (<Strong>あまぞん</Strong> finds &ldquo;Amazon&rdquo;), so there is no need to switch your IME on or off between searches.</P>
+        <Ul>
+          <Li>The same applies to file and folder names inside bookmarked folders.</Li>
+          <Li>For a word with a long vowel, type the hyphen as you would with a Japanese IME (<Strong>ra-men</Strong> finds &ldquo;ラーメン&rdquo;).</Li>
+        </Ul>
         <H3>Search Inside Folders</H3>
         <P>Search also reaches <Strong>the file and folder names inside the folders you have bookmarked</Strong>. Type <Strong>two or more characters</Strong> and any matches appear below your bookmarks under &ldquo;In your folders&rdquo;, grouped by the bookmark they came from.</P>
         <Ul>
@@ -545,6 +559,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         </Ul>
         <H3>Type to Search</H3>
         <P>Wherever focus is in the list, just start typing — the search bar takes focus and your keystroke goes into it. This is disabled while a text field is focused, or when you press a modifier combo (Ctrl / Alt / Shift / ⌘), so bookmark shortcuts and editing keys keep working.</P>
+        <P>Likewise <Kbd>Backspace</Kbd> deletes a character from the search query even while focus sits on a card, so fixing a typo never means reaching back to the search bar.</P>
         <H3>Search History</H3>
         <Ul>
           <Li>Keywords are saved when you click a bookmark while searching.</Li>
@@ -735,6 +750,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Shortcuts</h2>
         <div className="rounded-lg border overflow-hidden mb-3">
           <ShortcutRow keys={["Any key"]} label="Focus search and start typing" />
+          <ShortcutRow keys={["Backspace"]} label="Delete a character from the search query" />
           <ShortcutRow keys={["Tab"]} label="Move focus to the next bookmark card" />
           <ShortcutRow keys={["Shift", "Tab"]} label="Move focus to the previous bookmark card" />
           <ShortcutRow keys={["Esc"]} label="Close modal / cancel action" />
