@@ -27,6 +27,9 @@ tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-global-shortcut = "2"
+# Same resolver Tauri's app_data_dir() uses, for the MCP server, which runs
+# without a Tauri context (see src/mcp.rs).
+dirs = "6"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

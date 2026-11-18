@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert, Keyboard, FileJson, RotateCcw, ExternalLink, Image as ImageIcon, FolderOpen, RefreshCw, Pin, PinOff } from "lucide-react";
+import { Settings, Sun, Monitor, MoonStar, Upload, Download, Trash2, X, TriangleAlert, Keyboard, FileJson, RotateCcw, ExternalLink, Image as ImageIcon, FolderOpen, RefreshCw, Pin, PinOff, Copy } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
@@ -24,12 +24,14 @@ const DELETE_CONFIRM_PHRASE = "delete all";
 /**
  * The dialog shows one of these at a time. Ordered the way they are reached
  * for: the two everyday appearance controls, then the keys, then the two
- * features that write outside the app, then what the app is.
+ * features that reach outside the app (Explorer, AI assistants), then the
+ * data itself, then what the app is.
  */
 const SETTINGS_SECTIONS = [
   { id: "appearance" },
   { id: "shortcuts" },
   { id: "files" },
+  { id: "ai" },
   { id: "data" },
   { id: "about" },
 ] as const;
@@ -240,6 +242,39 @@ export function SettingsDialog({
     setTheme(selected);
     localStorage.setItem("theme", selected);
     applyTheme(selected);
+  }
+
+  // The MCP server is this same executable started with `--mcp` by the
+  // assistant, so the command to give it is only known to the backend (and
+  // differs between the Store and installer builds).
+  const [mcpCommand, setMcpCommand] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || mcpCommand) return;
+    invoke<{ command: string }>("mcp_launch_command")
+      .then((res) => setMcpCommand(res.command))
+      .catch(() => {});
+  }, [open, mcpCommand]);
+
+  const mcpSnippets = mcpCommand
+    ? {
+        command: `"${mcpCommand}" --mcp`,
+        claudeDesktop: JSON.stringify(
+          { mcpServers: { bookmarks: { command: mcpCommand, args: ["--mcp"] } } },
+          null,
+          2
+        ),
+        claudeCode: `claude mcp add --scope user bookmarks -- "${mcpCommand}" --mcp`,
+      }
+    : null;
+
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t.copied);
+    } catch {
+      toast.error(t.copyFailed);
+    }
   }
 
   // "Fetch missing icons" is the only action that contacts many sites at once,
@@ -834,6 +869,66 @@ export function SettingsDialog({
                       <p className="text-xs text-muted-foreground mt-1.5">
                         {t.folderSearchNote}
                       </p>
+                    </div>
+                  </div>
+                </section>
+
+                <div className="border-t" />
+
+                <section ref={registerRef("ai")}>
+                  <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">{t.sections.ai}</h2>
+                  <div className="flex flex-col gap-5">
+                    {/* MCP server */}
+                    <div>
+                      <label className="block text-sm font-medium mb-2">{t.mcpLabel}</label>
+                      <p className="text-xs text-muted-foreground">{t.mcpIntro}</p>
+
+                      <p className="text-xs font-medium mt-3 mb-1.5">{t.mcpCommand}</p>
+                      <div className="flex gap-2">
+                        <div
+                          className="flex-1 min-w-0 rounded-md border border-input bg-transparent px-3 py-2 text-xs font-mono text-muted-foreground truncate"
+                          title={mcpSnippets?.command}
+                        >
+                          {mcpSnippets?.command ?? "…"}
+                        </div>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={Copy}
+                          onClick={() => mcpSnippets && copyText(mcpSnippets.command)}
+                          disabled={!mcpSnippets}
+                        >
+                          {t.copy}
+                        </Button>
+                      </div>
+                      <div className="flex gap-2 mt-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={Copy}
+                          onClick={() => mcpSnippets && copyText(mcpSnippets.claudeDesktop)}
+                          disabled={!mcpSnippets}
+                          className="flex-1"
+                        >
+                          Claude Desktop
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={Copy}
+                          onClick={() => mcpSnippets && copyText(mcpSnippets.claudeCode)}
+                          disabled={!mcpSnippets}
+                          className="flex-1"
+                        >
+                          Claude Code
+                        </Button>
+                      </div>
+                      <ul className="text-xs text-muted-foreground mt-1.5 flex flex-col gap-1">
+                        <li>{t.mcpHowToDesktop}</li>
+                        <li>{t.mcpHowToCode}</li>
+                        <li>{t.mcpHowToOther}</li>
+                      </ul>
+                      <p className="text-xs text-muted-foreground mt-2">{t.mcpPrivacy}</p>
                     </div>
                   </div>
                 </section>

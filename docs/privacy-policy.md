@@ -1,12 +1,12 @@
 # Privacy Policy — Bookmarks & Tags
 
-**Last updated: 2026-08-13**
+**Last updated: 2026-11-18**
 
 Bookmarks & Tags ("the app") is a bookmark manager developed by Yukihiro Sakuda. This policy explains what data the app handles and how.
 
 ## Summary
 
-The app does not collect, transmit, or store any of your data outside your own device. There are no accounts, no analytics, no ads, and no third-party data sharing. The only outbound connections the app makes are to the websites you bookmark, as described in "Connecting to the sites you bookmark" below.
+The app does not collect, transmit, or store any of your data outside your own device. There are no accounts, no analytics, no ads, and no third-party data sharing. The only outbound connections the app makes are to the websites you bookmark, as described in "Connecting to the sites you bookmark" below. If you connect an AI assistant to the app yourself (see "AI assistants (MCP)"), that assistant — not the app — sends what it reads to its own service.
 
 ## What data the app handles
 
@@ -38,6 +38,16 @@ The desktop app runs a local web server bound to `127.0.0.1` (your own machine o
 - Only accepts connections from your own computer — it is not reachable over the internet or your local network
 - Only accepts requests from the companion browser extension, using a token generated on your device
 - Never sends data anywhere outside your device
+
+## AI assistants (MCP)
+
+The app can act as an MCP server for AI assistants such as Claude Desktop or Claude Code. This is off unless you set it up: nothing happens until you add the app to an assistant's configuration yourself (**Settings → AI assistants** shows how).
+
+- The assistant starts the app's executable with `--mcp` on your computer and talks to it over standard input/output. No network port is opened and the app makes no network connection for this
+- It is read-only: the database is opened in read-only mode, so an assistant cannot change, add, or delete your bookmarks
+- It can read bookmark titles, URLs and file paths, tags, memos, usage counts and dates, and the names of files and folders inside folders you have bookmarked. It does not read the contents of those files
+- What the assistant reads is sent to the AI service that assistant uses and is handled under that service's own privacy policy. The developer of this app receives none of it
+- To stop, remove the app from the assistant's configuration
 
 ## Browser extension
 
