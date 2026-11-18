@@ -1346,6 +1346,23 @@ pub fn mcp_launch_command() -> Result<Value, String> {
     Ok(json!({ "command": mcp_executable()?, "args": ["--mcp"] }))
 }
 
+// ---------- AI bookmark suggestions ----------
+
+/// Bookmarks an assistant has proposed through the MCP `suggest_bookmark` tool
+/// and the user has not yet saved or dismissed (see suggestions.rs).
+#[tauri::command]
+pub fn list_suggestions(state: State<'_, AppState>) -> Value {
+    json!(state.suggestions.list())
+}
+
+/// Drops a suggestion: the user dismissed it, or saved it as a bookmark.
+#[tauri::command]
+pub fn dismiss_suggestion(id: String, app: AppHandle, state: State<'_, AppState>) {
+    if state.suggestions.remove(&id) {
+        let _ = app.emit("suggestions-changed", ());
+    }
+}
+
 fn mcp_executable() -> Result<String, String> {
     // The Store build's app.exe sits under WindowsApps, in a folder renamed on
     // every update, and launching it directly drops package identity. The

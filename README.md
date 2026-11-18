@@ -120,7 +120,8 @@ Hands your bookmarks to an AI assistant as a map of where your work lives, so it
 - ChatGPT / Codex desktop apps: **Settings → MCP servers → Add server**, choose **STDIO**, set the command to the app's executable path and the argument to `--mcp`, save, then **Restart**. The two apps share one MCP configuration (`%USERPROFILE%\.codex\config.toml`), so registering in either covers both; the Codex CLI equivalent is `codex mcp add bookmarks -- "<path>" --mcp`. ChatGPT on the web cannot reach a local server
 - Tools: `get_overview` (tags, pinned, in use lately), `search_bookmarks` (title / memo / tags / URL or path, ranked by match and recent use), `get_bookmark` (full memo; for a folder, what is inside it), `search_files` (file names inside bookmarked folders)
 - Memos are matched as strongly as titles, since they are usually what you call the bookmark
-- **Read-only** — the database is opened read-only, so an assistant cannot change or delete anything
+- `suggest_bookmark` — the assistant can **propose** a web page, file or folder it found for you. It lands under **Suggestions** in the header (app must be running) and is saved only if you press **Review & add** and Save; dismissing it, or restarting the app, drops it. Only plain `http(s)` URLs or paths that exist on a local drive (no network shares, and no programs, scripts, installers or shortcuts), at most 20 waiting, and only your existing tags are used
+- **Read-only** — the database is opened read-only, so an assistant cannot change or delete anything; a suggestion is a proposal, not a write
 - Runs in its own process and reads the database directly, so it works whether or not the app is running
 
 ### UI / UX

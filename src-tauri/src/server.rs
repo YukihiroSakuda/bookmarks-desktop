@@ -4,7 +4,7 @@ use axum::{
     http::{HeaderMap, HeaderValue, Method, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
 };
 use chrono::{SecondsFormat, Utc};
 use rusqlite::{Connection, OptionalExtension};
@@ -12,11 +12,15 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use tower_http::cors::{Any, CorsLayer};
 use uuid::Uuid;
 
 pub type SharedDb = Arc<Mutex<Connection>>;
+
+/// Where the local API listens. The MCP server (a separate process) posts
+/// bookmark suggestions here, so both sides read it from one place.
+pub const LOCAL_API_ADDR: &str = "127.0.0.1:37373";
 
 /// Allowed extension origins. Store submissions strip the `key` field from
 /// extension/public/manifest.json (Edge/Chrome both reject a pinned key), so
@@ -105,6 +109,17 @@ struct CreateBookmarkBody {
     memo: Option<String>,
     #[serde(default)]
     shortcut: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct SuggestBody {
+    url: String,
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    reason: Option<String>,
+    #[serde(default)]
+    tags: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -364,6 +379,64 @@ async fn get_tag_rules(State(state): State<ServerState>) -> ApiResult {
     .map(Json)
 }
 
+/// Queues a bookmark an AI assistant proposes. Nothing is written to the
+/// database: the user has to open it in the app and save it themselves (see
+/// suggestions.rs). Reached by the MCP server, which carries the pairing token.
+async fn post_suggestion(
+    State(state): State<ServerState>,
+    Json(body): Json<SuggestBody>,
+) -> ApiResult {
+    use crate::suggestions::{Outcome, Probe, Proposal};
+
+    let db = state.db;
+    let app = state.app.clone();
+    let outcome = tokio::task::spawn_blocking(move || -> Result<Value, (StatusCode, String)> {
+        let (urls, tags) = {
+            let conn = db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+            let column = |sql: &str| -> Result<Vec<String>, String> {
+                let mut stmt = conn.prepare(sql).map_err(|e| e.to_string())?;
+                let rows = stmt.query_map([], |r| r.get::<_, String>(0)).map_err(|e| e.to_string())?;
+                rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+            };
+            let urls = column("SELECT url FROM bookmarks")
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+            let tags = column("SELECT name FROM tags")
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+            (urls, tags)
+        };
+
+        let suggestions = &app.state::<crate::db::AppState>().suggestions;
+        let result = suggestions
+            .add(
+                Proposal { url: body.url, title: body.title, reason: body.reason, tags: body.tags },
+                &urls,
+                &tags,
+                |path| match std::fs::metadata(path) {
+                    Ok(m) if m.is_dir() => Probe::Folder,
+                    Ok(_) => Probe::File,
+                    Err(_) => Probe::Missing,
+                },
+                new_id,
+            )
+            .map_err(|e| (StatusCode::UNPROCESSABLE_ENTITY, e))?;
+
+        Ok(match result {
+            Outcome::Queued(s) => {
+                let _ = app.emit("suggestions-changed", ());
+                json!({ "status": "queued", "id": s.id })
+            }
+            Outcome::AlreadyPending => json!({ "status": "already_pending" }),
+            Outcome::AlreadyBookmarked => json!({ "status": "already_bookmarked" }),
+        })
+    })
+    .await
+    .map_err(|e| internal_err(e.to_string()))?;
+
+    outcome
+        .map(Json)
+        .map_err(|(status, msg)| (status, Json(json!({ "error": msg }))))
+}
+
 async fn get_title(Query(q): Query<TitleQuery>) -> ApiResult {
     let url = q.url;
     let title = tokio::task::spawn_blocking(move || crate::page_title::fetch_title_blocking(&url))
@@ -428,6 +501,7 @@ pub async fn start(db: SharedDb, app_handle: tauri::AppHandle) {
         .route("/api/bookmarks/title", get(get_title))
         .route("/api/tags", get(get_tags).post(post_tag))
         .route("/api/tag-rules", get(get_tag_rules))
+        .route("/api/suggestions", post(post_suggestion))
         .route_layer(middleware::from_fn_with_state(state.clone(), require_token));
 
     let app = Router::new()
@@ -436,7 +510,7 @@ pub async fn start(db: SharedDb, app_handle: tauri::AppHandle) {
         .layer(cors)
         .with_state(state);
 
-    match tokio::net::TcpListener::bind("127.0.0.1:37373").await {
+    match tokio::net::TcpListener::bind(LOCAL_API_ADDR).await {
         Ok(listener) => {
             log::info!("Local API server listening on http://127.0.0.1:37373");
             if let Err(e) = axum::serve(listener, app).await {

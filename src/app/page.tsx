@@ -31,6 +31,7 @@ import {
   useBookmarkArrowNavigation,
   useSearchHistory,
   useExplorerImport,
+  useSuggestions,
   useBookmarkHotkeys,
   useTypeToSearch,
   useNewBookmarkFromUrl,
@@ -95,8 +96,12 @@ export default function BookmarksPage() {
   const [isOrderingMode, setIsOrderingMode] = useState(false);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   const [newBookmarkInitialValues, setNewBookmarkInitialValues] = useState<
-    Partial<Pick<BookmarkUI, "title" | "url">> | undefined
+    Partial<Pick<BookmarkUI, "title" | "url" | "tags" | "memo">> | undefined
   >(undefined);
+  // The AI suggestion the add form was opened from, so saving it also clears it
+  // from the Suggestions list. Closing the form without saving keeps it there.
+  const [activeSuggestionId, setActiveSuggestionId] = useState<string | undefined>(undefined);
+  const { suggestions, dismissSuggestion } = useSuggestions();
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Tab key cycles focus through bookmark cards only (disabled while a modal
@@ -360,7 +365,21 @@ export default function BookmarksPage() {
               });
             }}
             selectedTags={filtering.selectedTags}
+            suggestions={suggestions}
+            onDismissSuggestion={dismissSuggestion}
+            onReviewSuggestion={(s) => {
+              setSelectedBookmark(undefined);
+              setActiveSuggestionId(s.id);
+              setNewBookmarkInitialValues({
+                url: s.url,
+                title: s.title || undefined,
+                memo: s.reason || undefined,
+                tags: s.tags,
+              });
+              setIsModalOpen(true);
+            }}
             onAddBookmark={() => {
+              setActiveSuggestionId(undefined);
               setNewBookmarkInitialValues(undefined);
               setSelectedBookmark(undefined);
               setIsModalOpen(true);
@@ -437,11 +456,16 @@ export default function BookmarksPage() {
               initialValues={selectedBookmark ? undefined : newBookmarkInitialValues}
               onClose={() => {
                 setNewBookmarkInitialValues(undefined);
+                setActiveSuggestionId(undefined);
                 setIsModalOpen(false);
                 setSelectedBookmark(undefined);
               }}
               onSave={async (bookmarkData) => {
-                await handleSave(bookmarkData);
+                const saved = await handleSave(bookmarkData);
+                if (saved && activeSuggestionId) {
+                  dismissSuggestion(activeSuggestionId);
+                  setActiveSuggestionId(undefined);
+                }
                 setNewBookmarkInitialValues(undefined);
               }}
               availableTags={availableTags}

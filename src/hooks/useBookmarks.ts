@@ -78,7 +78,10 @@ export function useBookmarks(options: UseBookmarksOptions) {
   );
 
   const handleSave = useCallback(
-    async (bookmarkData: Omit<BookmarkUI, "id">) => {
+    // Resolves to whether the bookmark was saved; failures are reported here as
+    // a toast rather than thrown, so callers that must act only on success (an
+    // accepted AI suggestion) need the flag.
+    async (bookmarkData: Omit<BookmarkUI, "id">): Promise<boolean> => {
       try {
         const { tagRules, availableTags } = optionsRef.current;
 
@@ -103,9 +106,11 @@ export function useBookmarks(options: UseBookmarksOptions) {
         setSelectedBookmark(undefined);
         await refreshAfterMutation();
         toast.success("Bookmark saved");
+        return true;
       } catch (error) {
         console.error("Error saving bookmark:", error);
         toast.error(error instanceof Error ? error.message : "Failed to save bookmark");
+        return false;
       }
     },
     [selectedBookmark, refreshAfterMutation]

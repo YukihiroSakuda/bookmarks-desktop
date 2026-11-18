@@ -16,6 +16,9 @@ pub struct AppState {
     pub summon_shortcut: Mutex<Option<String>>,
     /// Set while the user cancels the bulk "fetch missing icons" run.
     pub favicon_cancel: AtomicBool,
+    /// Bookmarks an AI assistant proposed that the user has not yet accepted or
+    /// dismissed. In memory only; see suggestions.rs.
+    pub suggestions: crate::suggestions::Suggestions,
 }
 
 const SCHEMA: &str = r#"

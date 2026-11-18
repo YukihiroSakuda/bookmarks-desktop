@@ -6,6 +6,7 @@ mod folder_search;
 pub mod mcp;
 mod server;
 mod shortcutdir;
+mod suggestions;
 #[cfg(target_os = "windows")]
 mod winpkg;
 
@@ -75,6 +76,7 @@ pub fn run() {
                 pending_path: Mutex::new(pending),
                 summon_shortcut: Mutex::new(None),
                 favicon_cancel: std::sync::atomic::AtomicBool::new(false),
+                suggestions: suggestions::Suggestions::default(),
             });
 
             // Register the global "summon" hotkey from settings so it is live
@@ -214,6 +216,8 @@ pub fn run() {
             commands::unregister_context_menu,
             commands::save_extension_zip,
             commands::mcp_launch_command,
+            commands::list_suggestions,
+            commands::dismiss_suggestion,
             folder_search::search_in_folders,
             shortcutdir::sync_shortcut_dir,
             shortcutdir::pick_shortcut_dir,

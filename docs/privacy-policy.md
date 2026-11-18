@@ -43,8 +43,9 @@ The desktop app runs a local web server bound to `127.0.0.1` (your own machine o
 
 The app can act as an MCP server for AI assistants such as Claude Desktop, Claude Code, or the ChatGPT and Codex desktop apps. This is off unless you set it up: nothing happens until you add the app to an assistant's configuration yourself (**Settings → AI assistants** shows how).
 
-- The assistant starts the app's executable with `--mcp` on your computer and talks to it over standard input/output. No network port is opened and the app makes no network connection for this
+- The assistant starts the app's executable with `--mcp` on your computer and talks to it over standard input/output. Reading bookmarks opens no network port and makes no network connection
 - It is read-only: the database is opened in read-only mode, so an assistant cannot change, add, or delete your bookmarks
+- The one thing an assistant can do besides read is *suggest* a web page, file or folder. The suggestion is sent to the running app over the app's local server (`127.0.0.1` on this computer only, protected by a token) and waits in the app's memory under **Suggestions**. Nothing is saved unless you open it and press Save; dismissing it, or restarting the app, discards it. Only plain `http`/`https` addresses and paths that exist on a local drive are accepted; network shares and files that run code (programs, scripts, installers, shortcuts) are refused
 - It can read bookmark titles, URLs and file paths, tags, memos, usage counts and dates, and the names of files and folders inside folders you have bookmarked. It does not read the contents of those files
 - What the assistant reads is sent to the AI service that assistant uses and is handled under that service's own privacy policy. The developer of this app receives none of it
 - To stop, remove the app from the assistant's configuration

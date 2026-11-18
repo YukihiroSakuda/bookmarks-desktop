@@ -20,9 +20,14 @@ import { SortControls } from "./SortControls";
 import { SettingsDialog } from "./SettingsDialog";
 import { buildQueryForms, matchesAnyForm, normalizeForSearch } from "@/lib/searchNormalize";
 import { HelpDialog } from "./HelpDialog";
+import { SuggestionsMenu } from "./SuggestionsMenu";
+import { Suggestion } from "@/types/suggestion";
 import { DEFAULT_UI_LANG, readStoredUiLang, storeUiLang, UiLang } from "@/lib/uiLanguage";
 
 interface BookmarkHeaderProps {
+  suggestions: Suggestion[];
+  onReviewSuggestion: (suggestion: Suggestion) => void;
+  onDismissSuggestion: (id: string) => void;
   listColumns: 1 | 2 | 3 | 4;
   onListColumnsChange: (columns: 1 | 2 | 3 | 4) => void;
   summonShortcut: string;
@@ -68,6 +73,9 @@ interface BookmarkHeaderProps {
 }
 
 export function BookmarkHeader({
+  suggestions,
+  onReviewSuggestion,
+  onDismissSuggestion,
   listColumns,
   onListColumnsChange,
   summonShortcut,
@@ -299,6 +307,12 @@ export function BookmarkHeader({
               onDeleteAll={onDeleteAll}
               onRestoreComplete={onRestoreComplete}
               isOrderingMode={isOrderingMode}
+            />
+            <SuggestionsMenu
+              suggestions={suggestions}
+              onReview={onReviewSuggestion}
+              onDismiss={onDismissSuggestion}
+              disabled={isOrderingMode}
             />
             <Button
               onClick={onAddBookmark}
