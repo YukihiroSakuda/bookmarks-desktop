@@ -41,7 +41,7 @@ The desktop app runs a local web server bound to `127.0.0.1` (your own machine o
 
 ## AI assistants (MCP)
 
-The app can act as an MCP server for AI assistants such as Claude Desktop or Claude Code. This is off unless you set it up: nothing happens until you add the app to an assistant's configuration yourself (**Settings → AI assistants** shows how).
+The app can act as an MCP server for AI assistants such as Claude Desktop, Claude Code, or the ChatGPT and Codex desktop apps. This is off unless you set it up: nothing happens until you add the app to an assistant's configuration yourself (**Settings → AI assistants** shows how).
 
 - The assistant starts the app's executable with `--mcp` on your computer and talks to it over standard input/output. No network port is opened and the app makes no network connection for this
 - It is read-only: the database is opened in read-only mode, so an assistant cannot change, add, or delete your bookmarks

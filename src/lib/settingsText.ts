@@ -43,13 +43,15 @@ export const SETTINGS_TEXT = {
       "検索時に、ブックマークしたフォルダの中のファイル名も検索対象に含めます。",
     mcpLabel: "AI アシスタントから読めるようにする（MCP）",
     mcpIntro:
-      "MCP に対応した AI アシスタント（Claude Desktop、Claude Code など）が、ブックマーク・タグ・メモと、ブックマークしたフォルダの中のファイル名を読めるようになります。どこに何があるかを、AI が自分で引けるようになります。",
+      "MCP に対応した AI アシスタント（Claude Desktop、Claude Code、ChatGPT・Codex のデスクトップアプリなど）が、ブックマーク・タグ・メモと、ブックマークしたフォルダの中のファイル名を読めるようになります。どこに何があるかを、AI が自分で引けるようになります。",
     mcpCommand: "起動コマンド",
     copy: "コピー",
     mcpHowToDesktop:
       "Claude Desktop: 設定の「開発者」から開く claude_desktop_config.json に貼り付けて、再起動します。ほかのサーバーが登録済みなら、mcpServers の中に bookmarks の項目だけを追加します。",
     mcpHowToCode:
       "Claude Code: ターミナルに貼り付けて実行します。すべてのプロジェクトで使えるよう、ユーザー単位で登録します。",
+    mcpHowToOpenAi:
+      "ChatGPT / Codex デスクトップアプリ: 設定の「MCP servers」→「Add server」で STDIO を選び、コマンドに「ChatGPT / Codex」でコピーしたパス、引数に --mcp を入力して保存し、「Restart」を押します。2つのアプリは MCP の設定を共有しているので、どちらかで登録すれば両方で使えます（Codex CLI なら codex mcp add bookmarks -- に続けて起動コマンドを実行しても同じです）。Web 版の ChatGPT はこのパソコン上のサーバーを使えません。",
     mcpHowToOther: "その他のアシスタント: 起動コマンドを stdio サーバーとして登録します。",
     mcpPrivacy:
       "読み取り専用で、AI がブックマークを変更・削除することはできません。アプリを起動していなくても使えます。AI が読んだ内容は、そのアシスタントの AI サービスに送られます。",
@@ -158,13 +160,15 @@ export const SETTINGS_TEXT = {
       "When searching, also match file names inside bookmarked folders.",
     mcpLabel: "Let AI assistants read your bookmarks (MCP)",
     mcpIntro:
-      "AI assistants that support MCP (Claude Desktop, Claude Code, and others) can read your bookmarks, tags and memos, plus the file names inside bookmarked folders — so they can look up where things are on their own.",
+      "AI assistants that support MCP (Claude Desktop, Claude Code, the ChatGPT and Codex desktop apps, and others) can read your bookmarks, tags and memos, plus the file names inside bookmarked folders — so they can look up where things are on their own.",
     mcpCommand: "Launch command",
     copy: "Copy",
     mcpHowToDesktop:
       "Claude Desktop: paste into claude_desktop_config.json (open it from the Developer page of its settings), then restart it. If other servers are already listed, add just the bookmarks entry inside mcpServers.",
     mcpHowToCode:
       "Claude Code: paste into a terminal and run. It is registered for your user, so every project can use it.",
+    mcpHowToOpenAi:
+      "ChatGPT / Codex desktop apps: in Settings, open MCP servers → Add server, choose STDIO, enter the path copied with \"ChatGPT / Codex\" as the command and --mcp as the argument, save, then select Restart. The two apps share their MCP configuration, so adding it in either makes it available in both (with the Codex CLI, running codex mcp add bookmarks -- followed by the launch command does the same). ChatGPT on the web cannot use a server on this computer.",
     mcpHowToOther: "Other assistants: register the launch command as a stdio server.",
     mcpPrivacy:
       "Read-only: an assistant cannot change or delete your bookmarks. Works whether or not the app is running. What an assistant reads is sent to the AI service it uses.",

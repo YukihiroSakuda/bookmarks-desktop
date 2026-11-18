@@ -116,7 +116,8 @@ Only files this app created are ever deleted — they are tracked in a manifest 
 
 Hands your bookmarks to an AI assistant as a map of where your work lives, so it can look things up instead of asking you.
 
-- The app's own executable started with `--mcp` is a stdio [MCP](https://modelcontextprotocol.io) server. Register it in Claude Desktop, Claude Code, or any MCP client — **Settings → AI assistants** copies the exact command or config for your install (Store or installer)
+- The app's own executable started with `--mcp` is a stdio [MCP](https://modelcontextprotocol.io) server. Register it in Claude Desktop, Claude Code, the ChatGPT / Codex desktop apps, or any MCP client — **Settings → AI assistants** copies the exact command, config or path for your install (Store or installer)
+- ChatGPT / Codex desktop apps: **Settings → MCP servers → Add server**, choose **STDIO**, set the command to the app's executable path and the argument to `--mcp`, save, then **Restart**. The two apps share one MCP configuration (`%USERPROFILE%\.codex\config.toml`), so registering in either covers both; the Codex CLI equivalent is `codex mcp add bookmarks -- "<path>" --mcp`. ChatGPT on the web cannot reach a local server
 - Tools: `get_overview` (tags, pinned, in use lately), `search_bookmarks` (title / memo / tags / URL or path, ranked by match and recent use), `get_bookmark` (full memo; for a folder, what is inside it), `search_files` (file names inside bookmarked folders)
 - Memos are matched as strongly as titles, since they are usually what you call the bookmark
 - **Read-only** — the database is opened read-only, so an assistant cannot change or delete anything

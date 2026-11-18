@@ -265,6 +265,9 @@ export function SettingsDialog({
           2
         ),
         claudeCode: `claude mcp add --scope user bookmarks -- "${mcpCommand}" --mcp`,
+        // The ChatGPT / Codex desktop apps take the executable and its
+        // arguments in separate fields, so this is the bare path.
+        openAiPath: mcpCommand,
       }
     : null;
 
@@ -922,10 +925,21 @@ export function SettingsDialog({
                         >
                           Claude Code
                         </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={Copy}
+                          onClick={() => mcpSnippets && copyText(mcpSnippets.openAiPath)}
+                          disabled={!mcpSnippets}
+                          className="flex-1"
+                        >
+                          ChatGPT / Codex
+                        </Button>
                       </div>
                       <ul className="text-xs text-muted-foreground mt-1.5 flex flex-col gap-1">
                         <li>{t.mcpHowToDesktop}</li>
                         <li>{t.mcpHowToCode}</li>
+                        <li>{t.mcpHowToOpenAi}</li>
                         <li>{t.mcpHowToOther}</li>
                       </ul>
                       <p className="text-xs text-muted-foreground mt-2">{t.mcpPrivacy}</p>
