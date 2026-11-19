@@ -1,5 +1,14 @@
 import { TagRuleLike, getAutoTagNames, mergeBookmarkTags } from "./form";
-import { tauriFetch as fetch } from "@/lib/tauriFetch";
+import * as backend from "@/lib/backend";
+
+/**
+ * Bookmark operations that apply the tag rules on the way in. The app's add
+ * form, edit form and HTML import all create and update through here, so a
+ * rule tags a bookmark the same way whichever of them saved it.
+ *
+ * App-only: these call the Rust backend through Tauri. The browser extension
+ * shares `form.ts`, not this file, and reaches the app over its local HTTP API.
+ */
 
 export interface BookmarkApiInput {
   title: string;
@@ -10,6 +19,8 @@ export interface BookmarkApiInput {
   tags: string[];
   memo?: string;
   shortcut?: string;
+  /** Create only: when the bookmark was originally added (e.g. from an import). */
+  createdAt?: string;
 }
 
 export interface TagApiItem {
@@ -29,56 +40,26 @@ export interface TagRuleApiItem extends TagRuleLike {
   updatedAt?: string;
 }
 
-interface TagRuleApiResponse {
-  id: string;
-  match_type: "starts_with" | "contains" | "ends_with";
-  pattern: string;
-  tag_id: string;
-  target_field: "title" | "url";
-  created_at?: string;
-  updated_at?: string;
+interface RuleContext {
+  availableTags?: TagApiItem[];
+  tagRules?: TagRuleApiItem[];
 }
 
-function buildApiUrl(path: string, baseUrl = ""): string {
-  if (!baseUrl) return path;
-  const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
-  return `${normalizedBaseUrl}${path}`;
+export async function fetchBookmarkPageTitle(url: string): Promise<string> {
+  const { title } = await backend.fetchPageTitle(url);
+  return title ?? "";
 }
 
-async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, init);
-
-  if (!response.ok) {
-    let message = `Request failed: ${response.status}`;
-    try {
-      const errorData = await response.json() as { error?: string };
-      if (errorData.error) message = errorData.error;
-    } catch {
-      // ignore non-JSON error bodies
-    }
-    throw new Error(message);
-  }
-
-  return response.json() as Promise<T>;
+export async function fetchTags(): Promise<TagApiItem[]> {
+  return backend.listTags();
 }
 
-export async function fetchBookmarkPageTitle(url: string, baseUrl = ""): Promise<string> {
-  const data = await requestJson<{ title?: string }>(
-    buildApiUrl(`/api/bookmarks/title?url=${encodeURIComponent(url)}`, baseUrl)
-  );
-  return data.title ?? "";
+export async function fetchBookmarks(): Promise<BookmarkListItem[]> {
+  return backend.listBookmarks();
 }
 
-export async function fetchTags(baseUrl = ""): Promise<TagApiItem[]> {
-  return requestJson<TagApiItem[]>(buildApiUrl("/api/tags", baseUrl));
-}
-
-export async function fetchBookmarks(baseUrl = ""): Promise<BookmarkListItem[]> {
-  return requestJson<BookmarkListItem[]>(buildApiUrl("/api/bookmarks", baseUrl));
-}
-
-export async function fetchTagRules(baseUrl = ""): Promise<TagRuleApiItem[]> {
-  const rules = await requestJson<TagRuleApiResponse[]>(buildApiUrl("/api/tag-rules", baseUrl));
+export async function fetchTagRules(): Promise<TagRuleApiItem[]> {
+  const rules = await backend.listTagRules();
   return rules.map((rule) => ({
     id: rule.id,
     matchType: rule.match_type,
@@ -90,63 +71,38 @@ export async function fetchTagRules(baseUrl = ""): Promise<TagRuleApiItem[]> {
   }));
 }
 
-export async function createBookmark(
-  bookmark: BookmarkApiInput,
-  options?: {
-    baseUrl?: string;
-    availableTags?: TagApiItem[];
-    tagRules?: TagRuleApiItem[];
-  }
-): Promise<{ id: string }> {
+function toPayload(bookmark: BookmarkApiInput, options?: RuleContext): backend.BookmarkPayload {
   const autoTagNames = getAutoTagNames(
     options?.tagRules ?? [],
     options?.availableTags ?? [],
     bookmark
   );
+  return {
+    title: bookmark.title,
+    url: bookmark.url,
+    kind: bookmark.kind ?? "url",
+    favicon: bookmark.favicon,
+    is_pinned: bookmark.isPinned,
+    tags: mergeBookmarkTags(bookmark.tags, autoTagNames),
+    memo: bookmark.memo ?? null,
+    shortcut: bookmark.shortcut ?? null,
+  };
+}
 
-  return requestJson<{ id: string }>(buildApiUrl("/api/bookmarks", options?.baseUrl), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: bookmark.title,
-      url: bookmark.url,
-      kind: bookmark.kind ?? "url",
-      favicon: bookmark.favicon,
-      is_pinned: bookmark.isPinned,
-      tags: mergeBookmarkTags(bookmark.tags, autoTagNames),
-      memo: bookmark.memo ?? null,
-      shortcut: bookmark.shortcut ?? null,
-    }),
+export async function createBookmark(
+  bookmark: BookmarkApiInput,
+  options?: RuleContext
+): Promise<{ id: string }> {
+  return backend.createBookmark({
+    ...toPayload(bookmark, options),
+    created_at: bookmark.createdAt ?? null,
   });
 }
 
 export async function updateBookmark(
   id: string,
   bookmark: BookmarkApiInput,
-  options?: {
-    baseUrl?: string;
-    availableTags?: TagApiItem[];
-    tagRules?: TagRuleApiItem[];
-  }
+  options?: RuleContext
 ): Promise<{ ok: true }> {
-  const autoTagNames = getAutoTagNames(
-    options?.tagRules ?? [],
-    options?.availableTags ?? [],
-    bookmark
-  );
-
-  return requestJson<{ ok: true }>(buildApiUrl(`/api/bookmarks/${id}`, options?.baseUrl), {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title: bookmark.title,
-      url: bookmark.url,
-      kind: bookmark.kind ?? "url",
-      favicon: bookmark.favicon,
-      is_pinned: bookmark.isPinned,
-      tags: mergeBookmarkTags(bookmark.tags, autoTagNames),
-      memo: bookmark.memo ?? null,
-      shortcut: bookmark.shortcut ?? null,
-    }),
-  });
+  return backend.updateBookmark(id, toPayload(bookmark, options));
 }

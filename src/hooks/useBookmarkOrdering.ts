@@ -1,19 +1,17 @@
 import { useState, useCallback, useRef } from "react";
 import { BookmarkUI, SortOption, SortOrder, convertToUI } from "@/types/bookmark";
-import { tauriFetch as fetch } from "@/lib/tauriFetch";
+import * as backend from "@/lib/backend";
 import { createBookmarkComparator } from "@/lib/bookmarkScore";
-import { buildQueryForms, matchesAnyForm, normalizeForSearch } from "@/lib/searchNormalize";
+import { createBookmarkFilter, searchableFields } from "@/lib/bookmarkFilter";
+import { TagMatchMode } from "@/lib/tagMatchMode";
 
-/** `queryForms` comes from `buildQueryForms` — built once by the caller, since
- * every bookmark in a pass is tested against the same query. */
-function bookmarkMatchesFilter(
-  bookmark: BookmarkUI,
-  queryForms: string[],
-  selectedTags: string[]
-): boolean {
-  const matchesSearch = matchesAnyForm(normalizeForSearch(bookmark.title), queryForms);
-  const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => bookmark.tags.includes(tag));
-  return matchesSearch && matchesTags;
+/**
+ * The cards currently shown, by the same test the list uses — drags arrive
+ * as positions among the shown cards, so this must agree with the list.
+ */
+function shownFilter(searchQuery: string, selectedTags: string[], tagMatchMode: TagMatchMode) {
+  const isShown = createBookmarkFilter(searchQuery, selectedTags, tagMatchMode);
+  return (bookmark: BookmarkUI) => isShown(searchableFields(bookmark), bookmark.tags);
 }
 
 interface UseBookmarkOrderingOptions {
@@ -21,6 +19,7 @@ interface UseBookmarkOrderingOptions {
   setBookmarks: React.Dispatch<React.SetStateAction<BookmarkUI[]>>;
   searchQuery: string;
   selectedTags: string[];
+  tagMatchMode: TagMatchMode;
   currentSort: SortOption;
   currentOrder: SortOrder;
   listColumns: 1 | 2 | 3 | 4;
@@ -60,21 +59,13 @@ export function useBookmarkOrdering(options: UseBookmarkOrderingOptions) {
         })
       );
 
-      const res = await fetch("/api/bookmarks/reorder", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: allUpdates }),
-      });
-      if (!res.ok) throw new Error("Failed to save order");
+      await backend.reorderBookmarks(allUpdates);
     } catch (error) {
       console.error("Error saving custom order:", error);
       try {
-        const bmRes = await fetch("/api/bookmarks");
-        if (bmRes.ok) {
-          const data = await bmRes.json();
-          optionsRef.current.setBookmarks(data.map(convertToUI));
-          await optionsRef.current.fetchTags();
-        }
+        const records = await backend.listBookmarks();
+        optionsRef.current.setBookmarks(records.map(convertToUI));
+        await optionsRef.current.fetchTags();
       } catch (retryError) {
         console.error("Error retrying fetch:", retryError);
       }
@@ -90,6 +81,7 @@ export function useBookmarkOrdering(options: UseBookmarkOrderingOptions) {
         setBookmarks,
         searchQuery,
         selectedTags,
+        tagMatchMode,
         currentSort,
         currentOrder,
         setIsOrderingMode,
@@ -101,10 +93,10 @@ export function useBookmarkOrdering(options: UseBookmarkOrderingOptions) {
         // (array index). This way entering ordering mode never reshuffles
         // hidden bookmarks relative to visible ones just to display the
         // visible subset in customOrder sequence.
-        const queryForms = buildQueryForms(searchQuery);
+        const isShown = shownFilter(searchQuery, selectedTags, tagMatchMode);
         const visibleSlots: number[] = [];
         bookmarks.forEach((bookmark, index) => {
-          if (bookmarkMatchesFilter(bookmark, queryForms, selectedTags)) {
+          if (isShown(bookmark)) {
             visibleSlots.push(index);
           }
         });
@@ -140,13 +132,12 @@ export function useBookmarkOrdering(options: UseBookmarkOrderingOptions) {
   const handleReorder = useCallback(
     (oldIndex: number, newIndex: number, isPinned: boolean) => {
       optionsRef.current.setBookmarks((prevBookmarks) => {
-        const { searchQuery, selectedTags } = optionsRef.current;
-        const queryForms = buildQueryForms(searchQuery);
+        const { searchQuery, selectedTags, tagMatchMode } = optionsRef.current;
+        const isShown = shownFilter(searchQuery, selectedTags, tagMatchMode);
 
         // The visible group for this pin section, in the order currently shown.
         const visibleGroup = prevBookmarks.filter(
-          (bookmark) =>
-            bookmark.isPinned === isPinned && bookmarkMatchesFilter(bookmark, queryForms, selectedTags)
+          (bookmark) => bookmark.isPinned === isPinned && isShown(bookmark)
         );
 
         if (

@@ -93,6 +93,10 @@ export const SETTINGS_TEXT = {
     restoring: "復元中…",
     jsonNote:
       "JSON バックアップにはすべて（タグ・メモ・ショートカット・設定）が含まれます。復元すると現在のデータはすべて置き換わります。",
+    openBackups: "自動バックアップのフォルダを開く",
+    autoBackupNote:
+      "1日1回と、復元・全削除の直前に自動でバックアップを保存しています（日次は7世代、ほかは各5世代）。「復元」でそのファイルを選べば元に戻せます。",
+    openBackupsFailed: (e: string) => `フォルダを開けませんでした: ${e}`,
     fetchIcons: (n: number) => `未取得のアイコンを取得（${n}）`,
     fetchingIcons: (done: number, total: number) => `取得中 ${done} / ${total}…`,
     allIconsFetched: "アイコンはすべて取得済み",
@@ -106,38 +110,42 @@ export const SETTINGS_TEXT = {
       "ストア版とインストーラー版は同じデータフォルダを使うため、どちらに切り替えてもブックマークは引き継がれます。",
     cancel: "キャンセル",
     deleteConfirmTitle: "すべてのブックマークを削除しますか？",
-    deleteConfirmBefore: "この操作は",
-    deleteConfirmStrong: "取り消せません",
-    deleteConfirmAfter: "。すべてのブックマークが完全に削除されます。",
+    deleteConfirmBefore: "この操作で",
+    deleteConfirmStrong: "すべてのブックマークとタグが削除されます",
+    deleteConfirmAfter:
+      "。削除前の状態は自動バックアップに保存され、「復元」で戻せます。",
     typeConfirmBefore: "確認のため ",
     typeConfirmAfter: " と入力してください",
     restoreConfirmTitle: "バックアップから復元しますか？",
     restoreConfirmBefore: "バックアップファイルの内容で",
     restoreConfirmStrong: "現在のデータをすべて置き換えます",
     restoreConfirmAfter:
-      "（ブックマーク・タグ・ルール・設定）。取り消せません。",
+      "（ブックマーク・タグ・ルール・設定）。置き換える前の状態は自動バックアップに保存されます。",
 
     // --- toasts ---
     iconsStopped: (n: number) => `中止しました。${n} 件のアイコンを取得しました。`,
     iconsDone: (updated: number, total: number) =>
       `${total} 件中 ${updated} 件のアイコンを取得しました。`,
     iconsFailed: "アイコンを取得できませんでした。",
-    pickFolderFailed: "フォルダを選択できませんでした。",
     pickFolderFailedWith: (e: string) => `フォルダを選択できませんでした: ${e}`,
     openFolderFailedWith: (e: string) => `フォルダを開けませんでした: ${e}`,
-    quickAccessFailed: "クイックアクセスを変更できませんでした。",
     quickAccessFailedWith: (e: string) => `クイックアクセスを変更できませんでした: ${e}`,
     quickAccessPinned: "クイックアクセスにピン留めしました。",
     quickAccessUnpinned: "クイックアクセスから外しました。",
     quickAccessManual:
       "クイックアクセスを変更できませんでした。フォルダを右クリックして操作してください。",
-    syncFailed: "ショートカットを同期できませんでした。",
     syncFailedWith: (e: string) => `同期できませんでした: ${e}`,
     syncDone: "ショートカットフォルダを更新しました。",
     syncDoneSkipped: (n: number) =>
       `ショートカットフォルダを更新しました。${n} 件はスキップしました。`,
-    imported: (n: number) =>
-      `${n} 件のブックマークをインポートしました。アイコンは「未取得のアイコンを取得」で集められます。`,
+    imported: (n: number, duplicates: number) =>
+      `${n} 件のブックマークをインポートしました${
+        duplicates > 0 ? `（登録済み・重複の ${duplicates} 件はスキップ）` : ""
+      }。アイコンは「未取得のアイコンを取得」で集められます。`,
+    importFailed: (n: number, e: string) =>
+      n > 0
+        ? `${n} 件をインポートしたところで中断しました: ${e}`
+        : `インポートできませんでした: ${e}`,
     exported: (n: number) => `${n} 件のブックマークをエクスポートしました。`,
     exportFailed: "エクスポートできませんでした。もう一度お試しください。",
     backupSaved: "バックアップを保存しました。",
@@ -227,6 +235,10 @@ export const SETTINGS_TEXT = {
     restoring: "Restoring...",
     jsonNote:
       "JSON backup includes everything (tags, memos, shortcuts, settings). Restore replaces all current data.",
+    openBackups: "Open automatic backups folder",
+    autoBackupNote:
+      "A backup is also saved automatically once a day and right before Restore or Delete all (7 daily, 5 of each other kind). Choose one with Restore to go back to it.",
+    openBackupsFailed: (e: string) => `Could not open the folder: ${e}`,
     fetchIcons: (n: number) => `Fetch missing icons (${n})`,
     fetchingIcons: (done: number, total: number) => `Fetching ${done} / ${total}...`,
     allIconsFetched: "All icons fetched",
@@ -240,37 +252,39 @@ export const SETTINGS_TEXT = {
       "Store and installer builds share the same data folder, so bookmarks carry over between them.",
     cancel: "Cancel",
     deleteConfirmTitle: "Delete all bookmarks?",
-    deleteConfirmBefore: "This action ",
-    deleteConfirmStrong: "cannot be undone",
-    deleteConfirmAfter: ". All bookmarks will be permanently deleted.",
+    deleteConfirmBefore: "This ",
+    deleteConfirmStrong: "deletes all bookmarks and tags",
+    deleteConfirmAfter:
+      ". The current data is saved to an automatic backup first, so Restore can bring it back.",
     typeConfirmBefore: "Type ",
     typeConfirmAfter: " to confirm",
     restoreConfirmTitle: "Restore from backup?",
     restoreConfirmBefore: "This ",
     restoreConfirmStrong: "replaces all current data",
     restoreConfirmAfter:
-      " (bookmarks, tags, rules, and settings) with the contents of the backup file. This cannot be undone.",
+      " (bookmarks, tags, rules, and settings) with the contents of the backup file. The current data is saved to an automatic backup first.",
 
     // --- toasts ---
     iconsStopped: (n: number) => `Stopped. ${n} icons fetched.`,
     iconsDone: (updated: number, total: number) =>
       `${updated} of ${total} icons fetched.`,
     iconsFailed: "Failed to fetch icons.",
-    pickFolderFailed: "Could not choose a folder.",
     pickFolderFailedWith: (e: string) => `Could not choose a folder: ${e}`,
     openFolderFailedWith: (e: string) => `Could not open the folder: ${e}`,
-    quickAccessFailed: "Could not change Quick Access.",
     quickAccessFailedWith: (e: string) => `Could not change Quick Access: ${e}`,
     quickAccessPinned: "Pinned to Quick Access.",
     quickAccessUnpinned: "Unpinned from Quick Access.",
     quickAccessManual:
       "Could not change Quick Access. Right-click the folder and do it from there.",
-    syncFailed: "Could not sync the shortcuts.",
     syncFailedWith: (e: string) => `Could not sync: ${e}`,
     syncDone: "Shortcut folder updated.",
     syncDoneSkipped: (n: number) => `Shortcut folder updated. ${n} skipped.`,
-    imported: (n: number) =>
-      `${n} bookmarks imported. Use "Fetch missing icons" for their icons.`,
+    imported: (n: number, duplicates: number) =>
+      `${n} bookmarks imported${
+        duplicates > 0 ? ` (${duplicates} already saved or repeated, skipped)` : ""
+      }. Use "Fetch missing icons" for their icons.`,
+    importFailed: (n: number, e: string) =>
+      n > 0 ? `Import stopped after ${n} bookmarks: ${e}` : `Import failed: ${e}`,
     exported: (n: number) => `${n} bookmarks exported successfully!`,
     exportFailed: "Export failed. Please try again.",
     backupSaved: "Backup saved successfully!",

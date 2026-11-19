@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Tag } from "@/types/tag";
-import { MatchType, TagRule, TagRuleDB, TagRuleFormData, TargetField, convertTagRuleToUI } from "@/types/tagRule";
+import { MatchType, TagRule, TagRuleFormData, TargetField, convertTagRuleToUI } from "@/types/tagRule";
 import { matchesPattern } from "@/shared/bookmarks/form";
-import { tauriFetch as fetch } from "@/lib/tauriFetch";
+import * as backend from "@/lib/backend";
 
 interface RuleMatcher {
   matchType: MatchType;
@@ -12,44 +12,28 @@ interface RuleMatcher {
 }
 
 /**
- * Fetch all bookmarks and add/remove `tagName` on every bookmark whose
- * title/url matches the rule. Shared by tag-rule create (add) and delete (remove).
+ * Add/remove the tag `tagId` on every bookmark whose title/url matches the
+ * rule. Shared by tag-rule create (add) and delete (remove).
+ *
+ * Only the bookmark-tag links are touched, in one transaction. Rewriting each
+ * matching bookmark through the update endpoint would reset every field not
+ * resent with it — that is how applying a rule used to wipe the bookmarks'
+ * keyboard shortcuts.
  */
 async function applyTagToMatchingBookmarks(
   rule: RuleMatcher,
-  tagName: string,
+  tagId: string,
   mode: "add" | "remove"
 ) {
-  const bmRes = await fetch("/api/bookmarks");
-  const bookmarks = await bmRes.json();
+  const bookmarks = await backend.listBookmarks();
+  const bookmarkIds = bookmarks
+    .filter((bm) =>
+      matchesPattern(rule.matchType, rule.targetField === "title" ? bm.title : bm.url, rule.pattern)
+    )
+    .map((bm) => bm.id);
+  if (bookmarkIds.length === 0) return;
 
-  for (const bm of bookmarks) {
-    const target = rule.targetField === "title" ? bm.title : bm.url;
-    if (!matchesPattern(rule.matchType, target, rule.pattern)) continue;
-
-    const currentTags = bm.tags as string[];
-    let nextTags: string[];
-    if (mode === "add") {
-      if (currentTags.includes(tagName)) continue;
-      nextTags = [...currentTags, tagName];
-    } else {
-      nextTags = currentTags.filter((n) => n !== tagName);
-    }
-
-    await fetch(`/api/bookmarks/${bm.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: bm.title,
-        url: bm.url,
-        kind: bm.kind,
-        favicon: bm.favicon,
-        is_pinned: bm.is_pinned,
-        memo: bm.memo,
-        tags: nextTags,
-      }),
-    });
-  }
+  await backend.setTagOnBookmarks(tagId, bookmarkIds, mode === "add");
 }
 
 export function useTagManagement() {
@@ -58,9 +42,7 @@ export function useTagManagement() {
 
   const fetchTags = useCallback(async (): Promise<Tag[]> => {
     try {
-      const res = await fetch("/api/tags");
-      if (!res.ok) throw new Error("Failed to fetch tags");
-      const tags = await res.json();
+      const tags = await backend.listTags();
       setAvailableTags(tags);
       return tags;
     } catch (error) {
@@ -71,10 +53,7 @@ export function useTagManagement() {
 
   const fetchTagRules = useCallback(async (): Promise<TagRule[]> => {
     try {
-      const res = await fetch("/api/tag-rules");
-      if (!res.ok) throw new Error("Failed to fetch tag rules");
-      const rules: TagRuleDB[] = await res.json();
-      const converted = rules.map(convertTagRuleToUI);
+      const converted = (await backend.listTagRules()).map(convertTagRuleToUI);
       setTagRules(converted);
       return converted;
     } catch (error) {
@@ -84,12 +63,7 @@ export function useTagManagement() {
   }, []);
 
   const addTag = useCallback(async (name: string) => {
-    const res = await fetch("/api/tags", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (!res.ok) throw new Error("Failed to add tag");
+    await backend.createTag(name);
     await fetchTags();
     toast.success("Tag saved");
   }, [fetchTags]);
@@ -102,11 +76,11 @@ export function useTagManagement() {
           .filter((r) => r.tagId === tagObj.id)
           .map((r) => r.id);
         for (const ruleId of relatedRuleIds) {
-          await fetch(`/api/tag-rules/${ruleId}`, { method: "DELETE" });
+          await backend.deleteTagRule(ruleId);
         }
         if (relatedRuleIds.length > 0) await fetchTagRules();
 
-        await fetch(`/api/tags/${tagObj.id}`, { method: "DELETE" });
+        await backend.deleteTag(tagObj.id);
         toast.success("Tag removed");
       }
       await fetchTags();
@@ -116,12 +90,7 @@ export function useTagManagement() {
 
   const setTagColor = useCallback(
     async (tagId: string, color: string | null) => {
-      const res = await fetch(`/api/tags/${tagId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ color }),
-      });
-      if (!res.ok) throw new Error("Failed to update tag color");
+      await backend.setTagColor(tagId, color);
       await fetchTags();
     },
     [fetchTags]
@@ -130,14 +99,7 @@ export function useTagManagement() {
   /** Persist the order produced by dragging rows in Tag Manager. */
   const reorderTags = useCallback(
     async (orderedIds: string[]) => {
-      const res = await fetch("/api/tags/reorder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          order: orderedIds.map((id, index) => ({ id, sort_order: index + 1 })),
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to reorder tags");
+      await backend.reorderTags(orderedIds.map((id, index) => ({ id, sort_order: index + 1 })));
       await fetchTags();
     },
     [fetchTags]
@@ -146,12 +108,7 @@ export function useTagManagement() {
   const updateTagName = useCallback(async (oldName: string, newName: string) => {
     const tagObj = availableTags.find((t) => t.name === oldName);
     if (!tagObj) return;
-    const res = await fetch(`/api/tags/${tagObj.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName }),
-    });
-    if (!res.ok) throw new Error("Failed to update tag name");
+    await backend.renameTag(tagObj.id, newName);
     await fetchTags();
     toast.success("Tag renamed");
   }, [availableTags, fetchTags]);
@@ -167,15 +124,11 @@ export function useTagManagement() {
         );
 
         for (const tag of newTagNames) {
-          await fetch("/api/tags", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: tag }),
-          });
+          await backend.createTag(tag);
         }
 
         for (const tag of removedTags) {
-          await fetch(`/api/tags/${tag.id}`, { method: "DELETE" });
+          await backend.deleteTag(tag.id);
         }
 
         await fetchTags();
@@ -188,47 +141,39 @@ export function useTagManagement() {
   );
 
   const saveTagRule = useCallback(async (data: TagRuleFormData) => {
-    const res = await fetch("/api/tag-rules", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        match_type: data.matchType,
-        pattern: data.pattern,
-        tag_id: data.tagId,
-        target_field: data.targetField,
-      }),
+    await backend.createTagRule({
+      match_type: data.matchType,
+      pattern: data.pattern,
+      tag_id: data.tagId,
+      target_field: data.targetField,
     });
-    if (!res.ok) throw new Error("Failed to save tag rule");
     await fetchTagRules();
 
     // Apply rule to existing bookmarks
-    const tagObj = availableTags.find((t) => t.id === data.tagId);
-    if (!tagObj) return;
-    await applyTagToMatchingBookmarks(data, tagObj.name, "add");
-  }, [fetchTagRules, availableTags]);
+    await applyTagToMatchingBookmarks(data, data.tagId, "add");
+  }, [fetchTagRules]);
 
   const deleteTagRule = useCallback(
     async (ruleId: string, removeTags: boolean, currentTagRules: TagRule[]) => {
       const rule = currentTagRules.find((r) => r.id === ruleId);
       if (!rule) throw new Error("Rule not found");
 
-      await fetch(`/api/tag-rules/${ruleId}`, { method: "DELETE" });
+      await backend.deleteTagRule(ruleId);
 
       if (removeTags) {
-        const tagObj = availableTags.find((t) => t.id === rule.tagId);
-        if (tagObj) {
-          await applyTagToMatchingBookmarks(rule, tagObj.name, "remove");
-        }
+        await applyTagToMatchingBookmarks(rule, rule.tagId, "remove");
       }
 
       await fetchTagRules();
     },
-    [fetchTagRules, availableTags]
+    [fetchTagRules]
   );
 
   const deleteAllBookmarksAndTags = useCallback(async () => {
-    await fetch("/api/bookmarks", { method: "DELETE" });
-    await fetch("/api/tags", { method: "DELETE" });
+    // The backend refuses to delete when it cannot save a safety backup first;
+    // that rejection stops this before the tags are erased on their own.
+    await backend.deleteAllBookmarks();
+    await backend.deleteAllTags();
     await fetchTags();
     await fetchTagRules();
   }, [fetchTags, fetchTagRules]);

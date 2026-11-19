@@ -167,14 +167,21 @@ const BookmarkCard = memo(function BookmarkCard({
             <Button
               onClick={async (e) => { e.stopPropagation(); setIsPinLoading(true); try { await onTogglePin(bookmark.id); } finally { setIsPinLoading(false); } }}
               variant="ghost" size="sm" icon={Pin} isActive={bookmark.isPinned} isLoading={isPinLoading}
+              aria-label={bookmark.isPinned ? "Unpin" : "Pin"}
+              aria-pressed={bookmark.isPinned}
+              title={bookmark.isPinned ? "Unpin" : "Pin"}
             />
             <Button
               onClick={(e) => { e.stopPropagation(); onEdit(bookmark); }}
               variant="ghost" size="sm" icon={SquarePen}
+              aria-label="Edit"
+              title="Edit"
             />
             <Button
               onClick={(e) => { e.stopPropagation(); setDeleteConfirmOpen(true); }}
               variant="ghost" size="sm" icon={Trash2}
+              aria-label="Delete"
+              title="Delete"
             />
           </div>
         </div>

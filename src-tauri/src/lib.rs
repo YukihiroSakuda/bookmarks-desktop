@@ -1,7 +1,9 @@
+mod backup;
 mod commands;
 mod db;
 mod favicon;
 mod page_title;
+mod repo;
 mod folder_search;
 pub mod mcp;
 mod server;
@@ -50,13 +52,18 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // Every build logs, release included: the warnings below (a hotkey
+            // another app owns, a failed shortcut sync, a backup that could not
+            // be written) are what a user's bug report needs. Written to
+            // %LOCALAPPDATA%\<identifier>\logs\, capped at a few MB in total.
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .max_file_size(1024 * 1024)
+                    .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(3))
+                    .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseLocal)
+                    .build(),
+            )?;
 
             let raw_conn = db::init_db(&app.handle()).map_err(|e| {
                 Box::<dyn std::error::Error>::from(format!("database init failed: {e}"))
@@ -78,6 +85,9 @@ pub fn run() {
                 favicon_cancel: std::sync::atomic::AtomicBool::new(false),
                 suggestions: suggestions::Suggestions::default(),
             });
+
+            // Keep a daily snapshot of the database (see backup.rs).
+            backup::start_daily(app.handle().clone());
 
             // Register the global "summon" hotkey from settings so it is live
             // from launch.
@@ -196,6 +206,7 @@ pub fn run() {
             commands::update_tag,
             commands::set_tag_color,
             commands::reorder_tags,
+            commands::set_tag_on_bookmarks,
             commands::delete_tag,
             commands::delete_all_tags,
             commands::list_tag_rules,
@@ -205,6 +216,7 @@ pub fn run() {
             commands::update_settings,
             commands::export_data,
             commands::import_data,
+            commands::open_backup_dir,
             commands::fetch_title,
             commands::fetch_favicon,
             commands::count_missing_favicons,

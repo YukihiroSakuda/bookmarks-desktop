@@ -4,7 +4,7 @@ import { BookmarkUI, convertToUI } from "@/types/bookmark";
 import { Tag } from "@/types/tag";
 import { TagRule } from "@/types/tagRule";
 import { createBookmark, updateBookmark } from "@/shared/bookmarks/api";
-import { tauriFetch as fetch } from "@/lib/tauriFetch";
+import * as backend from "@/lib/backend";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -19,13 +19,7 @@ async function fetchFaviconInBackground(
   refresh: () => Promise<void>
 ): Promise<void> {
   try {
-    const res = await fetch(`/api/bookmarks/${id}/favicon`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-    });
-    if (!res.ok) return;
-    const { favicon } = await res.json();
+    const { favicon } = await backend.fetchFavicon(id, url);
     if (favicon) await refresh();
   } catch {
     /* offline, unreachable site, no icon — nothing to do */
@@ -47,22 +41,17 @@ export function useBookmarks(options: UseBookmarksOptions) {
   optionsRef.current = options;
 
   const fetchBookmarks = useCallback(async () => {
-    const res = await fetch("/api/bookmarks");
-    if (!res.ok) throw new Error("Failed to fetch bookmarks");
-    const data = await res.json();
-    const formatted = data.map(convertToUI);
+    const formatted = (await backend.listBookmarks()).map(convertToUI);
     setBookmarks(formatted);
     return formatted;
   }, []);
 
   const refreshAfterMutation = useCallback(async () => {
-    const [bookmarksRes] = await Promise.all([
-      fetch("/api/bookmarks"),
+    const [records] = await Promise.all([
+      backend.listBookmarks(),
       optionsRef.current.fetchTags(),
     ]);
-    if (!bookmarksRes.ok) throw new Error("Failed to fetch bookmarks");
-    const data = await bookmarksRes.json();
-    setBookmarks(data.map(convertToUI));
+    setBookmarks(records.map(convertToUI));
   }, []);
 
   const handleBookmarksUpdate = useCallback(
@@ -123,8 +112,7 @@ export function useBookmarks(options: UseBookmarksOptions) {
 
   const handleDelete = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/bookmarks/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete");
+      await backend.deleteBookmark(id);
       setBookmarks((prev) => prev.filter((b) => b.id !== id));
       toast.success("Bookmark deleted");
     } catch (error) {
@@ -135,9 +123,7 @@ export function useBookmarks(options: UseBookmarksOptions) {
 
   const handleTogglePin = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/bookmarks/${id}/pin`, { method: "PATCH" });
-      if (!res.ok) throw new Error("Failed to toggle pin");
-      const { is_pinned } = await res.json();
+      const { is_pinned } = await backend.togglePin(id);
       let movedTitle = "";
       setBookmarks((prev) =>
         prev.map((b) => {
@@ -202,7 +188,10 @@ export function useBookmarks(options: UseBookmarksOptions) {
             : b
         )
       );
-      await fetch(`/api/bookmarks/${bookmark.id}/access`, { method: "PATCH" });
+      // The bookmark is already open; a failed count is not worth an error.
+      await backend.recordAccess(bookmark.id).catch((error) => {
+        console.error("Error recording access:", error);
+      });
     } catch (error) {
       console.error("Error opening bookmark:", error);
       toast.error(error instanceof Error ? error.message : String(error));

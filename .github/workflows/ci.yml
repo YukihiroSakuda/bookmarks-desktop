@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    # The Rust crate's dependencies are declared for Windows only.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            extension/package-lock.json
+
+      - name: Install Node dependencies
+        run: |
+          npm ci
+          npm ci --prefix extension
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests (frontend)
+        run: npm test
+
+      # Type-checks the extension, including the app code it imports from
+      # src/shared.
+      - name: Build extension
+        run: npm run build --prefix extension
+
+      # tauri::generate_context! embeds ../out, so the Rust crate does not
+      # compile without the exported frontend.
+      - name: Build frontend
+        run: npm run build
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Unit tests (Rust)
+        working-directory: src-tauri
+        run: cargo test --lib --locked

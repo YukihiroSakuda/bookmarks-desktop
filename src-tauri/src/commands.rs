@@ -2,10 +2,8 @@ use crate::db::AppState;
 use crate::favicon;
 use crate::page_title;
 use chrono::{SecondsFormat, Utc};
-use rusqlite::OptionalExtension;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
@@ -37,6 +35,22 @@ pub struct BookmarkInput {
     memo: Option<String>,
     #[serde(default)]
     shortcut: Option<String>,
+    /// Create only: when the bookmark was first added, for imports that carry
+    /// the browser's own date. Ignored unless it is a valid RFC 3339 time.
+    #[serde(default)]
+    created_at: Option<String>,
+}
+
+/// `raw` re-formatted like `now()`, or `None` if it is not an RFC 3339 time.
+/// Stored timestamps are compared as strings, so a foreign format must never
+/// reach the table.
+fn normalize_timestamp(raw: Option<&str>) -> Option<String> {
+    let parsed = chrono::DateTime::parse_from_rfc3339(raw?.trim()).ok()?;
+    Some(
+        parsed
+            .with_timezone(&Utc)
+            .to_rfc3339_opts(SecondsFormat::Millis, true),
+    )
 }
 
 #[derive(Deserialize)]
@@ -76,120 +90,27 @@ pub struct TagRuleInput {
     target_field: String,
 }
 
-// ---------- Helpers ----------
-
-/// Order value for a newly created tag: the end of the manual order used by
-/// Tag Manager. Tags created before the manual order existed keep 0 and are
-/// listed first, alphabetically.
-fn next_tag_order(conn: &rusqlite::Connection) -> Result<i64, String> {
-    conn.query_row("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tags", [], |r| r.get(0))
-        .map_err(|e| e.to_string())
-}
-
-/// Insert tags (creating them if missing) and link them to a bookmark.
-fn link_tags(
-    conn: &rusqlite::Connection,
-    bookmark_id: &str,
-    tags: &[String],
-    ts: &str,
-) -> Result<(), String> {
-    for tag_name in tags {
-        let existing: Option<String> = conn
-            .query_row(
-                "SELECT id FROM tags WHERE name = ?1",
-                [tag_name],
-                |r| r.get(0),
-            )
-            .optional()
-            .map_err(|e| e.to_string())?;
-
-        let tag_id = match existing {
-            Some(id) => id,
-            None => {
-                let id = new_id();
-                conn.execute(
-                    "INSERT INTO tags (id, name, sort_order, created_at, updated_at) \
-                     VALUES (?1, ?2, ?3, ?4, ?5)",
-                    rusqlite::params![id, tag_name, next_tag_order(conn)?, ts, ts],
-                )
-                .map_err(|e| e.to_string())?;
-                id
-            }
-        };
-
-        conn.execute(
-            "INSERT INTO bookmarks_tags (bookmark_id, tag_id, created_at) VALUES (?1, ?2, ?3) \
-             ON CONFLICT(bookmark_id, tag_id) DO NOTHING",
-            rusqlite::params![bookmark_id, tag_id, ts],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+/// Every bookmark with its tag names under `tags` — what the app window and
+/// the JSON backup both use.
+fn bookmarks_with_tags(conn: &rusqlite::Connection) -> Result<Vec<Value>, String> {
+    Ok(crate::repo::list_bookmarks(conn)?
+        .into_iter()
+        .map(|(mut obj, tags)| {
+            obj["tags"] = Value::Array(tags.into_iter().map(Value::String).collect());
+            obj
+        })
+        .collect())
 }
 
 // ---------- Bookmark commands ----------
 
-#[tauri::command]
-pub fn list_bookmarks(state: State<AppState>) -> Result<Value, String> {
+// `async`: a plain command runs on the main thread, and this one — called each
+// time the window comes back — carries every bookmark with its icon, enough to
+// stall the window while it is built. Same pattern as `search_in_folders`.
+#[tauri::command(async)]
+pub fn list_bookmarks(state: State<'_, AppState>) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
-
-    // Map bookmark_id -> [tag names]
-    let mut tag_map: HashMap<String, Vec<String>> = HashMap::new();
-    {
-        let mut stmt = conn
-            .prepare(
-                "SELECT bt.bookmark_id, t.name FROM bookmarks_tags bt \
-                 JOIN tags t ON t.id = bt.tag_id",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |r| {
-                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
-            })
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            let (bid, name) = row.map_err(|e| e.to_string())?;
-            tag_map.entry(bid).or_default().push(name);
-        }
-    }
-
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, kind, title, url, favicon, is_pinned, access_count, custom_order, \
-             memo, created_at, updated_at, last_accessed_at, shortcut \
-             FROM bookmarks ORDER BY custom_order ASC",
-        )
-        .map_err(|e| e.to_string())?;
-
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(json!({
-                "id": r.get::<_, String>(0)?,
-                "kind": r.get::<_, String>(1)?,
-                "title": r.get::<_, String>(2)?,
-                "url": r.get::<_, String>(3)?,
-                "favicon": r.get::<_, Option<String>>(4)?,
-                "is_pinned": r.get::<_, i64>(5)? != 0,
-                "access_count": r.get::<_, i64>(6)?,
-                "custom_order": r.get::<_, i64>(7)?,
-                "memo": r.get::<_, Option<String>>(8)?,
-                "created_at": r.get::<_, String>(9)?,
-                "updated_at": r.get::<_, String>(10)?,
-                "last_accessed_at": r.get::<_, Option<String>>(11)?,
-                "shortcut": r.get::<_, Option<String>>(12)?,
-            }))
-        })
-        .map_err(|e| e.to_string())?;
-
-    let mut out = Vec::new();
-    for row in rows {
-        let mut obj = row.map_err(|e| e.to_string())?;
-        let id = obj["id"].as_str().unwrap_or_default().to_string();
-        let tags = tag_map.remove(&id).unwrap_or_default();
-        obj["tags"] = Value::Array(tags.into_iter().map(Value::String).collect());
-        out.push(obj);
-    }
-    Ok(Value::Array(out))
+    Ok(Value::Array(bookmarks_with_tags(&conn)?))
 }
 
 #[tauri::command]
@@ -199,36 +120,18 @@ pub fn create_bookmark(
     state: State<AppState>,
 ) -> Result<Value, String> {
     let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
-    let ts = now();
-    let id = new_id();
-    let kind = data.kind.unwrap_or_else(|| "url".to_string());
-
-    let tx = conn.transaction().map_err(|e| e.to_string())?;
-    let next_order: i64 = tx
-        .query_row("SELECT COALESCE(MAX(custom_order), 0) + 1 FROM bookmarks", [], |r| r.get(0))
-        .map_err(|e| e.to_string())?;
-
-    tx.execute(
-        "INSERT INTO bookmarks (id, kind, title, url, favicon, is_pinned, access_count, custom_order, memo, shortcut, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, ?7, ?8, ?9, ?10, ?11)",
-        rusqlite::params![
-            id,
-            kind,
-            data.title,
-            data.url,
-            data.favicon,
-            data.is_pinned as i64,
-            next_order,
-            data.memo,
-            data.shortcut,
-            ts,
-            ts
-        ],
-    )
-    .map_err(|e| e.to_string())?;
-
-    link_tags(&tx, &id, &data.tags, &ts)?;
-    tx.commit().map_err(|e| e.to_string())?;
+    let created_at = normalize_timestamp(data.created_at.as_deref());
+    let bookmark = crate::repo::NewBookmark {
+        kind: data.kind,
+        title: data.title,
+        url: data.url,
+        favicon: data.favicon,
+        is_pinned: data.is_pinned,
+        memo: data.memo,
+        shortcut: data.shortcut,
+        tags: data.tags,
+    };
+    let id = crate::repo::insert_bookmark(&mut conn, &bookmark, created_at.as_deref(), &now())?;
 
     drop(conn);
     crate::shortcutdir::request_sync(&app);
@@ -274,7 +177,7 @@ pub fn update_bookmark(
     // Replace tag links.
     tx.execute("DELETE FROM bookmarks_tags WHERE bookmark_id = ?1", [&id])
         .map_err(|e| e.to_string())?;
-    link_tags(&tx, &id, &data.tags, &ts)?;
+    crate::repo::link_tags(&tx, &id, &data.tags, &ts)?;
 
     tx.commit().map_err(|e| e.to_string())?;
 
@@ -299,10 +202,18 @@ pub fn delete_bookmark(
     Ok(json!({ "ok": true }))
 }
 
-#[tauri::command]
-pub fn delete_all_bookmarks(app: AppHandle, state: State<AppState>) -> Result<Value, String> {
+// `async`: writes the safety backup to disk first, off the main thread.
+#[tauri::command(async)]
+pub fn delete_all_bookmarks(app: AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
     {
         let conn = state.conn.lock().map_err(|e| e.to_string())?;
+        // Nothing is erased unless it could be saved first.
+        crate::backup::snapshot(
+            &conn,
+            &crate::backup::backup_dir(&app)?,
+            crate::backup::Reason::BeforeDeleteAll,
+        )
+        .map_err(|e| format!("Could not save a safety backup, so nothing was deleted: {e}"))?;
         conn.execute("DELETE FROM bookmarks", [])
             .map_err(|e| e.to_string())?;
     }
@@ -444,29 +355,7 @@ pub fn is_shortcut_available(app: AppHandle, accelerator: String) -> Result<bool
 #[tauri::command]
 pub fn list_tags(state: State<AppState>) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, name, color, sort_order, created_at, updated_at \
-             FROM tags ORDER BY sort_order ASC, name ASC",
-        )
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(json!({
-                "id": r.get::<_, String>(0)?,
-                "name": r.get::<_, String>(1)?,
-                "color": r.get::<_, Option<String>>(2)?,
-                "sort_order": r.get::<_, i64>(3)?,
-                "created_at": r.get::<_, String>(4)?,
-                "updated_at": r.get::<_, String>(5)?,
-            }))
-        })
-        .map_err(|e| e.to_string())?;
-    let mut out = Vec::new();
-    for row in rows {
-        out.push(row.map_err(|e| e.to_string())?);
-    }
-    Ok(Value::Array(out))
+    Ok(Value::Array(crate::repo::list_tags(&conn)?))
 }
 
 #[tauri::command]
@@ -476,23 +365,7 @@ pub fn create_tag(
     state: State<AppState>,
 ) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    let ts = now();
-
-    if let Some(id) = conn
-        .query_row("SELECT id FROM tags WHERE name = ?1", [&name], |r| r.get::<_, String>(0))
-        .optional()
-        .map_err(|e| e.to_string())?
-    {
-        return Ok(json!({ "id": id }));
-    }
-
-    let id = new_id();
-    conn.execute(
-        "INSERT INTO tags (id, name, color, sort_order, created_at, updated_at) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        rusqlite::params![id, name, color, next_tag_order(&conn)?, ts, ts],
-    )
-    .map_err(|e| e.to_string())?;
+    let id = crate::repo::find_or_create_tag(&conn, &name, color.as_deref(), &now())?;
     Ok(json!({ "id": id }))
 }
 
@@ -546,6 +419,60 @@ pub fn reorder_tags(order: Vec<TagOrderItem>, state: State<AppState>) -> Result<
     Ok(json!({ "ok": true }))
 }
 
+/// Add `tag_id` to, or remove it from, each listed bookmark. Used to apply a tag
+/// rule to the bookmarks that already exist (and to undo that when the rule is
+/// deleted). Only the bookmark-tag links change: going through
+/// `update_bookmark` instead would rewrite every column, wiping any field the
+/// caller did not resend (it once cleared the bookmarks' keyboard shortcuts).
+fn set_tag_on_bookmarks_inner(
+    conn: &mut rusqlite::Connection,
+    tag_id: &str,
+    bookmark_ids: &[String],
+    add: bool,
+) -> Result<usize, String> {
+    let ts = now();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let mut changed = 0;
+    for bookmark_id in bookmark_ids {
+        let n = if add {
+            tx.execute(
+                "INSERT INTO bookmarks_tags (bookmark_id, tag_id, created_at) \
+                 SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM bookmarks WHERE id = ?1) \
+                 ON CONFLICT(bookmark_id, tag_id) DO NOTHING",
+                rusqlite::params![bookmark_id, tag_id, ts],
+            )
+        } else {
+            tx.execute(
+                "DELETE FROM bookmarks_tags WHERE bookmark_id = ?1 AND tag_id = ?2",
+                rusqlite::params![bookmark_id, tag_id],
+            )
+        }
+        .map_err(|e| e.to_string())?;
+        if n > 0 {
+            tx.execute(
+                "UPDATE bookmarks SET updated_at = ?1 WHERE id = ?2",
+                rusqlite::params![ts, bookmark_id],
+            )
+            .map_err(|e| e.to_string())?;
+            changed += 1;
+        }
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(changed)
+}
+
+#[tauri::command]
+pub fn set_tag_on_bookmarks(
+    tag_id: String,
+    bookmark_ids: Vec<String>,
+    add: bool,
+    state: State<AppState>,
+) -> Result<Value, String> {
+    let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+    let changed = set_tag_on_bookmarks_inner(&mut conn, &tag_id, &bookmark_ids, add)?;
+    Ok(json!({ "changed": changed }))
+}
+
 #[tauri::command]
 pub fn delete_tag(id: String, state: State<AppState>) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
@@ -567,30 +494,7 @@ pub fn delete_all_tags(state: State<AppState>) -> Result<Value, String> {
 #[tauri::command]
 pub fn list_tag_rules(state: State<AppState>) -> Result<Value, String> {
     let conn = state.conn.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, match_type, pattern, tag_id, target_field, created_at, updated_at \
-             FROM tag_rules ORDER BY created_at ASC",
-        )
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(json!({
-                "id": r.get::<_, String>(0)?,
-                "match_type": r.get::<_, String>(1)?,
-                "pattern": r.get::<_, String>(2)?,
-                "tag_id": r.get::<_, String>(3)?,
-                "target_field": r.get::<_, String>(4)?,
-                "created_at": r.get::<_, String>(5)?,
-                "updated_at": r.get::<_, String>(6)?,
-            }))
-        })
-        .map_err(|e| e.to_string())?;
-    let mut out = Vec::new();
-    for row in rows {
-        out.push(row.map_err(|e| e.to_string())?);
-    }
-    Ok(Value::Array(out))
+    Ok(Value::Array(crate::repo::list_tag_rules(&conn)?))
 }
 
 #[tauri::command]
@@ -751,113 +655,12 @@ struct ImportData {
 }
 
 /// Build a complete, versioned JSON snapshot of all app data (bookmarks with
-/// their tags/memo/shortcut, tags, tag rules, settings).
-fn build_export_snapshot(conn: &rusqlite::Connection) -> Result<Value, String> {
-    // Map bookmark_id -> [tag names]
-    let mut tag_map: HashMap<String, Vec<String>> = HashMap::new();
-    {
-        let mut stmt = conn
-            .prepare(
-                "SELECT bt.bookmark_id, t.name FROM bookmarks_tags bt \
-                 JOIN tags t ON t.id = bt.tag_id",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            let (bid, name) = row.map_err(|e| e.to_string())?;
-            tag_map.entry(bid).or_default().push(name);
-        }
-    }
-
-    let mut bookmarks = Vec::new();
-    {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, kind, title, url, favicon, is_pinned, access_count, custom_order, \
-                 memo, shortcut, created_at, updated_at, last_accessed_at \
-                 FROM bookmarks ORDER BY custom_order ASC",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |r| {
-                Ok(json!({
-                    "id": r.get::<_, String>(0)?,
-                    "kind": r.get::<_, String>(1)?,
-                    "title": r.get::<_, String>(2)?,
-                    "url": r.get::<_, String>(3)?,
-                    "favicon": r.get::<_, Option<String>>(4)?,
-                    "is_pinned": r.get::<_, i64>(5)? != 0,
-                    "access_count": r.get::<_, i64>(6)?,
-                    "custom_order": r.get::<_, i64>(7)?,
-                    "memo": r.get::<_, Option<String>>(8)?,
-                    "shortcut": r.get::<_, Option<String>>(9)?,
-                    "created_at": r.get::<_, String>(10)?,
-                    "updated_at": r.get::<_, String>(11)?,
-                    "last_accessed_at": r.get::<_, Option<String>>(12)?,
-                }))
-            })
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            let mut obj = row.map_err(|e| e.to_string())?;
-            let id = obj["id"].as_str().unwrap_or_default().to_string();
-            let tags = tag_map.remove(&id).unwrap_or_default();
-            obj["tags"] = Value::Array(tags.into_iter().map(Value::String).collect());
-            bookmarks.push(obj);
-        }
-    }
-
-    let mut tags = Vec::new();
-    {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, name, color, sort_order, created_at, updated_at \
-                 FROM tags ORDER BY sort_order ASC, name ASC",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |r| {
-                Ok(json!({
-                    "id": r.get::<_, String>(0)?,
-                    "name": r.get::<_, String>(1)?,
-                    "color": r.get::<_, Option<String>>(2)?,
-                    "sort_order": r.get::<_, i64>(3)?,
-                    "created_at": r.get::<_, String>(4)?,
-                    "updated_at": r.get::<_, String>(5)?,
-                }))
-            })
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            tags.push(row.map_err(|e| e.to_string())?);
-        }
-    }
-
-    let mut tag_rules = Vec::new();
-    {
-        let mut stmt = conn
-            .prepare(
-                "SELECT id, match_type, pattern, tag_id, target_field, created_at, updated_at \
-                 FROM tag_rules ORDER BY created_at ASC",
-            )
-            .map_err(|e| e.to_string())?;
-        let rows = stmt
-            .query_map([], |r| {
-                Ok(json!({
-                    "id": r.get::<_, String>(0)?,
-                    "match_type": r.get::<_, String>(1)?,
-                    "pattern": r.get::<_, String>(2)?,
-                    "tag_id": r.get::<_, String>(3)?,
-                    "target_field": r.get::<_, String>(4)?,
-                    "created_at": r.get::<_, String>(5)?,
-                    "updated_at": r.get::<_, String>(6)?,
-                }))
-            })
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            tag_rules.push(row.map_err(|e| e.to_string())?);
-        }
-    }
+/// their tags/memo/shortcut, tags, tag rules, settings). Also what the
+/// automatic backups in backup.rs write.
+pub(crate) fn build_export_snapshot(conn: &rusqlite::Connection) -> Result<Value, String> {
+    let bookmarks = bookmarks_with_tags(conn)?;
+    let tags = crate::repo::list_tags(conn)?;
+    let tag_rules = crate::repo::list_tag_rules(conn)?;
 
     let settings = conn
         .query_row(
@@ -928,7 +731,7 @@ fn apply_import(conn: &mut rusqlite::Connection, data: &ImportData) -> Result<Va
         )
         .map_err(|e| e.to_string())?;
         // Re-link tags by name (tags inserted above are found, not duplicated).
-        link_tags(&tx, &b.id, &b.tags, &b.updated_at)?;
+        crate::repo::link_tags(&tx, &b.id, &b.tags, &b.updated_at)?;
     }
 
     for r in &data.tag_rules {
@@ -1036,6 +839,14 @@ pub async fn import_data(app: AppHandle, state: State<'_, AppState>) -> Result<V
 
     let summary = {
         let mut conn = state.conn.lock().map_err(|e| e.to_string())?;
+        // Restore replaces everything, so keep what is there now first. The
+        // lock is held throughout, so the snapshot is exactly what gets replaced.
+        crate::backup::snapshot(
+            &conn,
+            &crate::backup::backup_dir(&app)?,
+            crate::backup::Reason::BeforeRestore,
+        )
+        .map_err(|e| format!("Could not save a safety backup, so nothing was restored: {e}"))?;
         apply_import(&mut conn, &data)?
     };
 
@@ -1047,6 +858,16 @@ pub async fn import_data(app: AppHandle, state: State<'_, AppState>) -> Result<V
     crate::shortcutdir::request_sync(&app);
 
     Ok(summary)
+}
+
+/// Show the automatic backups (backup.rs) in Explorer, creating the folder if
+/// none has been written yet so the button never fails on a fresh install.
+#[tauri::command]
+pub fn open_backup_dir(app: AppHandle) -> Result<Value, String> {
+    let dir = crate::backup::backup_dir(&app)?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    tauri_plugin_opener::open_path(&dir, None::<&str>).map_err(|e| e.to_string())?;
+    Ok(json!({ "ok": true }))
 }
 
 // ---------- Title fetch ----------
@@ -1324,7 +1145,7 @@ pub fn register_autostart() -> Result<(), String> {
 pub fn open_path(path: String) -> Result<Value, String> {
     let p = std::path::Path::new(&path);
     if !p.exists() {
-        return Err(format!("パスが見つかりません: {path}"));
+        return Err(format!("Path not found: {path}"));
     }
 
     // Hands the path to the shell, which opens a folder in Explorer and a file
@@ -1381,4 +1202,167 @@ fn mcp_executable() -> Result<String, String> {
     std::env::current_exe()
         .map(|p| p.to_string_lossy().into_owned())
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    fn scratch_db() -> Connection {
+        let conn = Connection::open_in_memory().expect("open memory db");
+        crate::db::migrate(&conn).expect("migrate");
+        conn
+    }
+
+    fn insert_bookmark(conn: &Connection, id: &str, shortcut: Option<&str>) {
+        conn.execute(
+            "INSERT INTO bookmarks (id, kind, title, url, memo, shortcut, created_at, updated_at) \
+             VALUES (?1, 'url', 'Title', 'https://example.com', 'memo', ?2, 't0', 't0')",
+            rusqlite::params![id, shortcut],
+        )
+        .unwrap();
+    }
+
+    fn insert_tag(conn: &Connection, id: &str, name: &str) {
+        conn.execute(
+            "INSERT INTO tags (id, name, created_at, updated_at) VALUES (?1, ?2, 't0', 't0')",
+            rusqlite::params![id, name],
+        )
+        .unwrap();
+    }
+
+    fn tag_ids_of(conn: &Connection, bookmark_id: &str) -> Vec<String> {
+        let mut stmt = conn
+            .prepare("SELECT tag_id FROM bookmarks_tags WHERE bookmark_id = ?1 ORDER BY tag_id")
+            .unwrap();
+        let rows = stmt.query_map([bookmark_id], |r| r.get(0)).unwrap();
+        rows.collect::<Result<_, _>>().unwrap()
+    }
+
+    #[test]
+    fn applying_a_tag_rule_keeps_every_other_field() {
+        let mut conn = scratch_db();
+        insert_bookmark(&conn, "b1", Some("CmdOrCtrl+Shift+K"));
+        insert_tag(&conn, "t1", "docs");
+
+        let changed =
+            set_tag_on_bookmarks_inner(&mut conn, "t1", &["b1".to_string()], true).unwrap();
+        assert_eq!(changed, 1);
+        assert_eq!(tag_ids_of(&conn, "b1"), vec!["t1"]);
+
+        let (shortcut, memo, updated_at): (Option<String>, Option<String>, String) = conn
+            .query_row(
+                "SELECT shortcut, memo, updated_at FROM bookmarks WHERE id = 'b1'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(shortcut.as_deref(), Some("CmdOrCtrl+Shift+K"));
+        assert_eq!(memo.as_deref(), Some("memo"));
+        assert_ne!(updated_at, "t0", "a bookmark whose tags changed counts as updated");
+    }
+
+    #[test]
+    fn tag_rule_application_is_idempotent_and_reversible() {
+        let mut conn = scratch_db();
+        insert_bookmark(&conn, "b1", None);
+        insert_bookmark(&conn, "b2", None);
+        insert_tag(&conn, "t1", "docs");
+        let ids = vec!["b1".to_string(), "b2".to_string()];
+
+        assert_eq!(set_tag_on_bookmarks_inner(&mut conn, "t1", &ids, true).unwrap(), 2);
+        // Already tagged: nothing to do, and no error from the primary key.
+        assert_eq!(set_tag_on_bookmarks_inner(&mut conn, "t1", &ids, true).unwrap(), 0);
+
+        assert_eq!(set_tag_on_bookmarks_inner(&mut conn, "t1", &ids, false).unwrap(), 2);
+        assert!(tag_ids_of(&conn, "b1").is_empty());
+        assert!(tag_ids_of(&conn, "b2").is_empty());
+    }
+
+    #[test]
+    fn tagging_skips_bookmarks_that_no_longer_exist() {
+        let mut conn = scratch_db();
+        insert_tag(&conn, "t1", "docs");
+        // Deleted between the frontend's list and this call.
+        let changed =
+            set_tag_on_bookmarks_inner(&mut conn, "t1", &["gone".to_string()], true).unwrap();
+        assert_eq!(changed, 0);
+    }
+
+    #[test]
+    fn backup_round_trip_restores_everything() {
+        let mut conn = scratch_db();
+        insert_bookmark(&conn, "b1", Some("Alt+KeyK"));
+        insert_bookmark(&conn, "b2", None);
+        insert_tag(&conn, "t1", "docs");
+        conn.execute("UPDATE tags SET color = 'red', sort_order = 3 WHERE id = 't1'", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO bookmarks_tags (bookmark_id, tag_id, created_at) VALUES ('b1', 't1', 't0')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO tag_rules (id, match_type, pattern, tag_id, target_field, created_at, updated_at) \
+             VALUES ('r1', 'contains', 'example', 't1', 'url', 't0', 't0')",
+            [],
+        )
+        .unwrap();
+
+        let mut before = build_export_snapshot(&conn).unwrap();
+        let data: ImportData = serde_json::from_value(before.clone()).unwrap();
+
+        // Restore over a database that has since changed completely.
+        conn.execute("DELETE FROM bookmarks", []).unwrap();
+        conn.execute("DELETE FROM tags", []).unwrap();
+        insert_bookmark(&conn, "other", None);
+
+        apply_import(&mut conn, &data).unwrap();
+        let mut after = build_export_snapshot(&conn).unwrap();
+
+        before["exported_at"] = Value::Null;
+        after["exported_at"] = Value::Null;
+        assert_eq!(before, after);
+    }
+
+    #[test]
+    fn a_malformed_backup_leaves_the_database_untouched() {
+        let mut conn = scratch_db();
+        insert_bookmark(&conn, "b1", None);
+        // Two bookmarks with the same id violate the primary key part-way.
+        let data: ImportData = serde_json::from_value(json!({
+            "bookmarks": [
+                { "id": "x", "title": "A", "url": "https://a", "created_at": "t", "updated_at": "t" },
+                { "id": "x", "title": "B", "url": "https://b", "created_at": "t", "updated_at": "t" }
+            ]
+        }))
+        .unwrap();
+
+        assert!(apply_import(&mut conn, &data).is_err());
+        let ids: Vec<String> = conn
+            .prepare("SELECT id FROM bookmarks")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(ids, vec!["b1"]);
+    }
+
+    #[test]
+    fn normalize_timestamp_accepts_rfc3339_only() {
+        assert_eq!(
+            normalize_timestamp(Some("2019-03-04T05:06:07Z")).as_deref(),
+            Some("2019-03-04T05:06:07.000Z")
+        );
+        // Offsets are folded to UTC so stored values stay comparable as strings.
+        assert_eq!(
+            normalize_timestamp(Some("2019-03-04T14:06:07+09:00")).as_deref(),
+            Some("2019-03-04T05:06:07.000Z")
+        );
+        assert_eq!(normalize_timestamp(Some("1551675967")), None);
+        assert_eq!(normalize_timestamp(Some("")), None);
+        assert_eq!(normalize_timestamp(None), None);
+    }
 }

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { SortOption, SortOrder } from "@/types/bookmark";
 import { UserSettingsUI } from "@/types/userSettings";
-import { tauriFetch as fetch } from "@/lib/tauriFetch";
+import * as backend from "@/lib/backend";
 
 export const DEFAULT_SUMMON_SHORTCUT = "CmdOrCtrl+Alt+Space";
 
@@ -51,23 +51,17 @@ export function useUserSettings() {
       // Persist what was actually applied, so a legacy sort value is corrected
       // in the database rather than being written straight back.
       const applied = syncSettingsState(settings);
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          list_columns: applied.listColumns,
-          sort_option: applied.sortOption,
-          sort_order: applied.sortOrder,
-          summon_shortcut: applied.summonShortcut,
-          shortcut_dir_enabled: applied.shortcutDirEnabled,
-          shortcut_dir_path: applied.shortcutDirPath,
-          folder_search_enabled: applied.folderSearchEnabled,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to save settings");
       // The backend re-registers the summon hotkey and reports any combo it
       // could not claim in `failed`.
-      return (await res.json()) as { ok: boolean; failed?: string[] };
+      return await backend.updateSettings({
+        list_columns: applied.listColumns,
+        sort_option: applied.sortOption,
+        sort_order: applied.sortOrder,
+        summon_shortcut: applied.summonShortcut,
+        shortcut_dir_enabled: applied.shortcutDirEnabled,
+        shortcut_dir_path: applied.shortcutDirPath,
+        folder_search_enabled: applied.folderSearchEnabled,
+      });
     } catch (error) {
       console.error("Error saving user settings:", error);
       return undefined;
@@ -89,9 +83,7 @@ export function useUserSettings() {
 
   const fetchUserSettings = useCallback(async (): Promise<UserSettingsUI | null> => {
     try {
-      const res = await fetch("/api/settings");
-      if (!res.ok) throw new Error("Failed to fetch settings");
-      const data = await res.json();
+      const data = await backend.getSettings();
 
       const uiSettings: UserSettingsUI = {
         listColumns: data.list_columns,

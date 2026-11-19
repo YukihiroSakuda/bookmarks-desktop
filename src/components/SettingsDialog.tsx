@@ -7,12 +7,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "./Button";
-import { useImportBookmarks } from "./ImportBookmarks";
+import { BookmarkImportError, useImportBookmarks } from "./ImportBookmarks";
 import { exportBookmarksToHtml, downloadHtml } from "@/utils/export";
 import { BookmarkUI } from "@/types/bookmark";
 import { eventToAccelerator, formatAcceleratorForDisplay } from "@/lib/shortcut";
 import { toast } from "sonner";
-import { tauriFetch } from "@/lib/tauriFetch";
+import * as backend from "@/lib/backend";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { UiLang } from "@/lib/uiLanguage";
@@ -80,6 +80,9 @@ function applyTheme(selected: Theme) {
   document.documentElement.classList.remove("light", "dark");
   document.documentElement.classList.add(applied);
 }
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
 
 interface SettingsDialogProps {
   lang: UiLang;
@@ -322,10 +325,10 @@ export function SettingsDialog({
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    tauriFetch("/api/favicons/missing")
-      .then((res) => (res.ok ? res.json() : { count: 0 }))
-      .then((data) => {
-        if (!cancelled) setMissingIcons(data?.count ?? 0);
+    backend
+      .countMissingFavicons()
+      .then(({ count }) => {
+        if (!cancelled) setMissingIcons(count);
       })
       .catch(() => {});
     return () => {
@@ -345,12 +348,11 @@ export function SettingsDialog({
   async function handleFetchIconsClick() {
     setIconProgress({ done: 0, total: missingIcons });
     try {
-      const res = await tauriFetch("/api/favicons/fetch-missing", { method: "POST" });
-      const data = res.ok ? await res.json() : null;
-      if (data?.cancelled) {
+      const data = await backend.fetchMissingFavicons();
+      if (data.cancelled) {
         toast.success(t.iconsStopped(data.updated));
       } else {
-        toast.success(t.iconsDone(data?.updated ?? 0, data?.total ?? 0));
+        toast.success(t.iconsDone(data.updated, data.total));
       }
       onRestoreComplete();
     } catch (error) {
@@ -362,7 +364,7 @@ export function SettingsDialog({
   }
 
   function handleCancelFetchIcons() {
-    tauriFetch("/api/favicons/cancel", { method: "POST" }).catch(() => {});
+    backend.cancelFetchFavicons().catch(() => {});
   }
 
   // Shortcut folder. Switching it on or picking a new location is saved like
@@ -373,25 +375,20 @@ export function SettingsDialog({
 
   async function handlePickShortcutDir() {
     try {
-      const res = await tauriFetch("/api/shortcut-dir/pick", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(t.pickFolderFailedWith(data?.error ?? "unknown error"));
-        return;
-      }
-      if (data?.cancelled) return;
+      const data = await backend.pickShortcutDir();
+      if ("cancelled" in data) return;
       onShortcutDirChange({ shortcutDirPath: data.path });
     } catch (error) {
       console.error("Error picking shortcut folder:", error);
-      toast.error(t.pickFolderFailed);
+      toast.error(t.pickFolderFailedWith(errorMessage(error)));
     }
   }
 
   async function handleOpenShortcutDir() {
-    const res = await tauriFetch("/api/shortcut-dir/open", { method: "POST" });
-    if (!res.ok) {
-      const data = await res.json();
-      toast.error(t.openFolderFailedWith(data?.error ?? "unknown error"));
+    try {
+      await backend.openShortcutDir();
+    } catch (error) {
+      toast.error(t.openFolderFailedWith(errorMessage(error)));
     }
   }
 
@@ -400,12 +397,14 @@ export function SettingsDialog({
   useEffect(() => {
     if (!open || !shortcutDirEnabled) return;
     let cancelled = false;
-    tauriFetch("/api/shortcut-dir/pinned")
-      .then((res) => (res.ok ? res.json() : { pinned: false }))
-      .then((data) => {
-        if (!cancelled) setIsPinned(Boolean(data?.pinned));
+    backend
+      .isShortcutDirPinned()
+      .then(({ pinned }) => {
+        if (!cancelled) setIsPinned(pinned);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setIsPinned(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -415,29 +414,19 @@ export function SettingsDialog({
     const pinning = !isPinned;
     setIsPinning(true);
     try {
-      const res = await tauriFetch(`/api/shortcut-dir/${pinning ? "pin" : "unpin"}`, {
-        method: "POST",
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        // tauriFetch turns a backend error into `ok: false` rather than
-        // throwing, so this branch has to report it — swallowing it here is
-        // what made a real failure look like a silent refusal.
-        toast.error(t.quickAccessFailedWith(data?.error ?? "unknown error"));
-        return;
-      }
+      const { pinned } = await (pinning ? backend.pinShortcutDir() : backend.unpinShortcutDir());
 
       // The backend reports the state it observed afterwards, so the button
       // never claims an outcome the shell did not actually produce.
-      setIsPinned(Boolean(data?.pinned));
-      if (data?.pinned === pinning) {
+      setIsPinned(pinned);
+      if (pinned === pinning) {
         toast.success(pinning ? t.quickAccessPinned : t.quickAccessUnpinned);
       } else {
         toast.warning(t.quickAccessManual);
       }
     } catch (error) {
       console.error("Error changing Quick Access pin:", error);
-      toast.error(t.quickAccessFailed);
+      toast.error(t.quickAccessFailedWith(errorMessage(error)));
     } finally {
       setIsPinning(false);
     }
@@ -446,39 +435,35 @@ export function SettingsDialog({
   async function handleSyncShortcuts() {
     setIsSyncingShortcuts(true);
     try {
-      const res = await tauriFetch("/api/shortcut-dir/sync", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(t.syncFailedWith(data?.error ?? "unknown error"));
-        return;
-      }
-      if (data?.enabled === false) return;
-      const skipped = data.skipped?.length ?? 0;
+      const data = await backend.syncShortcutDir();
+      if ("enabled" in data) return;
+      const skipped = data.skipped.length;
       toast.success(skipped > 0 ? t.syncDoneSkipped(skipped) : t.syncDone);
     } catch (error) {
       console.error("Error syncing shortcut folder:", error);
-      toast.error(t.syncFailed);
+      toast.error(t.syncFailedWith(errorMessage(error)));
     } finally {
       setIsSyncingShortcuts(false);
     }
   }
 
-  const { isImporting, handleFileUpload } = useImportBookmarks({
-    onImportComplete: (count) => {
-      toast.success(t.imported(count));
-      setOpen(false);
-    },
-    onBookmarksUpdate,
-  });
+  const { isImporting, importFile } = useImportBookmarks({ onBookmarksUpdate });
 
   function handleImportClick() {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".html";
-    input.onchange = (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      if (target.files) {
-        handleFileUpload({ target: { files: target.files } } as React.ChangeEvent<HTMLInputElement>);
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        const { imported, duplicates } = await importFile(file);
+        toast.success(t.imported(imported, duplicates));
+        setOpen(false);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const done = error instanceof BookmarkImportError ? error.imported : 0;
+        toast.error(t.importFailed(done, message));
       }
     };
     input.click();
@@ -505,6 +490,14 @@ export function SettingsDialog({
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
       toast.error(t.exportFailed);
+    }
+  }
+
+  async function handleOpenBackupsClick() {
+    try {
+      await invoke("open_backup_dir");
+    } catch (err) {
+      toast.error(t.openBackupsFailed(err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -1027,6 +1020,18 @@ export function SettingsDialog({
                       </div>
                       <p className="text-xs text-muted-foreground mt-1.5">
                         {t.jsonNote}
+                      </p>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={FolderOpen}
+                        onClick={handleOpenBackupsClick}
+                        className="w-full mt-3"
+                      >
+                        {t.openBackups}
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        {t.autoBackupNote}
                       </p>
 
                       <div className="flex gap-2 mt-3">

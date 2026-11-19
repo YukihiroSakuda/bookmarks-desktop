@@ -2,70 +2,83 @@
 
 import { useState } from 'react';
 import { BookmarkUI, convertToUI } from '@/types/bookmark';
-import { tauriFetch as fetch } from '@/lib/tauriFetch';
+import * as backend from '@/lib/backend';
+import { extractLinksFromHtml, planBookmarkImport } from '@/lib/bookmarkImport';
+import {
+  createBookmark,
+  fetchBookmarks,
+  fetchTagRules,
+  fetchTags,
+} from '@/shared/bookmarks/api';
+
+export interface ImportResult {
+  imported: number;
+  /** Already saved, or repeated within the file. */
+  duplicates: number;
+}
+
+/** Thrown when an import stops part-way; `imported` bookmarks were saved before it. */
+export class BookmarkImportError extends Error {
+  constructor(message: string, readonly imported: number) {
+    super(message);
+    this.name = 'BookmarkImportError';
+  }
+}
 
 interface UseImportBookmarksProps {
-  onImportComplete?: (importedCount: number) => void;
   onBookmarksUpdate?: (bookmarks: BookmarkUI[]) => void;
 }
 
-export function useImportBookmarks({
-  onImportComplete,
-  onBookmarksUpdate
-}: UseImportBookmarksProps = {}) {
+export function useImportBookmarks({ onBookmarksUpdate }: UseImportBookmarksProps = {}) {
   const [isImporting, setIsImporting] = useState(false);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const importFile = async (file: File): Promise<ImportResult> => {
     setIsImporting(true);
+    let imported = 0;
     try {
-      const text = await file.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(text, 'text/html');
-      const links = doc.getElementsByTagName('a');
+      const links = extractLinksFromHtml(await file.text());
+      const [existing, availableTags, tagRules] = await Promise.all([
+        fetchBookmarks(),
+        fetchTags(),
+        fetchTagRules(),
+      ]);
+      const { toCreate, duplicates } = planBookmarkImport(links, existing);
 
-      const existingRes = await fetch('/api/bookmarks');
-      const existingBookmarks: { url: string }[] = await existingRes.json();
-
-      let imported = 0;
-      for (const link of Array.from(links)) {
-        const url = link.href;
-        const title = link.textContent || '';
-        if (!url || existingBookmarks.some((b) => b.url === url)) continue;
-
-        let createdAt: string;
-        try {
-          const addDate = link.getAttribute('add_date');
-          createdAt = addDate && !isNaN(parseInt(addDate))
-            ? new Date(parseInt(addDate) * 1000).toISOString()
-            : new Date().toISOString();
-        } catch {
-          createdAt = new Date().toISOString();
-        }
-
-        await fetch('/api/bookmarks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, url, is_pinned: false, tags: [], created_at: createdAt }),
-        });
+      for (const link of toCreate) {
+        // The shared create applies the tag rules, the same as adding by hand.
+        await createBookmark(
+          {
+            title: link.title,
+            url: link.url,
+            kind: 'url',
+            isPinned: false,
+            tags: [],
+            createdAt: link.createdAt,
+          },
+          { availableTags, tagRules }
+        );
         imported++;
       }
 
-      const updatedRes = await fetch('/api/bookmarks');
-      const updatedData = await updatedRes.json();
-      onBookmarksUpdate?.(updatedData.map(convertToUI));
-
-      onImportComplete?.(imported);
-      return imported;
+      return { imported, duplicates };
     } catch (error) {
-      console.error('インポートエラー:', error);
-      throw new Error('インポート中にエラーが発生しました');
+      console.error('Import error:', error);
+      throw new BookmarkImportError(
+        error instanceof Error ? error.message : String(error),
+        imported
+      );
     } finally {
+      // Refresh even after a failure, so what did get saved is on screen.
+      if (imported > 0) {
+        try {
+          onBookmarksUpdate?.((await backend.listBookmarks()).map(convertToUI));
+        } catch {
+          /* the next full refresh picks them up */
+        }
+      }
       setIsImporting(false);
     }
   };
 
-  return { isImporting, handleFileUpload };
+  return { isImporting, importFile };
 }

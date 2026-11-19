@@ -19,6 +19,7 @@ import { TagRule as TagRuleComponent } from "./TagRule";
 import { SortControls } from "./SortControls";
 import { SettingsDialog } from "./SettingsDialog";
 import { buildQueryForms, matchesAnyForm, normalizeForSearch } from "@/lib/searchNormalize";
+import { TagMatchMode } from "@/lib/tagMatchMode";
 import { HelpDialog } from "./HelpDialog";
 import { SuggestionsMenu } from "./SuggestionsMenu";
 import { Suggestion } from "@/types/suggestion";
@@ -41,6 +42,9 @@ interface BookmarkHeaderProps {
   folderSearchEnabled: boolean;
   onFolderSearchChange: (enabled: boolean) => void;
   selectedTags: string[];
+  /** How two or more selected tags combine: any of them, or all of them. */
+  tagMatchMode: TagMatchMode;
+  onTagMatchModeChange: (mode: TagMatchMode) => void;
   onAddBookmark: () => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -86,6 +90,8 @@ export function BookmarkHeader({
   folderSearchEnabled,
   onFolderSearchChange,
   selectedTags,
+  tagMatchMode,
+  onTagMatchModeChange,
   onAddBookmark,
   searchQuery,
   onSearchChange,
@@ -335,6 +341,39 @@ export function BookmarkHeader({
                 <span className="text-blue-500">#</span> Filter by Tags
               </h2>
               <span className="text-xs text-muted-foreground hidden sm:inline">Ctrl+click: multi-select</span>
+              {/* With one tag, any and all are the same filter — so the choice
+                  only appears once there is something to choose between. */}
+              {selectedTags.length >= 2 && (
+                <div
+                  role="group"
+                  aria-label="Match selected tags"
+                  className="flex items-center border-l border-border pl-2 ml-0.5"
+                >
+                  <span className="text-xs text-muted-foreground mr-0.5">Match</span>
+                  <Button
+                    onClick={() => onTagMatchModeChange("any")}
+                    variant="ghost"
+                    size="sm"
+                    isActive={tagMatchMode === "any"}
+                    aria-pressed={tagMatchMode === "any"}
+                    title="Bookmarks with any of the selected tags"
+                    disabled={isOrderingMode}
+                  >
+                    Any
+                  </Button>
+                  <Button
+                    onClick={() => onTagMatchModeChange("all")}
+                    variant="ghost"
+                    size="sm"
+                    isActive={tagMatchMode === "all"}
+                    aria-pressed={tagMatchMode === "all"}
+                    title="Only bookmarks with all of the selected tags"
+                    disabled={isOrderingMode}
+                  >
+                    All
+                  </Button>
+                </div>
+              )}
               {selectedTags.length > 0 && (
                 <Button
                   onClick={onClearAll}

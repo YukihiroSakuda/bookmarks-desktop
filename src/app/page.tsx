@@ -147,6 +147,7 @@ export default function BookmarksPage() {
     setBookmarks,
     searchQuery: filtering.searchQuery,
     selectedTags: filtering.selectedTags,
+    tagMatchMode: filtering.tagMatchMode,
     currentSort: settings.currentSort,
     currentOrder: settings.currentOrder,
     listColumns: settings.listColumns,
@@ -321,8 +322,11 @@ export default function BookmarksPage() {
       setBookmarks([]);
     } catch (error) {
       console.error("Error deleting all:", error);
+      toast.error(error instanceof Error ? error.message : String(error));
+      // A failure part-way can still have changed something.
+      void refreshData();
     }
-  }, [deleteAllBookmarksAndTags, setBookmarks]);
+  }, [deleteAllBookmarksAndTags, setBookmarks, refreshData]);
 
   // Tag update handler for BookmarkForm
   const handleUpdateTags = useCallback(
@@ -365,6 +369,8 @@ export default function BookmarksPage() {
               });
             }}
             selectedTags={filtering.selectedTags}
+            tagMatchMode={filtering.tagMatchMode}
+            onTagMatchModeChange={filtering.setTagMatchMode}
             suggestions={suggestions}
             onDismissSuggestion={dismissSuggestion}
             onReviewSuggestion={(s) => {
@@ -488,7 +494,8 @@ export default function BookmarksPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete all bookmarks?</AlertDialogTitle>
             <AlertDialogDescription>
-              All bookmarks and tags will be permanently deleted. This action cannot be undone.
+              All bookmarks and tags will be deleted. The current data is saved to an automatic
+              backup first — Settings → Data → Restore can bring it back.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

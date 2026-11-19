@@ -30,8 +30,12 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      # The extension is built and zipped into the app during `tauri build`
+      # (beforeBuildCommand), so its dependencies are needed too.
       - name: Install Node dependencies
-        run: npm ci
+        run: |
+          npm ci
+          npm ci --prefix extension
 
       # タグ push 時のみ GitHub Release を作成する
       - name: Build and create release
@@ -49,7 +53,7 @@ jobs:
             2. ブラウザ拡張機能はアプリのヘルプダイアログからダウンロードできます。
 
             ---
-            変更内容の詳細は [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) を参照してください。
+            変更内容は [このバージョンまでのコミット履歴](https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}) を参照してください。
           releaseDraft: true
           prerelease: false
 

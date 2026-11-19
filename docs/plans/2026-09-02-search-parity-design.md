@@ -1,7 +1,7 @@
 # 設計: Everything との差を埋める — 検索構文・ランキング・先読み
 
 - **日付**: 2026-09-02
-- **ステータス**: 計画（未着手）
+- **ステータス**: 一部実装 — 機能Aのうち「複数語 AND」と引用符は 2026-11-19 に実装（`src/lib/searchQuery.ts`、Rust 側は `split_search_terms` / `build_terms`）。`search_in_folders` の引数は `query_forms` から語ごとの `query_terms: string[][]` に変わった。`ext:` などの演算子・機能B・機能Cは未着手
 - **前提**: [2026-08-20-folder-search-design.md](2026-08-20-folder-search-design.md) の Phase 1・2 実装済み
 
 ## 背景 / 目的

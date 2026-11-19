@@ -214,6 +214,9 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">検索</h2>
         <H3>キーワード検索</H3>
         <P>ヘッダーの検索バーにキーワードを入力すると、<Strong>タイトル・URL・メモ</Strong> を対象に絞り込まれます。</P>
+        <H3>複数のキーワード</H3>
+        <P>スペース（全角でも可）で区切ると、<Strong>すべてのキーワードを含むもの</Strong> だけに絞り込まれます（AND 検索）。順番は問わず、キーワードごとに別の項目で一致してもかまいません（<Strong>github actions</Strong> で「Actions · GitHub」、<Strong>見積 2026</Strong> で「2026_見積書.xlsx」）。</P>
+        <P>スペースを含む語をそのまま探したいときは <Strong>&quot;release notes&quot;</Strong> のように引用符で囲みます。</P>
         <H3>入力モードを気にせず検索</H3>
         <P>検索は <Strong>ひらがな・カタカナ・全角・半角</Strong> の違いを無視して一致します。さらに <Strong>ローマ字のまま打っても、かな表記のブックマークが見つかります</Strong>（<Strong>pasokon</Strong> で「パソコン」）。逆にかなで打ったときも英字表記が見つかります（<Strong>あまぞん</Strong> で「Amazon」）。検索のたびにIMEを切り替え直す必要はありません。</P>
         <Ul>
@@ -253,7 +256,7 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <H3>タグで絞り込む</H3>
         <P>ヘッダー下部のタグ一覧からタグをクリックすると、そのタグを持つブックマークだけが表示されます。</P>
         <H3>複数タグの同時選択</H3>
-        <P><Kbd>Ctrl</Kbd> + クリック（Macは <Kbd>⌘</Kbd> + クリック）で複数のタグを同時に選択できます。選択した<Strong>いずれか</Strong>のタグを持つブックマークが OR 絞り込みで表示されます。</P>
+        <P><Kbd>Ctrl</Kbd> + クリック（Macは <Kbd>⌘</Kbd> + クリック）で複数のタグを同時に選択できます。2つ以上選ぶと横に <Strong>Match Any / All</Strong> が出ます。<Strong>Any</Strong>（初期値）は選んだタグの<Strong>いずれか</Strong>を持つもの、<Strong>All</Strong> は<Strong>すべて</Strong>を持つものだけを表示します。選んだ方は次回も引き継がれます。</P>
         <H3>フィルターの解除</H3>
         <Ul>
           <Li>個別タグ: 選択中のタグをもう一度クリックで解除。</Li>
@@ -367,7 +370,8 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>HTML形式では失われる情報も含め、アプリのすべてのデータを <Strong>JSON</Strong> ファイルで保存・復元できます。PCの移行や定期バックアップに適しています。</P>
         <Ul>
           <Li><Strong>Backup</Strong> — ブックマーク（タグ・メモ・ショートカット・並び順を含む）、タグ、タグルール、設定をまとめてJSONファイルに書き出します。</Li>
-          <Li><Strong>Restore</Strong> — JSONバックアップファイルを選択して取り込みます。<Strong>現在のすべてのデータが置き換えられます</Strong>（この操作は取り消せません）。実行前に確認ダイアログが表示されます。</Li>
+          <Li><Strong>Restore</Strong> — JSONバックアップファイルを選択して取り込みます。<Strong>現在のすべてのデータが置き換えられます</Strong>。実行前に確認ダイアログが表示されます。</Li>
+          <Li><Strong>自動バックアップ</Strong> — 1日1回と、Restore・Delete All の直前に、同じ形式のJSONが自動で保存されます（日次は7世代、ほかは各5世代）。<Strong>Open automatic backups folder</Strong> で保存先を開き、Restore でそのファイルを選べば元に戻せます。</Li>
         </Ul>
         <H3>サイトアイコン（ファビコン）</H3>
         <P>Web ブックマークを追加すると、そのサイト自身からアイコンを1回だけ取得してアプリ内に保存します。以降の表示は完全にローカルなので、オフラインでもアイコンが出ます。アイコン取得のために外部のサービスを経由することはありません。</P>
@@ -377,11 +381,12 @@ function ContentJA({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <Ul>
           <Li><Strong>データベース</Strong>（ブックマーク・タグ・タグルール・設定） — <Strong>%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db</Strong></Li>
           <Li><Strong>テーマ・検索履歴・一覧キャッシュ</Strong> — <Strong>%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\EBWebView\</Strong>（WebView2のプロファイル）</Li>
+          <Li><Strong>自動バックアップ</Strong> — <Strong>%APPDATA%\com.yukihirosakuda.bookmarks\backups\</Strong></Li>
           <Li><Strong>ログ</Strong> — <Strong>%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\</Strong></Li>
         </Ul>
         <P><Strong>Microsoft Store 版とインストーラー版（.exe / .msi）は同じフォルダを使います</Strong>ので、どちらに入れ替えてもブックマークはそのまま引き継がれます。アンインストールしてもこれらのフォルダは残るため、完全に消したい場合は手動で削除してください。別のPCへ移す場合は上の <Strong>Backup</Strong> でJSONを書き出し、移行先で <Strong>Restore</Strong> してください。</P>
         <H3>全件削除（Delete All）</H3>
-        <P>同じ <Strong>Settings</Strong> ダイアログの <Strong>Danger Zone</Strong> から、すべてのブックマークとタグを完全に削除できます。誤操作を防ぐため、確認入力欄に <Strong>delete all</Strong> と入力した上で確認すると実行されます。この操作は取り消せません。</P>
+        <P>同じ <Strong>Settings</Strong> ダイアログの <Strong>Danger Zone</Strong> から、すべてのブックマークとタグを完全に削除できます。誤操作を防ぐため、確認入力欄に <Strong>delete all</Strong> と入力した上で確認すると実行されます。削除前の状態は自動バックアップに保存されるので、間違えた場合は Restore で戻せます。</P>
       </section>
 
       <div className="border-t" />
@@ -576,6 +581,9 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <h2 className="text-base font-bold text-foreground border-l-2 border-blue-500 pl-2.5 mb-3">Search</h2>
         <H3>Keyword Search</H3>
         <P>Type in the search bar to filter bookmarks by <Strong>title, URL, and memo</Strong>.</P>
+        <H3>Several Keywords</H3>
+        <P>Separate keywords with spaces to show only what contains <Strong>every one of them</Strong> (AND search). Order does not matter, and each keyword may match a different field (<Strong>github actions</Strong> finds &ldquo;Actions · GitHub&rdquo;, <Strong>見積 2026</Strong> finds &ldquo;2026_見積書.xlsx&rdquo;).</P>
+        <P>To look for words side by side, put them in quotes: <Strong>&quot;release notes&quot;</Strong>.</P>
         <H3>Type in Either Script</H3>
         <P>Search ignores the difference between <Strong>hiragana, katakana, full-width and half-width</Strong> characters. It also matches <Strong>romaji you type against kana in your bookmarks</Strong> (<Strong>pasokon</Strong> finds &ldquo;パソコン&rdquo;), and kana against Latin text (<Strong>あまぞん</Strong> finds &ldquo;Amazon&rdquo;), so there is no need to switch your IME on or off between searches.</P>
         <Ul>
@@ -615,7 +623,7 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <H3>Filter by Tag</H3>
         <P>Click a tag from the list below the header to show only bookmarks with that tag.</P>
         <H3>Multi-Tag Selection</H3>
-        <P><Kbd>Ctrl</Kbd>+click (or <Kbd>⌘</Kbd>+click on Mac) to select multiple tags at once. Bookmarks matching <Strong>any</Strong> of the selected tags are shown (OR filter).</P>
+        <P><Kbd>Ctrl</Kbd>+click (or <Kbd>⌘</Kbd>+click on Mac) to select multiple tags at once. With two or more selected, <Strong>Match Any / All</Strong> appears beside them: <Strong>Any</Strong> (the default) shows bookmarks with <Strong>any</Strong> of the selected tags, <Strong>All</Strong> only those with <Strong>every</Strong> one. Your choice is remembered.</P>
         <H3>Clearing Filters</H3>
         <Ul>
           <Li>Individual tag: click the selected tag again to deselect.</Li>
@@ -729,7 +737,8 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <P>Save and restore <Strong>all</Strong> app data as a <Strong>JSON</Strong> file, including information that HTML drops. Ideal for migrating to a new PC or keeping periodic backups.</P>
         <Ul>
           <Li><Strong>Backup</Strong> — writes bookmarks (including tags, memos, shortcuts, and order), tags, tag rules, and settings to a single JSON file.</Li>
-          <Li><Strong>Restore</Strong> — pick a JSON backup file to import. This <Strong>replaces all current data</Strong> (cannot be undone). A confirmation dialog is shown first.</Li>
+          <Li><Strong>Restore</Strong> — pick a JSON backup file to import. This <Strong>replaces all current data</Strong>. A confirmation dialog is shown first.</Li>
+          <Li><Strong>Automatic backups</Strong> — the same JSON is also saved automatically once a day and right before Restore or Delete All (7 daily, 5 of each other kind). <Strong>Open automatic backups folder</Strong> shows where; pick one with Restore to go back to it.</Li>
         </Ul>
         <H3>Site Icons (Favicons)</H3>
         <P>When you add a web bookmark, its icon is fetched once from the site itself and stored in the app. Everything after that is local, so icons show up even offline. No third-party icon service is involved.</P>
@@ -739,11 +748,12 @@ function ContentEN({ registerRef }: { registerRef: (id: string) => (el: HTMLElem
         <Ul>
           <Li><Strong>Database</Strong> (bookmarks, tags, tag rules, settings) — <Strong>%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db</Strong></Li>
           <Li><Strong>Theme, search history, list cache</Strong> — <Strong>%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\EBWebView\</Strong> (WebView2 profile)</Li>
+          <Li><Strong>Automatic backups</Strong> — <Strong>%APPDATA%\com.yukihirosakuda.bookmarks\backups\</Strong></Li>
           <Li><Strong>Logs</Strong> — <Strong>%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\</Strong></Li>
         </Ul>
         <P><Strong>The Microsoft Store build and the installer build (.exe / .msi) use these same folders</Strong>, so your bookmarks carry over when you switch between them. Uninstalling does not delete these folders — remove them manually to erase everything. To move to another PC, use <Strong>Backup</Strong> above to write a JSON file and <Strong>Restore</Strong> it there.</P>
         <H3>Delete All</H3>
-        <P>The same <Strong>Settings</Strong> dialog has a <Strong>Danger Zone</Strong> that permanently deletes all bookmarks and tags. To prevent mistakes, you must type <Strong>delete all</Strong> in the confirmation field before confirming. This action cannot be undone.</P>
+        <P>The same <Strong>Settings</Strong> dialog has a <Strong>Danger Zone</Strong> that deletes all bookmarks and tags. To prevent mistakes, you must type <Strong>delete all</Strong> in the confirmation field before confirming. The data is saved to an automatic backup first, so Restore can bring it back if it was a mistake.</P>
       </section>
 
       <div className="border-t" />

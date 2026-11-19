@@ -188,3 +188,70 @@ fn add_column_if_missing(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migrate_is_idempotent_and_keeps_data() {
+        let conn = Connection::open_in_memory().unwrap();
+        migrate(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO bookmarks (id, title, url, created_at, updated_at) \
+             VALUES ('b1', 'T', 'https://example.com', 't0', 't0')",
+            [],
+        )
+        .unwrap();
+        let token: String = conn
+            .query_row("SELECT api_token FROM user_settings WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+
+        // Every launch runs the migrations again.
+        migrate(&conn).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM bookmarks", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+        let token_again: String = conn
+            .query_row("SELECT api_token FROM user_settings WHERE id = 1", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(token, token_again, "the extension's pairing must survive a restart");
+    }
+
+    #[test]
+    fn migrate_upgrades_the_original_schema() {
+        // The tables as the first release created them, before any of the
+        // columns added since.
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE bookmarks (id TEXT PRIMARY KEY, kind TEXT NOT NULL DEFAULT 'url', \
+               title TEXT NOT NULL, url TEXT NOT NULL, favicon TEXT, \
+               is_pinned INTEGER NOT NULL DEFAULT 0, access_count INTEGER NOT NULL DEFAULT 0, \
+               custom_order INTEGER NOT NULL DEFAULT 0, memo TEXT, created_at TEXT NOT NULL, \
+               updated_at TEXT NOT NULL, last_accessed_at TEXT); \
+             CREATE TABLE tags (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, \
+               created_at TEXT NOT NULL, updated_at TEXT NOT NULL); \
+             CREATE TABLE user_settings (id INTEGER PRIMARY KEY CHECK (id = 1), \
+               display_mode TEXT NOT NULL DEFAULT 'list', list_columns INTEGER NOT NULL DEFAULT 4, \
+               sort_option TEXT NOT NULL DEFAULT 'title', sort_order TEXT NOT NULL DEFAULT 'asc'); \
+             INSERT INTO user_settings (id) VALUES (1);",
+        )
+        .unwrap();
+
+        migrate(&conn).unwrap();
+
+        let (summon, folder_search): (String, i64) = conn
+            .query_row(
+                "SELECT summon_shortcut, folder_search_enabled FROM user_settings WHERE id = 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(summon, "CmdOrCtrl+Alt+Space");
+        assert_eq!(folder_search, 1);
+        conn.execute("UPDATE bookmarks SET shortcut = NULL", []).unwrap();
+        conn.execute("UPDATE tags SET color = NULL, sort_order = 0", []).unwrap();
+    }
+}

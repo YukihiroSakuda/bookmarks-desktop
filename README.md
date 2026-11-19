@@ -19,7 +19,8 @@ All data lives on your own PC — nothing is sent to a server operated by the de
 | ---- | -------- |
 | Database (bookmarks, tags, tag rules, settings) | `%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db`<br>(= `C:\Users\<user>\AppData\Roaming\com.yukihirosakuda.bookmarks\`) |
 | WebView2 profile — theme, search history, list cache (localStorage) | `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\EBWebView\` |
-| Logs | `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\` |
+| Automatic backups (JSON, restorable with **Restore**) | `%APPDATA%\com.yukihirosakuda.bookmarks\backups\` |
+| Logs (a few MB at most) | `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\` |
 | File shortcuts (only when switched on) | `%USERPROFILE%\Bookmarks\` — changeable in Settings |
 
 **The Microsoft Store build and the GitHub Releases build share these same folders**, so your bookmarks carry over when you switch between them. (The Store build is a plain MSIX package with only the `runFullTrust` capability and no Package Support Framework, so Windows does not redirect its `%APPDATA%` writes into the package container.) Only the executable differs:
@@ -43,6 +44,7 @@ Because the data folders sit outside the package, **uninstalling either build le
 - Custom reordering via drag and drop
 - List view (1–4 columns)
 - Bulk delete all bookmarks and tags (with a `delete all` confirmation prompt)
+- Automatic backups: a JSON snapshot once a day and right before **Restore** or **Delete all** (7 daily, 5 of each other kind), in the same format as **Backup** — so a mistaken restore or delete can be undone with **Restore**. **Settings → Data → Open automatic backups folder** shows them
 
 ### Desktop path bookmarks
 
@@ -83,7 +85,7 @@ Only files this app created are ever deleted — they are tracked in a manifest 
 ### Tag management
 
 - Add, edit, and delete tags
-- Filter by tag (single or multiple selection)
+- Filter by tag (single or multiple selection with Ctrl+click). With two or more selected, **Match Any / All** chooses between bookmarks with any of them (default) and only those with every one; the choice is remembered
 - Per-tag color (8 presets, blue by default) — applied in the filter bar and on bookmark cards
 - Manual tag order via drag and drop in Tag Manager (the filter bar follows it)
 - Tag rules: automatic tagging based on URL/title patterns
@@ -91,6 +93,7 @@ Only files this app created are ever deleted — they are tracked in a manifest 
 ### Search
 
 - Real-time search across title, URL, and memo
+- Several words separated by spaces must all match (AND), in any order and in any field — `github actions` finds "Actions · GitHub". Quotes keep a phrase together: `"release notes"`. Folder search follows the same rule
 - Search history (up to 10 entries, stored in localStorage)
 - Just start typing to focus the search bar and begin typing (no need to press `/`; disabled while an input is focused or when modifier-key combos are used), `Esc` closes the modal
 - Search reaches **inside the folders you have bookmarked** — matching file and folder names appear under "In your folders", grouped by the bookmark they came from. Click to open, or open the containing folder
@@ -101,7 +104,7 @@ Only files this app created are ever deleted — they are tracked in a manifest 
 ### Import / export
 
 - Export to an HTML file
-- Import an HTML file exported from a browser (with duplicate detection)
+- Import an HTML file exported from a browser. URLs already saved — or filed in several browser folders — are imported once; the original "date added" is kept; tag rules apply as they do to bookmarks added by hand; bookmarklets (`javascript:`) and browser-internal queries are skipped
 
 ### Browser extension
 

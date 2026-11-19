@@ -1,7 +1,13 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { BookmarkUI, SortOption, SortOrder } from "@/types/bookmark";
 import { createBookmarkComparator } from "@/lib/bookmarkScore";
-import { buildQueryForms, matchesAnyForm, normalizeForSearch } from "@/lib/searchNormalize";
+import { createBookmarkFilter, searchableFields } from "@/lib/bookmarkFilter";
+import {
+  DEFAULT_TAG_MATCH_MODE,
+  TagMatchMode,
+  readStoredTagMatchMode,
+  storeTagMatchMode,
+} from "@/lib/tagMatchMode";
 
 interface UseBookmarkFilteringOptions {
   bookmarks: BookmarkUI[];
@@ -18,6 +24,15 @@ export function useBookmarkFiltering({
 }: UseBookmarkFilteringOptions) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Read after mount: localStorage does not exist in the static prerender.
+  const [tagMatchMode, setTagMatchModeState] = useState<TagMatchMode>(DEFAULT_TAG_MATCH_MODE);
+  useEffect(() => {
+    setTagMatchModeState(readStoredTagMatchMode());
+  }, []);
+  const setTagMatchMode = useCallback((mode: TagMatchMode) => {
+    setTagMatchModeState(mode);
+    storeTagMatchMode(mode);
+  }, []);
 
   const handleTagClick = useCallback(
     (tag: string, ctrlKey: boolean = false) => {
@@ -44,28 +59,15 @@ export function useBookmarkFiltering({
   // bookmark to the same result it had a moment ago.
   const searchableBookmarks = useMemo(
     () =>
-      bookmarks.map((bookmark) => ({
-        bookmark,
-        title: normalizeForSearch(bookmark.title),
-        url: normalizeForSearch(bookmark.url),
-        memo: normalizeForSearch(bookmark.memo ?? ""),
-      })),
+      bookmarks.map((bookmark) => ({ bookmark, fields: searchableFields(bookmark) })),
     [bookmarks]
   );
 
   const filteredAndSortedBookmarks = useMemo(() => {
-    const queryForms = buildQueryForms(searchQuery);
+    // Every term must appear somewhere in title, URL or memo (see searchQuery.ts).
+    const isShown = createBookmarkFilter(searchQuery, selectedTags, tagMatchMode);
     const filtered = searchableBookmarks
-      .filter(({ bookmark, title, url, memo }) => {
-        const matchesSearch =
-          matchesAnyForm(title, queryForms) ||
-          matchesAnyForm(url, queryForms) ||
-          matchesAnyForm(memo, queryForms);
-        const matchesTags =
-          selectedTags.length === 0 ||
-          selectedTags.some((tag) => bookmark.tags.includes(tag));
-        return matchesSearch && matchesTags;
-      })
+      .filter(({ bookmark, fields }) => isShown(fields, bookmark.tags))
       .map(({ bookmark }) => bookmark);
 
     let sorted;
@@ -81,13 +83,23 @@ export function useBookmarkFiltering({
       pinned: sorted.filter((b) => b.isPinned),
       unpinned: sorted.filter((b) => !b.isPinned),
     };
-  }, [searchableBookmarks, searchQuery, selectedTags, currentSort, currentOrder, isOrderingMode]);
+  }, [
+    searchableBookmarks,
+    searchQuery,
+    selectedTags,
+    tagMatchMode,
+    currentSort,
+    currentOrder,
+    isOrderingMode,
+  ]);
 
   return {
     searchQuery,
     setSearchQuery,
     selectedTags,
     setSelectedTags,
+    tagMatchMode,
+    setTagMatchMode,
     handleTagClick,
     filteredAndSortedBookmarks,
   };

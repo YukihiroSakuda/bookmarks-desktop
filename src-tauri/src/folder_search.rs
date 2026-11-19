@@ -127,7 +127,7 @@ pub(crate) struct Target {
 #[tauri::command(async)]
 pub fn search_in_folders(
     query: String,
-    query_forms: Vec<String>,
+    query_terms: Vec<Vec<String>>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     // Read the targets and release the DB lock immediately — the walk below can
@@ -136,31 +136,86 @@ pub fn search_in_folders(
         let conn = state.conn.lock().map_err(|e| e.to_string())?;
         collect_targets(&conn)?
     };
-    search_targets(&query, query_forms, targets)
+    search_targets(&query, query_terms, targets)
 }
 
-/// Walks `targets` for entries whose name contains `query`. Shared by the
-/// in-app search above and the MCP server's `search_files` tool, which runs in
-/// its own process with its own read-only connection (and passes no
-/// `query_forms`, so the raw query is normalized here).
+/// The terms in a search query: whitespace (the full-width space included)
+/// separates them, and text in double quotes stays one term; an unclosed quote
+/// runs to the end. A port of `splitSearchTerms` in `src/lib/searchQuery.ts` —
+/// keep the two in step.
+pub(crate) fn split_search_terms(raw: &str) -> Vec<String> {
+    fn flush(current: &mut String, terms: &mut Vec<String>) {
+        let term = current.split_whitespace().collect::<Vec<_>>().join(" ");
+        if !term.is_empty() {
+            terms.push(term);
+        }
+        current.clear();
+    }
+
+    let mut terms = Vec::new();
+    let mut current = String::new();
+    let mut quoted = false;
+    for c in raw.chars() {
+        if matches!(c, '"' | '＂' | '“' | '”') {
+            flush(&mut current, &mut terms);
+            quoted = !quoted;
+        } else if !quoted && c.is_whitespace() {
+            flush(&mut current, &mut terms);
+        } else {
+            current.push(c);
+        }
+    }
+    flush(&mut current, &mut terms);
+    terms
+}
+
+/// The terms to match, each with its search forms.
+///
+/// The frontend (`buildQueryTerms` in `src/lib/searchQuery.ts`) already splits
+/// the query and normalizes and romaji/katakana-converts each term — a plain
+/// form and, typically, a hiragana form so a romaji query like "pasokon" can
+/// still match a file named with katakana. Without them, the raw query is split
+/// and normalized here, one plain form per term. Empty forms are dropped: an
+/// empty string is contained in every name.
+fn build_terms(query: &str, query_terms: Vec<Vec<String>>) -> Vec<Vec<String>> {
+    if query_terms.is_empty() {
+        split_search_terms(query)
+            .iter()
+            .map(|term| vec![normalize_for_search(term)])
+            .collect()
+    } else {
+        query_terms
+            .into_iter()
+            .map(|forms| forms.into_iter().filter(|f| !f.is_empty()).collect::<Vec<_>>())
+            .filter(|forms| !forms.is_empty())
+            .collect()
+    }
+}
+
+/// Whether a (normalized) name contains every term — at least one of each
+/// term's forms.
+fn name_matches(normalized_name: &str, terms: &[Vec<String>]) -> bool {
+    terms
+        .iter()
+        .all(|forms| forms.iter().any(|form| normalized_name.contains(form.as_str())))
+}
+
+/// Walks `targets` for entries whose name contains every term of `query`.
+/// Shared by the in-app search above and the MCP server's `search_files` tool,
+/// which runs in its own process with its own read-only connection (and passes
+/// no `query_terms`, so the raw query is split and normalized here).
 pub(crate) fn search_targets(
     query: &str,
-    query_forms: Vec<String>,
+    query_terms: Vec<Vec<String>>,
     targets: Vec<Target>,
 ) -> Result<Value, String> {
     if query.trim().chars().count() < MIN_QUERY_CHARS {
         return Ok(empty_result(query, false));
     }
-    // The frontend (`buildQueryForms` in `src/lib/searchNormalize.ts`) already
-    // normalizes and romaji/katakana-converts these — a plain form and,
-    // typically, a hiragana form so a romaji query like "pasokon" can still
-    // match a file named with katakana. Falls back to the raw query normalized
-    // here in case the caller ever sends an empty list.
-    let needles = if query_forms.is_empty() {
-        vec![normalize_for_search(query.trim())]
-    } else {
-        query_forms
-    };
+    let terms = build_terms(query, query_terms);
+    if terms.is_empty() {
+        return Ok(empty_result(query, false));
+    }
 
     let ticket = SEARCH_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let limits = Limits::default();
@@ -171,7 +226,7 @@ pub(crate) fn search_targets(
         .name("folder-search".into())
         .spawn(move || {
             enter_background_priority();
-            let result = walk_targets(&targets, &needles, ticket, limits);
+            let result = walk_targets(&targets, &terms, ticket, limits);
             leave_background_priority();
             result
         })
@@ -256,7 +311,7 @@ fn is_superseded(ticket: u64) -> bool {
 
 fn walk_targets(
     targets: &[Target],
-    needles: &[String],
+    terms: &[Vec<String>],
     ticket: u64,
     limits: Limits,
 ) -> (Vec<Group>, Vec<Skipped>) {
@@ -292,7 +347,7 @@ fn walk_targets(
             continue;
         }
 
-        let group = walk_one(target, &root, needles, ticket, limits);
+        let group = walk_one(target, &root, terms, ticket, limits);
         if group.match_count > 0 || group.truncated {
             groups.push(group);
         }
@@ -304,7 +359,7 @@ fn walk_targets(
 fn walk_one(
     target: &Target,
     root: &Path,
-    needles: &[String],
+    terms: &[Vec<String>],
     ticket: u64,
     limits: Limits,
 ) -> Group {
@@ -358,7 +413,7 @@ fn walk_one(
             let is_dir = metadata.is_dir();
 
             let normalized_name = normalize_for_search(&name);
-            if needles.iter().any(|n| normalized_name.contains(n.as_str())) {
+            if name_matches(&normalized_name, terms) {
                 group.match_count += 1;
                 if group.matches.len() < limits.max_matches_per_group {
                     let full = entry.path();
@@ -555,8 +610,68 @@ mod tests {
         }
     }
 
-    fn run(root: &Path, needle: &str, limits: Limits) -> Group {
-        walk_one(&target(root), root, &[needle.to_string()], NEVER_CANCELLED, limits)
+    /// Walk with each whitespace-separated word of `query` as one term.
+    fn run(root: &Path, query: &str, limits: Limits) -> Group {
+        let terms: Vec<Vec<String>> = query
+            .split_whitespace()
+            .map(|term| vec![term.to_string()])
+            .collect();
+        walk_one(&target(root), root, &terms, NEVER_CANCELLED, limits)
+    }
+
+    #[test]
+    fn every_term_must_appear_in_the_name_in_any_order() {
+        let tree = TempTree::new();
+        tree.file("2026_見積書.xlsx");
+        tree.file("見積書_2025.xlsx");
+        tree.file("2026_請求書.xlsx");
+
+        let group = run(tree.path(), "見積 2026", Limits::default());
+
+        assert_eq!(names(&group), vec!["2026_見積書.xlsx".to_string()]);
+    }
+
+    #[test]
+    fn any_form_of_a_term_satisfies_it() {
+        let tree = TempTree::new();
+        tree.file("パソコン_2026.txt");
+        tree.file("パソコン_2025.txt");
+
+        // A romaji term arrives as its plain and hiragana forms.
+        let terms = vec![
+            vec!["pasokon".to_string(), "ぱそこん".to_string()],
+            vec!["2026".to_string()],
+        ];
+        let group = walk_one(&target(tree.path()), tree.path(), &terms, NEVER_CANCELLED, Limits::default());
+
+        assert_eq!(names(&group), vec!["パソコン_2026.txt".to_string()]);
+    }
+
+    #[test]
+    fn split_search_terms_matches_the_frontend() {
+        assert_eq!(split_search_terms("見積　2026  final"), vec!["見積", "2026", "final"]);
+        assert_eq!(
+            split_search_terms("\"release  notes\" 2026"),
+            vec!["release notes", "2026"]
+        );
+        assert_eq!(split_search_terms("docs “getting started"), vec!["docs", "getting started"]);
+        assert!(split_search_terms("\"\"  ").is_empty());
+    }
+
+    #[test]
+    fn without_terms_the_raw_query_is_split_and_normalized_here() {
+        // The MCP server's search_files passes only the raw query.
+        assert_eq!(
+            build_terms("見積 ＡＢＣ", Vec::new()),
+            vec![vec!["見積".to_string()], vec!["abc".to_string()]]
+        );
+    }
+
+    #[test]
+    fn empty_forms_never_match_everything() {
+        let terms = build_terms("x", vec![vec!["".to_string()], vec!["a".to_string(), "".to_string()]]);
+        assert_eq!(terms, vec![vec!["a".to_string()]]);
+        assert!(build_terms("x", vec![vec!["".to_string()]]).is_empty());
     }
 
     fn names(group: &Group) -> Vec<String> {
