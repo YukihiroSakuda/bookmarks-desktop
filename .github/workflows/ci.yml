@@ -14,6 +14,12 @@ jobs:
   check:
     # The Rust crate's dependencies are declared for Windows only.
     runs-on: windows-latest
+    # Windows runners default to PowerShell, where a multi-line step only fails
+    # if its *last* command does — a failed `npm ci` followed by a successful
+    # one sailed through. Actions runs bash with `-e`, so any failure stops.
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - uses: actions/checkout@v4

@@ -32,7 +32,10 @@ jobs:
 
       # The extension is built and zipped into the app during `tauri build`
       # (beforeBuildCommand), so its dependencies are needed too.
+      # bash (run with -e): under the default PowerShell only the last line's
+      # failure fails the step.
       - name: Install Node dependencies
+        shell: bash
         run: |
           npm ci
           npm ci --prefix extension
