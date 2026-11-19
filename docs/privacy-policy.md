@@ -1,6 +1,6 @@
 # Privacy Policy — Bookmarks & Tags
 
-**Last updated: 2026-11-18**
+**Last updated: 2026-11-20**
 
 Bookmarks & Tags ("the app") is a bookmark manager developed by Yukihiro Sakuda. This policy explains what data the app handles and how.
 
@@ -21,6 +21,11 @@ The app stores the following information, all of which you enter yourself:
 All data is stored locally in a SQLite database (`bookmarks.db`) on your own computer. It is never uploaded to any server operated by the developer or any third party.
 
 The database file is located at `%APPDATA%\com.yukihirosakuda.bookmarks\bookmarks.db`, and display preferences such as theme and search history are kept in the app's local WebView2 profile under `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\`. The Microsoft Store version and the installer version use these same folders.
+
+Two more kinds of file are kept next to them, also only on your computer:
+
+- **Automatic backups** — copies of the database's contents (bookmarks, tags, memos, tag rules, settings) as JSON files in `%APPDATA%\com.yukihirosakuda.bookmarks\backups\`, written once a day and right before you restore a backup or delete all bookmarks, so a mistake can be undone. Only the most recent ones are kept (7 daily, 5 of each other kind); older ones are deleted automatically
+- **Log files** — technical messages about the app's own operation (for example, that a backup was written or a keyboard shortcut could not be registered) in `%LOCALAPPDATA%\com.yukihirosakuda.bookmarks\logs\`, limited to a few megabytes. They can include file paths on your computer. They are never sent anywhere; they exist so that you can look at them, or choose to share them, if something goes wrong
 
 ## Connecting to the sites you bookmark
 
@@ -56,7 +61,7 @@ The companion browser extension only communicates with the local server describe
 
 ## Data retention and deletion
 
-Your data remains on your device until you delete it. You can delete individual bookmarks within the app, or remove all data by deleting the local data folders listed above. Note that uninstalling the app — including the Microsoft Store version — does not delete these folders, so delete them manually if you want to erase everything.
+Your data remains on your device until you delete it. You can delete individual bookmarks within the app, or remove all data by deleting the local data folders listed above (which include the automatic backups and logs). Deleting all bookmarks within the app first saves an automatic backup of them, so to erase everything, also delete the `backups` folder. Note that uninstalling the app — including the Microsoft Store version — does not delete these folders, so delete them manually if you want to erase everything.
 
 ## Changes to this policy
 
